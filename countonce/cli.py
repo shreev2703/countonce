@@ -95,7 +95,47 @@ def _parser() -> argparse.ArgumentParser:
     r = sub.add_parser("report", help="write a self-contained report.html for a finished run")
     r.add_argument("out_dir", type=Path, help="directory holding result.json")
     r.add_argument("--pdf", action="store_true", help="also write report.pdf (needs weasyprint)")
+
+    c = sub.add_parser("correct", help="apply split/merge/reject corrections to a finished run")
+    c.add_argument("out_dir", type=Path, help="directory holding result.json")
+    c.add_argument("--file", type=Path, required=True, help="corrections.json")
+    c.add_argument("--pairs", type=Path, help="also write consented training pairs (JSONL)")
     return p
+
+
+def _correct(args: argparse.Namespace) -> int:
+    import json
+
+    from countonce.corrections import (
+        apply_corrections,
+        export_training_pairs,
+        load_corrections,
+        write_corrected,
+        write_training_pairs_jsonl,
+    )
+    from countonce.errors import CountOnceError
+    from countonce.explain import load_result_dir
+
+    try:
+        result = load_result_dir(args.out_dir)
+        corrections = load_corrections(args.file)
+        corrected = apply_corrections(result, corrections)
+    except (FileNotFoundError, ValueError, KeyError, CountOnceError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    scale = None
+    mpath = Path(args.out_dir) / "markers.json"
+    if mpath.is_file():
+        scale = json.loads(mpath.read_text(encoding="utf-8")).get("scene_scale")
+    dest = Path(args.out_dir) / "corrected"
+    write_corrected(corrected, dest, scale)
+    print(f"correct: count {result.count} -> {corrected.count}; wrote {dest}")
+    if args.pairs:
+        jobs = {c.job_id: result for c in corrections}
+        pairs = export_training_pairs(corrections, jobs)
+        write_training_pairs_jsonl(pairs, args.pairs)
+        print(f"correct: wrote {len(pairs)} consented pairs to {args.pairs}")
+    return 0
 
 
 def _report(args: argparse.Namespace) -> int:
@@ -289,6 +329,8 @@ def main(argv: list[str] | None = None) -> int:
         return _drift(args)
     if args.cmd == "explain":
         return _explain(args)
+    if args.cmd == "correct":
+        return _correct(args)
     if args.cmd == "report":
         return _report(args)
 

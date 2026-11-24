@@ -11,6 +11,8 @@ from pathlib import Path
 from countonce.schemas import CURRENT_VERSION, MarkersV1, ResultV11
 from countonce.types import CountResult, Detection, Frame
 
+AnyResult = CountResult | ResultV11  # both expose the fields the markers/CSV writers read
+
 
 def to_result(result: CountResult) -> ResultV11:
     data = result.to_dict()
@@ -19,7 +21,7 @@ def to_result(result: CountResult) -> ResultV11:
     return ResultV11.model_validate(data)
 
 
-def to_markers(result: CountResult, scene_scale: float | None = None) -> MarkersV1:
+def to_markers(result: AnyResult, scene_scale: float | None = None) -> MarkersV1:
     markers = [
         {
             "id": i.id,
@@ -54,11 +56,11 @@ def write_result_json(result: CountResult, path: Path) -> Path:
     return _write_json(Path(path), to_result(result))
 
 
-def write_markers_json(result: CountResult, path: Path, scene_scale: float | None = None) -> Path:
+def write_markers_json(result: AnyResult, path: Path, scene_scale: float | None = None) -> Path:
     return _write_json(Path(path), to_markers(result, scene_scale))
 
 
-def write_counts_csv(result: CountResult, path: Path) -> Path:
+def write_counts_csv(result: AnyResult, path: Path) -> Path:
     """One row per frame: detections by status, plus a final ``total`` row.
 
     The ``new`` column sums to the final count (each instance is counted in
@@ -66,7 +68,7 @@ def write_counts_csv(result: CountResult, path: Path) -> Path:
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    per_frame: dict[int, Counter[str]] = {fid: Counter() for fid in result.per_frame_counts}
+    per_frame: dict[int, Counter[str]] = {int(fid): Counter() for fid in result.per_frame_counts}
     for det_id, status in result.detection_status.items():
         per_frame.setdefault(int(det_id.split(":")[0]), Counter())[status] += 1
     cols = ("new", "duplicate", "rejected")

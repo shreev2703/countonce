@@ -22,6 +22,8 @@ class ErrorCode(StrEnum):
     ERR_TOO_FEW_FRAMES = "ERR_TOO_FEW_FRAMES"
     ERR_NO_RECON = "ERR_NO_RECON"
     ERR_NO_OVERLAP = "ERR_NO_OVERLAP"
+    ERR_CANNOT_LINK = "ERR_CANNOT_LINK"
+    ERR_INVALID_CORRECTION = "ERR_INVALID_CORRECTION"
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,14 @@ ERROR_INFO: dict[ErrorCode, ErrorInfo] = {
     ErrorCode.ERR_NO_OVERLAP: ErrorInfo(
         False, "The views do not overlap. Capture the scene so neighbouring views share content."
     ),
+    ErrorCode.ERR_CANNOT_LINK: ErrorInfo(
+        False,
+        "Those detections appear in the same photo, so they must be different objects and "
+        "cannot be merged.",
+    ),
+    ErrorCode.ERR_INVALID_CORRECTION: ErrorInfo(
+        False, "The correction refers to detections that do not exist or cannot be changed."
+    ),
 }
 
 
@@ -98,6 +108,12 @@ class CountOnceError(RuntimeError):
 
 class MediaError(CountOnceError):
     """A permanent user/media error raised by ingest sanitization."""
+
+
+class CorrectionError(CountOnceError):
+    """A user correction was refused (cannot-link violation or invalid reference)."""
+
+    code = ErrorCode.ERR_INVALID_CORRECTION
 
 
 class GpuOomError(CountOnceError):

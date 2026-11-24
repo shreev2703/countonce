@@ -265,3 +265,10 @@ One entry per decision: date, what the plan said, what was done, why.
 - The real-scene (GPU) half of `configs/golden.yaml` is empty: no datasets are on disk, so no scenes or hashes were invented. `bench.golden run` without `--cpu-synthetic` refuses unpinned scenes; `freeze` pins them. `configs/golden_gpu_baseline.json` does not exist yet (`TODO: fill from results`), so `golden-gpu.yml` fails until the owner adds it.
 - CPU mode writes `results/golden/<sha>-cpu.json` (suffix added to keep it apart from GPU results). Hosted CI compares to `configs/golden_cpu_baseline.json` with latency ignored (`--tol latency_s=off`). Association F1 is only defined for synthetic scenes (real scenes have counts only).
 - pytest on this box lacks matplotlib/torch/cv2 so 6 unrelated tests fail and 5 modules fail collection; not caused by this task.
+
+## Correction tools
+- `apply_corrections` takes and returns the persisted `ResultV11` (not the in-memory `CountResult` dataclass): corrections arrive after the job finished and only `result.json` exists. `corrections_applied` is stored in `result.config` (the provenance dict). Schema version is unchanged.
+- Idempotence uses a content key (job id + action + sorted detection ids); already-recorded keys are skipped. Interval low/high shift by the count change (clamped at 0), method unchanged: not re-calibrated.
+- Split with several source instances puts all moved detections in one new instance; splitting an instance's entire membership is refused (`ERR_INVALID_CORRECTION`). Merge of detections already in one instance is a no-op. Cannot-link violations raise `CorrectionError` with `ERR_CANNOT_LINK`.
+- Merge hard positives are all cross pairs between the two instances' members; Split hard negatives are moved-vs-remaining members. Pass the ORIGINAL results to `export_training_pairs`. Corrections whose job id has no result are skipped. CLI maps every job id in the file to the one `out_dir` result.
+- Tests ran with `~/vggtProject/.venv` (project `.venv` lacks torch/matplotlib).
