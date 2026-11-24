@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "ScenePrediction": {
+      "additionalProperties": false,
+      "properties": {
+        "assignments": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "detection id -> predicted instance label",
+          "title": "Assignments"
+        },
+        "count": {
+          "minimum": 0,
+          "title": "Count",
+          "type": "number"
+        },
+        "interval": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interval"
+        },
+        "scene_id": {
+          "minLength": 1,
+          "title": "Scene Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scene_id",
+        "count"
+      ],
+      "title": "ScenePrediction",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "default": "countonce",
+      "description": "countonce | baseline | vlm | other",
+      "title": "Kind",
+      "type": "string"
+    },
+    "method": {
+      "minLength": 1,
+      "title": "Method",
+      "type": "string"
+    },
+    "scenes": {
+      "items": {
+        "$ref": "#/$defs/ScenePrediction"
+      },
+      "minItems": 1,
+      "title": "Scenes",
+      "type": "array"
+    },
+    "split": {
+      "description": "split the scenes belong to, e.g. 'test'",
+      "minLength": 1,
+      "title": "Split",
+      "type": "string"
+    }
+  },
+  "required": [
+    "method",
+    "split",
+    "scenes"
+  ],
+  "title": "Predictions",
+  "type": "object"
+}

@@ -275,3 +275,7 @@ One entry per decision: date, what the plan said, what was done, why.
 
 ## Negative prompts (natural-language prompts)
 - Suppression runs the negative phrases as a second detector call and matches boxes by IoU >= 0.5 (same frame) rather than adding tokens to one caption, because `Detection` carries only the max-token score. Works for any detector whose scores depend on the caption; opt-in via `supports_negatives` (GroundingDINO only). `Config.negative_margin` default 0.0, untuned. Detectors without the flag keep the original prompt and get a `negative_prompts_ignored` warning. `Config.negative_prompts=False` sends the raw prompt untouched (ablation row).
+
+## Bench evaluator / leaderboard
+- GT lives in `bench/gt/<split>.json` (`{"split", "scenes": {id: {"count", "instances"?}}}`) or any path via `--gt`; no GT files are committed. "Frozen" means `bench/splits.json` exists, names the split, and predictions cover exactly its scenes; with no splits file, the leaderboard refuses every row.
+- Assignments are `detection id -> label`; F1 is pairwise over detections shared with GT, per-scene mean with bootstrap CI.
