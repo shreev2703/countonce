@@ -28,6 +28,13 @@ recon = [
 mcp = [
     "mcp>=1.0",
 ]
+test = [
+    "matplotlib",
+    "scipy",
+    "pyyaml",
+    "opencv-python-headless",
+    "pillow",
+]
 dev = [
     "ruff>=0.5",
     "pytest>=8",
