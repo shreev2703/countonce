@@ -82,3 +82,19 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   (a separate low-privilege user in its own WSL2 distro, restricted to this repo) is yours to do, and so is choosing the 5 real golden
   scenes after captures exist.
 - **Track J (Parquet/DuckDB/WebDataset/DVC):** `pyarrow` and `duckdb` are still missing, so it stays unqueued (see the fourth audit).
+
+## 2026-11-24: Seventh tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state: all 54 earlier overnight tasks are checked. `pytest` passes 477 tests (2 skipped) and `ruff check .` is clean in
+  `~/vggtProject/.venv`. A countonce `.venv` now exists (uv, **Python 3.12.3**, dev extra only). In it, 5 test modules fail to collect
+  (matplotlib/torch missing) and `mypy countonce` reports 65 errors. Both are queued as fixes. Human items: decide whether the venv should be
+  3.11 to match CI (`setup-python 3.11`), then `uv pip install -e .[dev,recon,mcp]` (torch for `sm_120` needs the CUDA 12.8+ wheel index).
+- **SAM/SAM2 weights** for the queued mask producer: download a checkpoint (e.g. `sam2_hiera_small.pt`) on a networked session and set its path
+  in config. The queued task builds and tests only the box-fill/fake producer.
+- **Human baseline study (PLAN §9.3 item 10):** the queued task builds the count sheets and the scoring harness only. Recruiting 3–5
+  participants, running the timed sessions, and collecting the CSV need you, and they need real captures with hand counts first.
+- **Model registry promotion on real data:** the promotion gate will be tested on synthetic/fake checkpoints. A real promotion needs a trained v3
+  checkpoint (see the fourth audit) and the frozen real test split.
+- **Still unqueued (dependencies or approvals missing):** the web API/DB/queue/worker and load test (fastapi/sqlalchemy/Postgres plus mockup
+  approval); Track J Parquet/DuckDB/WebDataset/DVC (pyarrow/duckdb); OpenTelemetry (needs the API and an exporter account); Triton kernel and
+  FP8/NVFP4 (interactive GPU); VGGT-Ω/VGG-T³/CountGD++ backends (gated weights); OneScene-Bench, RGBD-VideoCount and VideoCount loaders plus the
+  C-DOG/CountVid/DG-Net baselines (downloads); HF Space/model/dataset releases (needs results and your accounts).
