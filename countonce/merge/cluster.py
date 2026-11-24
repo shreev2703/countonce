@@ -8,22 +8,15 @@ detections from the same frame are never merged, even transitively.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 import numpy as np
 
-from countonce.types import Instance, LiftedDetection, MatchEvidence
+from countonce.merge.base import ClusterResult
+from countonce.types import Frame, Instance, LiftedDetection, MatchEvidence, Recon
 
 DEFAULT_K = 0.5
-
-
-@dataclass
-class ClusterResult:
-    instances: list[Instance]
-    detection_status: dict[str, str] = field(default_factory=dict)  # new/duplicate/rejected
-    reject_reasons: dict[str, str] = field(default_factory=dict)
-    evidence: list[MatchEvidence] = field(default_factory=list)
 
 
 def _evidence(a, b, dist, k, merged, reason) -> MatchEvidence:
@@ -68,7 +61,10 @@ def cluster_detections(lifted: Sequence[LiftedDetection], k: float = DEFAULT_K) 
     diff = np.linalg.norm(xyz[:, None, :] - xyz[None, :, :], axis=-1)
     norm = diff / ((sizes[:, None] + sizes[None, :]) / 2.0)
     ii, jj = np.where(np.triu(norm < k, 1))
-    order = sorted(zip(ii.tolist(), jj.tolist(), strict=True), key=lambda p: (norm[p], p))
+    def tie_key(p: tuple[int, int]):  # order-independent: distance, then detection ids
+        return (norm[p], *sorted((ok[p[0]].det.id, ok[p[1]].det.id)))
+
+    order = sorted(zip(ii.tolist(), jj.tolist(), strict=True), key=tie_key)
 
     parent = list(range(n))
     cluster_frames: list[set[int]] = [{f} for f in frames]
@@ -117,7 +113,23 @@ def cluster_detections(lifted: Sequence[LiftedDetection], k: float = DEFAULT_K) 
                 possibly_moving=any(m.possibly_moving for m in members),
             )
         )
-        best = max(members, key=lambda m: (m.lift_conf, m.det.score))
+        best = max(members, key=lambda m: (m.lift_conf, m.det.score, m.det.id))
         for m in members:
             res.detection_status[m.det.id] = "new" if m is best else "duplicate"
     return res
+
+
+@dataclass
+class V1Associator:
+    """``Associator`` wrapper around :func:`cluster_detections` (geometry only; ignores recon)."""
+
+    k: float = DEFAULT_K
+    name: str = "v1"
+
+    def associate(
+        self,
+        lifted: Sequence[LiftedDetection],
+        recon: Recon | None = None,
+        frames: Mapping[int, Frame] | None = None,
+    ) -> ClusterResult:
+        return cluster_detections(lifted, k=self.k)

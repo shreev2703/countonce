@@ -13,7 +13,8 @@ from countonce.export import export_all
 from countonce.ingest.frames import IMAGE_EXTS, drop_blurry, extract_frames
 from countonce.ingest.select import cap_frames, drop_near_duplicates
 from countonce.lift import compute_scene_scale, lift_detections
-from countonce.merge.cluster import cluster_detections
+from countonce.merge.cluster import V1Associator
+from countonce.merge.match import V2Associator
 from countonce.provenance import run_metadata
 from countonce.recon.base import Reconstructor
 from countonce.recon.cache import CachedReconstructor, ReconCache
@@ -89,7 +90,7 @@ def run(
 
     ``detector`` / ``reconstructor`` override the config-selected backends (tests, notebooks).
     """
-    if config.assoc != "v1":
+    if config.assoc not in ("v1", "v2"):
         raise NotImplementedError(f"associator {config.assoc!r} is not implemented yet")
     timings: dict[str, float] = {}
     t0 = time.perf_counter()
@@ -133,7 +134,8 @@ def run(
     # Lift + associate
     t = time.perf_counter()
     lifted = lift_detections(detections, recon, {f.id: f for f in frames})
-    clustered = cluster_detections(lifted, k=config.merge_k)
+    associator = V1Associator(k=config.merge_k) if config.assoc == "v1" else V2Associator()
+    clustered = associator.associate(lifted, recon, {f.id: f for f in frames})
     timings["associate"] = time.perf_counter() - t
 
     per_frame: dict[int, int] = {f.id: 0 for f in frames}

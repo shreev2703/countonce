@@ -95,10 +95,18 @@ def test_zero_detections_gives_zero_count(tmp_path):
     assert res.count == 0 and res.zero_count
 
 
+def test_end_to_end_v2_counts_each_object_once(tmp_path):
+    img_dir, script = make_scene(tmp_path)
+    cfg = Config(out_dir=tmp_path / "out", max_frames=0, assoc="v2")
+    res = run(img_dir, "widgets", cfg, detector=FakeDetector(script), reconstructor=PlaneRecon())
+    assert res.count == len(OBJECTS)
+    assert any(e.merged and e.reproj_error_px >= 0 for e in res.match_evidence)
+
+
 def test_unimplemented_backends_raise(tmp_path):
     img_dir, _ = make_scene(tmp_path)
     with pytest.raises(NotImplementedError):
-        run(img_dir, "x", Config(assoc="v2", out_dir=tmp_path / "o"))
+        run(img_dir, "x", Config(assoc="v3", out_dir=tmp_path / "o"))
 
 
 def test_config_yaml_roundtrip(tmp_path):

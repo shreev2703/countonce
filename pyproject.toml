@@ -13,6 +13,7 @@ dependencies = [
     "pydantic>=2.6",
     "pillow",
     "pyyaml",
+    "scipy",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +28,7 @@ recon = [
 dev = [
     "ruff>=0.5",
     "pytest>=8",
+    "hypothesis>=6",
     "mypy>=1.10",
 ]
 

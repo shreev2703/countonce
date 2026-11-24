@@ -66,3 +66,12 @@ One entry per decision: date, what the plan said, what was done, why.
 - Provenance (git commit/dirty, UTC time, torch/GPU, full config) is stored under `result.config`, since the strict v1 schema has no separate provenance field.
 - `pyyaml` promoted to a core dependency (Config YAML). `bench`/`synth`/`train`/`profile` subcommands are not part of this task.
 - Defaults `max_frames=32`, `score_threshold=0.3`, blur filter off: `TODO: tune on real captures`.
+
+## v2 associator (2026-11-24)
+- **Associator return type:** PLAN §8.7 writes `associate(...) -> list[Instance]`; the shared `Associator` protocol (`merge/base.py`) returns `ClusterResult` (instances plus detection status, reject reasons and match evidence), because the pipeline needs all four. `V1Associator` wraps `cluster_detections`; `ClusterResult` moved to `merge/base.py`.
+- **Sequential matching:** v2 processes frames in increasing frame id and matches each frame's detections to the running tracks (Hungarian per frame), instead of one global assignment. One detection per track per frame gives cannot-link by construction; output is independent of input ordering, but depends on frame ids.
+- **Cost and gating:** cost = reprojection error / box size (max box side; projected object size for bare points) + `appearance_weight * (1 - cos) / 2` when both features exist. Pairs above `max_reproj_norm` (0.5) or below `min_appearance_sim` are not assignable. Defaults are untuned (`TODO: tune on validation scenes`).
+- **Failed lifts** stay `rejected` in v2 (same as v1) rather than being matched by projection alone.
+- **Hallucination filter** only considers instances seen in <= 1 view; "expected" = visible (in image + depth test) in >= 2 other recon views. Modes `off|downweight|drop`, default `downweight` (conf x 0.5). Split check uses member spread (> 2 sizes) and appearance (min pairwise cosine < 0.3); defaults untuned.
+- **DINOv2:** `DinoV2Extractor` (torch.hub, lazy import) is written but never run; it needs torch and downloaded weights.
+- `Config.assoc="v2"` is wired in `run()` with default `V2Config` and no extractor.
