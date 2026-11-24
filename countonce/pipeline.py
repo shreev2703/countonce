@@ -8,6 +8,8 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
+import numpy as np
+
 from countonce.confidence import k_grid, sensitivity_range, threshold_grid
 from countonce.config import Config
 from countonce.conformal import CalibrationArtifact, interval_from_artifact, resolve_method
@@ -16,6 +18,11 @@ from countonce.detect.cache import CachedDetector, DetectionCache
 from countonce.errors import ErrorCode, MediaError
 from countonce.export import export_all
 from countonce.ingest.frames import IMAGE_EXTS, drop_blurry, extract_frames
+from countonce.ingest.privacy import (
+    PrivacyRegionDetector,
+    blur_image_file,
+    build_privacy_detector,
+)
 from countonce.ingest.sanitize import SanitizeReport, sanitize_image, validate_video
 from countonce.ingest.select import cap_frames, drop_near_duplicates
 from countonce.lift import LiftKwargs, apply_lift_region, compute_scene_scale, lift_detections
@@ -65,7 +72,24 @@ def collect_paths(
     return paths
 
 
-def make_frames(paths: list[Path], preprocess_mode: str | None = None) -> list[Frame]:
+def apply_privacy_blur(
+    paths: list[Path], config: Config, out_dir: Path, detector: PrivacyRegionDetector | None = None
+) -> tuple[list[Path], dict[Path, np.ndarray]]:
+    """Blur face/plate regions (after sanitization); returns new paths and ``path -> mask``."""
+    det = detector if detector is not None else build_privacy_detector(config.privacy_model_path)
+    new_paths, masks = [], {}
+    for p in paths:
+        dest, mask = blur_image_file(p, out_dir / "privacy", det, config.privacy_blur_sigma)
+        new_paths.append(dest)
+        masks[dest] = mask
+    return new_paths, masks
+
+
+def make_frames(
+    paths: list[Path],
+    preprocess_mode: str | None = None,
+    masks: dict[Path, np.ndarray] | None = None,
+) -> list[Frame]:
     """Frames at native size. With a backbone ``preprocess_mode`` ("crop"/"pad") each frame also
     gets the exact `GridMap` onto that backbone's input grid (PLAN 8.1)."""
     from PIL import Image
@@ -77,7 +101,10 @@ def make_frames(paths: list[Path], preprocess_mode: str | None = None) -> list[F
         with Image.open(p) as im:
             w, h = im.size
         gm = backbone_grid_map(w, h, preprocess_mode) if preprocess_mode else None
-        frames.append(Frame(id=i, path=p, width=w, height=h, sha256=_sha256(p), grid_map=gm))
+        pm = masks.get(p) if masks else None
+        frames.append(
+            Frame(id=i, path=p, width=w, height=h, sha256=_sha256(p), privacy_mask=pm, grid_map=gm)
+        )
     return frames
 
 
@@ -193,10 +220,12 @@ def run(
     detector: Detector | None = None,
     reconstructor: Reconstructor | None = None,
     export: bool = True,
+    privacy_detector: PrivacyRegionDetector | None = None,
 ) -> CountResult:
     """Count distinct instances of ``prompt`` in the images/video at ``inputs``.
 
-    ``detector`` / ``reconstructor`` override the config-selected backends (tests, notebooks).
+    ``detector`` / ``reconstructor`` override the config-selected backends (tests, notebooks);
+    ``privacy_detector`` likewise overrides the model-file detector used when ``privacy_blur``.
     """
     if config.assoc not in ("v1", "v2", "v3", "sync"):
         raise NotImplementedError(f"associator {config.assoc!r} is not implemented yet")
@@ -219,8 +248,11 @@ def run(
         paths = cap_frames(paths, config.max_frames)
     if not paths:
         raise ValueError("no frames left after filtering")
+    privacy_masks = None
+    if config.privacy_blur:
+        paths, privacy_masks = apply_privacy_blur(paths, config, out_dir, privacy_detector)
     rec = reconstructor if reconstructor is not None else build_reconstructor(config)
-    frames = make_frames(paths, getattr(rec, "preprocess_mode", None))
+    frames = make_frames(paths, getattr(rec, "preprocess_mode", None), privacy_masks)
     timings["ingest"] = time.perf_counter() - t0
 
     # Detect

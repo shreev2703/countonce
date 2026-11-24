@@ -68,6 +68,12 @@ class Config(BaseModel):
     # Trained CountOnce-Match checkpoint (match.model.save_checkpoint); required for assoc: v3.
     v3_checkpoint: Path | None = None
 
+    # Face/plate blur (PLAN 14.8). Off by default so bench pixels are untouched; when on, a
+    # model file (OpenCV .xml cascade or .onnx face model) must be supplied: nothing is downloaded.
+    privacy_blur: bool = False
+    privacy_model_path: Path | None = None
+    privacy_blur_sigma: float = Field(12.0, gt=0)
+
     # Backend options passed to the real detector / reconstructor (paths, device, ...)
     detector_options: dict[str, Any] = Field(default_factory=dict)
     backbone_options: dict[str, Any] = Field(default_factory=dict)
