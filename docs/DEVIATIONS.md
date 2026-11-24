@@ -354,3 +354,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - `activation_checkpointing` is a `make_model` argument and `TrainConfig` field but not in the model `hparams`: it changes memory only, so old checkpoints and the registry hash stay valid. The setting is recorded in checkpoint `meta` and the `run` event of `log.jsonl`.
 - `attention` wraps each block's attention sub-layer; `all` also wraps the MLP. Both skip checkpointing under `torch.no_grad()` as well as eval mode.
 - `countonce train --profile-memory` measures bytes saved for backward with `saved_tensors_hooks` (works on CPU) rather than RSS; GPU numbers stay `TODO: fill from results`.
+
+## Viewpoint-spread sweep axis (bench/sweep.py)
+- Camera centres come from GT (`camera_centers`, optional `scene_scale` in `gt.json`), not from a recon, so the axis needs no GPU. Scenes without them record `skipped_no_cameras` for narrow/wide; `all` rows still record `baseline_spread` when centres exist. `scene_scale` falls back to the RMS spread of all the scene's centres.
+- Views are ordered by angle in the best-fit plane of the centres; candidate sub-arcs are drawn from that order (pool of 64 plus one even full-arc set), but the terciles are of the measured spread (`bench.slices.centers_spread`), so `spread` and `baseline_spread` always agree. The even sample picks the tercile member with the most even angular spacing.
+- `Job.spread` joins the run key only when not `all`, so existing CSV resume keys are unchanged. The repo config now sweeps 3 spreads (3x the grid).

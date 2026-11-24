@@ -6,6 +6,7 @@ any GPU time is spent. Only the default executor touches the pipeline.
 
 from __future__ import annotations
 
+import itertools
 import json
 import random
 import time
@@ -14,11 +15,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
 
+import numpy as np
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from bench.baselines import BASELINES
 from bench.runner import DEFAULT_CSV, Job, RunOutput, SkipRun, run_jobs
+from bench.slices import centers_spread
 from countonce.detect.base import Detector, filter_by_score
 from countonce.detect.cache import CachedDetector, DetectionCache
 from countonce.ingest.frames import list_images, sample_frames
@@ -68,6 +71,8 @@ class BenchConfig(BaseModel):
     allow_paid: bool = False
     spend_cap_usd: float | None = None
     order: list[Literal["ordered", "shuffled"]] = ["ordered", "shuffled"]
+    # Viewpoint spread (9.5): narrow/wide = bottom/top tercile of angular extent; all = no filter.
+    spread: list[Literal["narrow", "wide", "all"]] = ["all"]
     methods: list[MethodSpec]
     ablation_base: str | None = None
     ablations: dict[str, Ablation] = Field(default_factory=dict)
@@ -111,17 +116,105 @@ def view_samples(cfg: BenchConfig) -> list[tuple[str, int | None]]:
     return s
 
 
+def scene_centers(scene: dict[str, Any], n_images: int) -> np.ndarray | None:
+    """GT camera centres (N,3) of a scene, or None when absent or not one per image."""
+    c = scene.get("camera_centers")
+    if c is None:
+        return None
+    a = np.asarray(c, dtype=np.float64)
+    return a if a.shape == (n_images, 3) else None
+
+
+def scene_scale(scene: dict[str, Any], centers: np.ndarray) -> float:
+    """``scene_scale`` from gt.json, else the RMS spread of all the scene's camera centres."""
+    s = scene.get("scene_scale")
+    return float(s) if s else centers_spread(centers, 1.0)
+
+
 def select_views(
-    paths: list[Path], n_views: int, sample_seed: int | None, base_seed: int, ordered: bool
+    paths: list[Path],
+    n_views: int,
+    sample_seed: int | None,
+    base_seed: int,
+    ordered: bool,
+    spread: str = "all",
+    centers: np.ndarray | None = None,
 ) -> list[Path]:
     """The frames for one run. Selection is identical for ordered and shuffled runs (same
     frames, only the presentation order differs), and for every method (paired comparisons)."""
-    seed = None if sample_seed is None else base_seed * 1000 + sample_seed
-    chosen = sample_frames(paths, n_views, seed)
+    if spread != "all" and centers is not None:
+        chosen = select_spread_views(paths, centers, n_views, spread, sample_seed, base_seed)
+    else:
+        seed = None if sample_seed is None else base_seed * 1000 + sample_seed
+        chosen = sample_frames(paths, n_views, seed)
     if not ordered:
         rng = random.Random(f"{base_seed}:{n_views}:{sample_seed}")
         rng.shuffle(chosen)
     return chosen
+
+
+SPREAD_POOL = 64  # candidate subsets drawn per (scene, n_views) for tercile selection
+
+
+def angular_order(centers: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Views in angular order around the centroid, in the best-fit plane of the centres.
+
+    Returns (order, angle): ``angle[k]`` is the monotone angle in radians of ``order[k]`` from
+    the start of the arc. The arc starts after the largest angular gap, so a partial arc is not
+    split at the +-pi seam."""
+    c = np.asarray(centers, dtype=np.float64)
+    c = c - c.mean(axis=0)
+    _, _, vt = np.linalg.svd(c, full_matrices=False)
+    ang = np.arctan2(c @ vt[1], c @ vt[0])
+    idx = np.argsort(ang, kind="stable")
+    sa = ang[idx]
+    gaps = np.diff(np.concatenate([sa, [sa[0] + 2 * np.pi]]))
+    start = (int(np.argmax(gaps)) + 1) % len(idx)
+    order = np.roll(idx, -start)
+    rolled = np.roll(sa, -start)
+    unwrapped = np.unwrap(rolled)
+    return order, unwrapped - unwrapped[0]
+
+
+def select_spread_views(
+    paths: list[Path],
+    centers: np.ndarray,
+    n_views: int,
+    spread: str,
+    sample_seed: int | None,
+    base_seed: int,
+) -> list[Path]:
+    """Frames whose spread around the centroid is in the bottom (``narrow``) or top (``wide``)
+    tercile of a seeded pool of candidate sub-arcs of the angular order; ``all`` is the plain
+    ``sample_frames`` rule.
+
+    The pool is one evenly spaced full-arc set plus random sub-arcs of the angular order. A random
+    sample (int ``sample_seed``) draws uniformly from the tercile; the even sample (``None``)
+    takes the tercile member with the most even angular spacing. Returned in image order."""
+    if spread == "all" or n_views <= 0 or n_views >= len(paths):
+        seed = None if sample_seed is None else base_seed * 1000 + sample_seed
+        return sample_frames(paths, n_views, seed)
+    if len(centers) != len(paths):
+        raise ValueError(f"{len(centers)} camera centres for {len(paths)} images")
+    order, angle = angular_order(centers)
+    m = len(order)
+    pool_rng = random.Random(f"spread-pool:{base_seed}:{n_views}")  # same pool for every sample
+    pool: list[np.ndarray] = [np.linspace(0, m - 1, n_views).round().astype(int)]
+    for _ in range(SPREAD_POOL):
+        w = pool_rng.randint(n_views, m)
+        start = pool_rng.randint(0, m - w)
+        pool.append(np.array(sorted(pool_rng.sample(range(start, start + w), n_views))))
+    # Terciles are of the measured spread (the CSV column), so the label and the column agree;
+    # the angular order only shapes the candidate sub-arcs.
+    extent = np.array([centers_spread(centers[order[p]]) for p in pool])
+    lo, hi = np.quantile(extent, [1 / 3, 2 / 3])
+    keep = np.flatnonzero(extent <= lo if spread == "narrow" else extent >= hi)
+    if sample_seed is None:
+        gap_std = [float(np.std(np.diff(angle[pool[k]]))) for k in keep]
+        pick = int(keep[int(np.argmin(gap_std))])
+    else:
+        pick = int(random.Random(f"spread:{base_seed}:{n_views}:{sample_seed}").choice(list(keep)))
+    return [paths[i] for i in sorted(int(order[k]) for k in pool[pick])]
 
 
 def build_jobs(cfg: BenchConfig, scenes: list[dict[str, Any]]) -> list[Job]:
@@ -135,7 +228,7 @@ def build_jobs(cfg: BenchConfig, scenes: list[dict[str, Any]]) -> list[Job]:
                 continue  # run by bench.zero_suite, not part of the view grid
             for n in cfg.views:
                 for label, _ in view_samples(cfg):
-                    for order in cfg.order:
+                    for spread, order in itertools.product(cfg.spread, cfg.order):
                         jobs.append(
                             Job(
                                 scene_id=scene["id"],
@@ -144,6 +237,7 @@ def build_jobs(cfg: BenchConfig, scenes: list[dict[str, Any]]) -> list[Job]:
                                 sample=label,
                                 ordered=order == "ordered",
                                 split=cfg.split,
+                                spread=spread,
                                 config={
                                     "kind": method.kind,
                                     "baseline": method.baseline,
@@ -169,6 +263,10 @@ def discover_scenes(scenes_dir: Path) -> list[dict[str, Any]]:
             continue
         gt = json.loads(gt_path.read_text())
         scene = {"id": d.name, "dir": d, "tier": gt.get("tier", ""), "gt": gt}
+        if "camera_centers" in gt:  # GT camera centres, in sorted image order (spread axis)
+            scene["camera_centers"] = gt["camera_centers"]
+            if "scene_scale" in gt:
+                scene["scene_scale"] = gt["scene_scale"]
         if "overlap" in gt:
             scene["overlap"] = gt["overlap"]  # view-overlap label or fraction, for figure 10
         scenes.append(scene)
@@ -223,9 +321,20 @@ def make_executor(
         scene = by_id[job.scene_id]
         gt = scene["gt"]
         prompt = gt.get(cfg.prompt_key, cfg.prompt)
+        all_paths = list_images(scene["dir"])
+        centers = scene_centers(scene, len(all_paths))
+        if job.spread != "all" and centers is None:
+            raise SkipRun("skipped_no_cameras", "scene gt.json has no usable camera_centers")
         paths = select_views(
-            list_images(scene["dir"]), job.n_views or 0, seeds[job.sample], cfg.seed, job.ordered
-        )
+            all_paths, job.n_views or 0, seeds[job.sample], cfg.seed, job.ordered,
+            spread=job.spread, centers=centers,
+        )  # fmt: skip
+        spread_val = None
+        if centers is not None:
+            pos = {p: i for i, p in enumerate(all_paths)}
+            spread_val = centers_spread(
+                centers[[pos[p] for p in paths]], scene_scale(scene, centers)
+            )
         t0 = time.perf_counter()
         options = {"cache_dir": cfg.cache_dir, **job.config["options"]}
         conf = Config(**options).with_overrides(out_dir=cfg.runs_dir / job.key())
@@ -236,6 +345,7 @@ def make_executor(
                 pred=reduce(counts),
                 gt=float(gt["count"]),
                 runtime_s=time.perf_counter() - t0,
+                baseline_spread=spread_val,
             )
         res = run(
             paths,
@@ -253,6 +363,7 @@ def make_executor(
             peak_vram_mb=float(res.peak_vram_mb),
             timings={k: float(v) for k, v in res.timings.items()},
             run_dir=str(conf.out_dir),
+            baseline_spread=spread_val,
         )
 
     return fn

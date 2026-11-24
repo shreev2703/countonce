@@ -12,6 +12,10 @@ random_samples: 3           # random draws per view count ...
 even_sample: true           # ... plus one evenly spaced draw
 seed: 0
 order: [ordered, shuffled]  # ordered video/arc order vs shuffled unordered photos
+# Viewpoint spread: narrow/wide = subsets in the bottom/top tercile of angular extent around the
+# camera centroid; all = no filter. narrow/wide need `camera_centers` ([[x,y,z], ...] one per
+# sorted image, optional `scene_scale`) in gt.json, else those rows are skipped_no_cameras.
+spread: [narrow, wide, all]
 
 # Method / ablation grid. `kind: baseline` uses per-image counts (sum/max/median);
 # `kind: countonce` overrides countonce.Config fields.

@@ -46,8 +46,13 @@ def baseline_spread(recon: Recon) -> float:
 
     Larger for a wide-arc rig than a narrow-arc one; 0 for a single view.
     """
-    c = camera_centers(recon.extrinsics)
-    scale = recon.scene_scale if recon.scene_scale > 0 else 1.0
+    return centers_spread(camera_centers(recon.extrinsics), recon.scene_scale)
+
+
+def centers_spread(centers: np.ndarray, scale: float = 1.0) -> float:
+    """RMS distance of (N,3) camera centres from their centroid, divided by ``scale``."""
+    c = np.asarray(centers, dtype=np.float64)
+    scale = scale if scale > 0 else 1.0
     return float(np.sqrt(((c - c.mean(axis=0)) ** 2).sum(axis=1).mean()) / scale)
 
 

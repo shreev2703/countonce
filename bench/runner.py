@@ -23,6 +23,7 @@ COLUMNS = [
     "peak_vram_mb", "timings_json", "assoc_f1", "run_dir",
     "domain", "duplicate_rate", "miss_rate", "count_error",
     "ghost_duplicate_rate",
+    "spread", "baseline_spread",
 ]  # fmt: skip
 _V1_COLUMN_COUNT = 18  # columns of the original schema; any longer prefix of COLUMNS is valid
 
@@ -38,12 +39,20 @@ class Job:
     ordered: bool = True
     split: str = ""
     config: dict[str, Any] = field(default_factory=dict)
+    spread: str = "all"  # viewpoint-spread subset: narrow | wide | all (PLAN 9.5)
 
     def key(self) -> str:
-        payload = json.dumps(
-            [self.scene_id, self.method, self.n_views, self.sample, self.ordered, self.config],
-            sort_keys=True,
-        )
+        parts: list[Any] = [
+            self.scene_id,
+            self.method,
+            self.n_views,
+            self.sample,
+            self.ordered,
+            self.config,
+        ]
+        if self.spread != "all":  # keeps the keys of pre-spread runs (resume) unchanged
+            parts.append(self.spread)
+        payload = json.dumps(parts, sort_keys=True)
         return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
@@ -73,6 +82,7 @@ class RunOutput:
     miss_rate: float | None = None
     count_error: float | None = None  # |pred - gt|
     ghost_duplicate_rate: float | None = None  # blank when no moving GT ids (NaN -> blank)
+    baseline_spread: float | None = None  # measured camera-centre spread / scene_scale
 
 
 def _fmt(v: object) -> str:
@@ -191,6 +201,8 @@ def run_jobs(
                 "miss_rate": _fmt(out.miss_rate) if out else "",
                 "count_error": _fmt(out.count_error) if out else "",
                 "ghost_duplicate_rate": _fmt(out.ghost_duplicate_rate) if out else "",
+                "spread": job.spread,
+                "baseline_spread": _fmt(out.baseline_spread) if out else "",
             }
             w.writerow(row)
             f.flush()

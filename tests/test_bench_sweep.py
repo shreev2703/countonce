@@ -22,7 +22,7 @@ def test_repo_config_loads_and_grid_shape():
     assert cfg.views == [3, 5, 10, 20, 40]
     jobs = build_jobs(cfg, [{"id": "s1", "tier": "easy"}])
     n_methods = len([m for m in cfg.all_methods() if m.kind != "zero_suite"])
-    assert len(jobs) == n_methods * 5 * 4 * 2  # 3 random + 1 even, ordered + shuffled
+    assert len(jobs) == n_methods * 5 * 4 * 2 * 3  # 4 samples, 2 orders, 3 spreads
     assert len({j.key() for j in jobs}) == len(jobs)
     assert any("+merge_k=" in m.name for m in cfg.all_methods())
     assert all(m.name != "co_v2_vggt+backbone=vggt" for m in cfg.all_methods())

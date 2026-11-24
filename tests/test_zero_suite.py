@@ -125,7 +125,7 @@ def test_run_zero_suite_wrong_prompt_uses_injected_backends(tmp_path):
 
 
 def test_ghost_column_round_trips_with_old_rows(tmp_path):
-    assert COLUMNS[-1] == "ghost_duplicate_rate"
+    assert "ghost_duplicate_rate" in COLUMNS
     old = tmp_path / "old.csv"
     old_cols = COLUMNS[: COLUMNS.index("ghost_duplicate_rate")]
     with old.open("w", newline="") as f:

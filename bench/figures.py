@@ -48,6 +48,8 @@ class Row:
     timings: dict[str, float] | None = None
     assoc_f1: float | None = None
     run_dir: str = ""
+    spread: str = ""  # narrow | wide | all; blank in pre-spread CSVs
+    baseline_spread: float | None = None
 
 
 def _f(s: str) -> float | None:
@@ -67,7 +69,7 @@ def load_rows(path: str | Path) -> list[Row]:
                 pred, gt, _f(r["low"]), _f(r["high"]), tier,
                 r["run_key"], _f(r["runtime_s"]), _f(r["peak_vram_mb"]),
                 json.loads(r["timings_json"]) if r["timings_json"] else None,
-                _f(r["assoc_f1"]), r["run_dir"])
+                _f(r["assoc_f1"]), r["run_dir"], r["spread"], _f(r["baseline_spread"]))
         )  # fmt: skip
     return out
 
@@ -353,6 +355,37 @@ def fig_conformal_coverage(
     return out
 
 
+def fig_error_vs_spread(rows: Sequence[Row], out: Path) -> Path | None:
+    """Relative error vs. measured viewpoint spread (camera-centre RMS / scene_scale), one line
+    per method through the narrow / wide / all subsets (PLAN 9.7 figs 1-2). None without data."""
+    usable = [r for r in rows if r.baseline_spread is not None and r.spread]
+    if not usable:
+        return None
+    apply_style()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    for i, m in enumerate(_methods(usable)):
+        xs, ps = [], []
+        for sp in ("narrow", "wide", "all"):
+            sub = [r for r in usable if r.method == m and r.spread == sp]
+            p = point(sub, rel_error)
+            if p is not None:
+                xs.append(float(np.mean([r.baseline_spread for r in sub])))
+                ps.append(p)
+        order = np.argsort(xs)
+        if ps:
+            ys = np.array([ps[i].mean for i in order])
+            ax.errorbar(
+                np.array(xs)[order], ys,
+                yerr=[ys - [ps[i].lo for i in order], [ps[i].hi for i in order] - ys],
+                marker="o", capsize=3, label=m, color=color_for(m, i),
+            )  # fmt: skip
+    ax.set_xlabel("baseline spread (camera-centre RMS / scene scale)")
+    ax.set_ylabel("relative error (%)")
+    ax.legend(fontsize=7)
+    save(fig, out)
+    return out
+
+
 def make_all(csv_path: str | Path, out_dir: str | Path, base: str | None = None) -> list[Path]:
     rows = load_rows(csv_path)
     if not rows:
@@ -366,6 +399,7 @@ def make_all(csv_path: str | Path, out_dir: str | Path, base: str | None = None)
         fig_assoc_f1(rows, out / "assoc_f1.png"),
         fig_runtime_vs_views(rows, out / "runtime_vs_views.png"),
         fig_ablation(rows, out / "ablation.png", base),
+        fig_error_vs_spread(rows, out / "error_vs_spread.png"),
     ]
     return [p for p in paths if p is not None]
 
