@@ -371,3 +371,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - Rate limit is a persisted token bucket (`rate_buckets`), off unless `rate_limit=N` per `rate_window_s` is passed to `SqliteJobStore`; checked inside the `submit` transaction, so a rejected submit leaves no row and an idempotent duplicate costs no token. Raises `RateLimitError` (not in the `ErrorCode` taxonomy yet).
 - `delete_job` refuses running jobs (`ValueError`); it deletes inputs and outputs (`<output_root>/<job_id>`), result rows and revokes share tokens, keeping the job row as `deleted`. `purge_expired` ages by `finished_at` (fallback `created_at`) and skips queued/running jobs.
 - `training_opt_in` lives in a new `users` table; `export_training_pairs(..., opted_in_users=)` is an extra gate on top of per-correction `consent` (None keeps the old behaviour).
+
+## Cost per job (admin metrics)
+- Rates live in a new `configs/cost.yaml` (`cost_per_hour.laptop|cloud`, both null; `admin-stats --cost`), not in the pipeline `Config`, since they are ops settings. No default rate; null rate gives null cost, shown as `TODO: set rate` in HTML.
+- GPU-seconds per job = sum of all stored stage `timings` (the store does not mark which stages are GPU). Worker kind comes from `workers.kind` via `jobs.worker_id`; jobs from unknown workers group as `unknown` with no rate. Frames = `n_frames` or `len(per_frame_counts)` in `result_json`; cost per 1,000 frames covers only jobs with a frame count.
+- `cost_per_job` alert: mean cost of done jobs finished in `window_s` > `max_cost`; disabled while `max_cost` is null (shipped state).

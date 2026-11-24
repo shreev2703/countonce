@@ -1,0 +1,6 @@
+# Worker cost rates (PLAN 14.6 "cost per job"): currency per GPU-hour of stage time, per worker kind.
+# Deliberately null: no rate has been chosen. Cost columns show "TODO: set rate" (JSON null)
+# until a human sets one. Used by `countonce admin-stats --cost configs/cost.yaml`.
+cost_per_hour:
+  laptop:   # TODO: set rate
+  cloud:    # TODO: set rate

@@ -188,6 +188,7 @@ def _parser() -> argparse.ArgumentParser:
     ad = sub.add_parser("admin-stats", help="job-store metrics and alerts (JSON / static HTML)")
     ad.add_argument("--db", type=Path, required=True)
     ad.add_argument("--alerts", type=Path, default=Path("configs/alerts.yaml"))
+    ad.add_argument("--cost", type=Path, default=Path("configs/cost.yaml"), help="cost_per_hour")
     ad.add_argument("--json", action="store_true", help="print metrics and alerts as JSON")
     ad.add_argument("--html", nargs="?", const=Path("admin.html"), type=Path, help="write HTML")
     ad.add_argument("--reference", type=Path, help="drift reference (bench CSV or result.json dir)")
@@ -365,6 +366,7 @@ def _admin_stats(args: argparse.Namespace) -> int:
     now = time.time()
     try:
         rules = admin.load_rules(args.alerts) if args.alerts.exists() else []
+        rates = admin.load_cost_rates(args.cost) if args.cost.exists() else None
         drift = None
         if args.reference:
             from countonce.monitor.drift import run_drift
@@ -373,8 +375,8 @@ def _admin_stats(args: argparse.Namespace) -> int:
     except (FileNotFoundError, ValueError, TypeError) as exc:
         print(f"countonce: error: {exc}", file=sys.stderr)
         return 2
-    metrics = admin.compute_metrics(store, now)
-    alerts = admin.evaluate_alerts(store, rules, now)
+    metrics = admin.compute_metrics(store, now, rates)
+    alerts = admin.evaluate_alerts(store, rules, now, rates)
     if args.html:
         args.html.write_text(admin.render_html(metrics, alerts, drift))
         print(f"admin-stats: wrote {args.html}")

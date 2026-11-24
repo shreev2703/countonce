@@ -28,7 +28,8 @@ import yaml
 from countonce.jobs.store import JobStore
 
 FAILED = ("failed", "dead_letter")
-RULE_TYPES = ("failure_rate_spike", "queue_age", "p95_regression")
+RULE_TYPES = ("failure_rate_spike", "queue_age", "p95_regression", "cost_per_job")
+WORKER_KINDS = ("laptop", "cloud")
 SEVERITIES = ("warning", "critical")
 
 
@@ -52,6 +53,7 @@ class AlertRule:
     min_rate: float = 0.0
     min_jobs: int = 5
     max_age_s: float = 900.0
+    max_cost: float | None = None  # cost_per_job: mean cost of recent done jobs above this fires
 
 
 def percentiles(values: Sequence[float]) -> dict[str, float | None]:
@@ -83,7 +85,101 @@ def _feedback_accuracy(store: JobStore) -> dict[str, Any] | None:
     return {"n": n, "accuracy": float(row[1]) / n} if n else None
 
 
-def compute_metrics(store: JobStore, now: float) -> dict[str, Any]:
+def load_cost_rates(path: str | Path) -> dict[str, float | None]:
+    """``cost_per_hour`` per worker kind from ``configs/cost.yaml``; missing/null stays None."""
+    raw = yaml.safe_load(Path(path).read_text()) or {}
+    rates = raw.get("cost_per_hour") or {}
+    unknown = set(rates) - set(WORKER_KINDS)
+    if unknown:
+        raise ValueError(f"cost_per_hour: unknown worker kind(s) {sorted(unknown)}")
+    out: dict[str, float | None] = {k: None for k in WORKER_KINDS}
+    for k, v in rates.items():
+        if v is not None and float(v) < 0:
+            raise ValueError(f"cost_per_hour.{k} must be >= 0")
+        out[k] = None if v is None else float(v)
+    return out
+
+
+def _worker_kinds(store: JobStore) -> dict[str, str]:
+    path = getattr(store, "path", None)
+    if path is None:
+        return {}
+    conn = sqlite3.connect(path)
+    try:
+        return {r[0]: r[1] for r in conn.execute("SELECT id, kind FROM workers")}
+    except sqlite3.OperationalError:
+        return {}
+    finally:
+        conn.close()
+
+
+def _job_usage(store: JobStore, job: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Stage timings, GPU-seconds (sum of stored stage timings) and frame count of a done job."""
+    res = store.get_result(job["id"])
+    raw = res.get("result_json") if res else None
+    if not raw:
+        return None
+    doc = json.loads(raw)
+    timings = {s: float(t) for s, t in (doc.get("timings") or {}).items()}
+    frames = doc.get("n_frames")
+    if frames is None and isinstance(doc.get("per_frame_counts"), Mapping):
+        frames = len(doc["per_frame_counts"])
+    return {"timings": timings, "gpu_s": sum(timings.values()), "frames": frames}
+
+
+def _cost(gpu_s: float, rate: float | None) -> float | None:
+    """Cost of ``gpu_s`` seconds at ``rate`` per hour; None (never 0) while the rate is unset."""
+    return None if rate is None else gpu_s / 3600.0 * rate
+
+
+def compute_cost(
+    store: JobStore, cost_per_hour: Mapping[str, float | None] | None = None
+) -> dict[str, Any]:
+    """GPU-seconds, cost per job / per 1,000 frames and per-stage p50/p95, per worker kind."""
+    rates: dict[str, float | None] = dict.fromkeys(WORKER_KINDS)
+    rates.update(cost_per_hour or {})
+    kinds = _worker_kinds(store)
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for j in store.list_jobs():
+        if j["status"] != "done":
+            continue
+        use = _job_usage(store, j)
+        if use is not None:
+            kind = kinds.get(j.get("worker_id") or "", "unknown")
+            groups.setdefault(kind, []).append(use)
+    by_kind: dict[str, Any] = {}
+    for kind, uses in sorted(groups.items()):
+        rate = rates.get(kind)
+        gpu = [u["gpu_s"] for u in uses]
+        stages: dict[str, list[float]] = {}
+        for u in uses:
+            for s, t in u["timings"].items():
+                stages.setdefault(s, []).append(t)
+        framed = [u for u in uses if u["frames"]]
+        frames = sum(int(u["frames"]) for u in framed)
+        framed_cost = _cost(sum(u["gpu_s"] for u in framed), rate)
+        by_kind[kind] = {
+            "n_jobs": len(uses),
+            "cost_per_hour": rate,
+            "gpu_seconds_total": sum(gpu),
+            "gpu_seconds_per_job": {**percentiles(gpu), "mean": sum(gpu) / len(gpu)},
+            "cost_total": _cost(sum(gpu), rate),
+            "cost_per_job_mean": _cost(sum(gpu) / len(gpu), rate),
+            "cost_per_1000_frames": (
+                framed_cost / frames * 1000.0 if framed_cost is not None and frames else None
+            ),
+            "n_jobs_with_frames": len(framed),
+            "stage_time_s": {
+                s: {k: v for k, v in percentiles(t).items() if k in ("p50", "p95")}
+                for s, t in sorted(stages.items())
+            },
+        }
+    return {"cost_per_hour": rates, "by_worker_kind": by_kind}
+
+
+def compute_metrics(
+    store: JobStore, now: float, cost_per_hour: Mapping[str, float | None] | None = None
+) -> dict[str, Any]:
     jobs = store.list_jobs()
     by_status = Counter(j["status"] for j in jobs)
     per_day = Counter(
@@ -138,6 +234,7 @@ def compute_metrics(store: JobStore, now: float) -> dict[str, Any]:
         "queue_depth": len(queued),
         "oldest_queued_age_s": oldest,
         "feedback": _feedback_accuracy(store),
+        "cost": compute_cost(store, cost_per_hour),
     }
 
 
@@ -166,7 +263,12 @@ def _fail_rate(jobs: Sequence[Mapping[str, Any]]) -> float | None:
     return sum(j["status"] in FAILED for j in done) / len(done) if done else None
 
 
-def evaluate_alerts(store: JobStore, rules: Sequence[AlertRule], now: float) -> list[Alert]:
+def evaluate_alerts(
+    store: JobStore,
+    rules: Sequence[AlertRule],
+    now: float,
+    cost_per_hour: Mapping[str, float | None] | None = None,
+) -> list[Alert]:
     jobs = store.list_jobs()
     alerts: list[Alert] = []
     for r in rules:
@@ -197,6 +299,31 @@ def evaluate_alerts(store: JobStore, rules: Sequence[AlertRule], now: float) -> 
                         f"failure rate {cur:.0%} vs baseline {(ref or 0.0):.0%}",
                         cur,
                         limit,
+                    )
+                )
+        elif r.type == "cost_per_job":
+            # Needs a rate and a threshold; with either unset the rule stays quiet (no made-up 0).
+            if r.max_cost is None:
+                continue
+            kinds = _worker_kinds(store)
+            costs: list[float] = []
+            for j in recent:
+                rate = (cost_per_hour or {}).get(kinds.get(j.get("worker_id") or "", ""))
+                use = _job_usage(store, j) if j["status"] == "done" else None
+                c = _cost(use["gpu_s"], rate) if use else None
+                if c is not None:
+                    costs.append(c)
+            if len(costs) < r.min_jobs:
+                continue
+            mean = sum(costs) / len(costs)
+            if mean > r.max_cost:
+                alerts.append(
+                    Alert(
+                        r.id,
+                        r.severity,
+                        f"mean cost per job {mean:.4g} exceeds {r.max_cost:.4g}",
+                        mean,
+                        r.max_cost,
                     )
                 )
         else:  # p95_regression
@@ -275,6 +402,45 @@ def render_html(
         + _table(
             ["stage", "p50", "p90", "p95"],
             [(k, v["p50"], v["p90"], v["p95"]) for k, v in times.items()],
+        )
+    )
+    cost = m.get("cost") or {"by_worker_kind": {}}
+    todo = "TODO: set rate"
+    parts.append(
+        "<h2>Cost per worker kind</h2>"
+        + _table(
+            [
+                "worker kind",
+                "jobs",
+                "GPU-s total",
+                "GPU-s/job p50",
+                "GPU-s/job p95",
+                "cost/job",
+                "cost/1,000 frames",
+            ],
+            [
+                (
+                    k,
+                    v["n_jobs"],
+                    v["gpu_seconds_total"],
+                    v["gpu_seconds_per_job"]["p50"],
+                    v["gpu_seconds_per_job"]["p95"],
+                    todo if v["cost_per_hour"] is None else v["cost_per_job_mean"],
+                    todo if v["cost_per_hour"] is None else v["cost_per_1000_frames"],
+                )
+                for k, v in cost["by_worker_kind"].items()
+            ],
+        )
+    )
+    parts.append(
+        "<h2>Stage time by worker kind (s)</h2>"
+        + _table(
+            ["worker kind", "stage", "p50", "p95"],
+            [
+                (k, s, t["p50"], t["p95"])
+                for k, v in cost["by_worker_kind"].items()
+                for s, t in v["stage_time_s"].items()
+            ],
         )
     )
     parts.append(

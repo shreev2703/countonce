@@ -20,3 +20,9 @@ rules:
     factor: 1.5           # fire when recent p95 total time > factor * baseline p95
     min_jobs: 5
     severity: warning
+  - id: cost_per_job
+    type: cost_per_job    # optional; quiet until configs/cost.yaml sets a rate and max_cost is set
+    window_s: 3600
+    max_cost:             # null = disabled. Same currency as cost_per_hour. TODO: set threshold
+    min_jobs: 5
+    severity: warning
