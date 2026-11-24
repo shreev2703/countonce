@@ -160,6 +160,12 @@ def _parser() -> argparse.ArgumentParser:
     c.add_argument("--file", type=Path, required=True, help="corrections.json")
     c.add_argument("--pairs", type=Path, help="also write consented training pairs (JSONL)")
 
+    pr = sub.add_parser("pilot-report", help="write the pilot usage report (docs/PILOT.md)")
+    pr.add_argument("--db", type=Path, required=True)
+    pr.add_argument("--since", help="ISO date/time; only jobs created at or after it")
+    pr.add_argument("--corrections", type=Path, help="corrections.json (not stored in the db)")
+    pr.add_argument("--out", type=Path, default=Path("docs/PILOT.md"))
+
     wk = sub.add_parser("worker", help="run a queue worker against a job database")
     wk.add_argument("--db", type=Path, required=True)
     wk.add_argument("--once", action="store_true", help="drain claimable jobs, then exit")
@@ -424,6 +430,27 @@ def _loadtest(args: argparse.Namespace) -> int:
     summary = run_load_test(cfg)
     print(format_summary(summary))
     return 0 if summary["reconciled"] else 1
+
+
+def _pilot_report(args: argparse.Namespace) -> int:
+    from datetime import UTC, datetime
+
+    from countonce.monitor.pilot import write_pilot_report
+
+    since = None
+    if args.since:
+        try:
+            dt = datetime.fromisoformat(args.since)
+        except ValueError:
+            print(f"countonce: error: bad --since {args.since!r}", file=sys.stderr)
+            return 2
+        since = (dt if dt.tzinfo else dt.replace(tzinfo=UTC)).timestamp()
+    if not args.db.exists():
+        print(f"countonce: error: no such db {args.db}", file=sys.stderr)
+        return 2
+    path = write_pilot_report(args.db, args.out, since=since, corrections_path=args.corrections)
+    print(f"pilot-report: wrote {path}")
+    return 0
 
 
 def _worker(args: argparse.Namespace) -> int:
@@ -891,6 +918,8 @@ def main(argv: list[str] | None = None) -> int:
         return _synth(args)
     if args.cmd == "profile":
         return _profile(args)
+    if args.cmd == "pilot-report":
+        return _pilot_report(args)
     if args.cmd == "drift":
         return _drift(args)
     if args.cmd == "shadow-report":

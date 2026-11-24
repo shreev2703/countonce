@@ -424,3 +424,8 @@ One entry per decision: date, what the plan said, what was done, why.
   stale-heartbeat exhaustion state), no duplicate completion events and one result row per done job.
 - **Numbers:** throughput, latency percentiles and error rates are `TODO: fill from results` until a run on the
   target machine appends to `results/load_test.csv` (gitignored). Tests carry the `loadtest` marker.
+
+## Pilot report (`countonce pilot-report`)
+- The job store has no corrections table (corrections live in `corrections.json` files), so corrections metrics take an optional `--corrections` file; without it those cells stay `TODO: fill from results`.
+- "Instances" for corrections-per-instance is `results.count` summed over finished jobs. A "visit" is a distinct `captured_at` (fallback `created_at`) per `jobs.site_id`; `sites.json` is not read.
+- Bootstrap CIs (95% percentile, seeded, 1000 resamples) appear only for n >= 5; otherwise `n/a (n<5)`.
