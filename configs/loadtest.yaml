@@ -1,0 +1,20 @@
+# Queue load test. Run: countonce loadtest --config configs/loadtest.yaml
+# Fake sleep-based workers against one sqlite job store. One row per run is appended to
+# results_csv. Nothing here is a result (TODO: fill from results).
+n_jobs: 200
+n_submitters: 2
+n_workers: 4
+stage_latency_s: {ingest: 0.02, reconstruct: 0.1, detect: 0.05}
+latency_jitter: 0.2
+fail_rate: 0.05            # per attempt, reported error
+permanent_fraction: 0.3    # share of failures that dead-letter immediately
+crash_rate: 0.01           # per attempt, worker process dies mid-job
+max_crashes: 2
+submit_rate_per_s: 0       # per submitter; 0 = unthrottled
+heartbeat_interval_s: 0.2
+heartbeat_timeout_s: 1.5
+timeout_s: 120
+seed: 0
+work_dir: runs/loadtest
+results_csv: results/load_test.csv
+summary_json: results/load_test_summary.json

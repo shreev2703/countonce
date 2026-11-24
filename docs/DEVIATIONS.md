@@ -409,3 +409,18 @@ One entry per decision: date, what the plan said, what was done, why.
 - Session expiry is idle time: each stored chunk renews `expires_at`. `purge_expired` also purges expired sessions (chunk files and rows) and creates the tables on demand, so an old database upgrades in place. A finalized session's sanitized file lives under `<root>/files/<id>` and goes with its job's retention, not with session purge.
 - Finalize without `job_id` queues a new job and needs a prompt (`idempotency_key=upload:<session>`); with `job_id` it attaches to that user's queued job. A wrong whole-file hash or a media rejection marks the session `failed` and discards its chunks (client restarts). Images are re-written by `sanitize_image` (the stored file is the sanitized copy, so its sha256 differs from the upload's); videos are validated with ffprobe and stored unchanged.
 - One file per session; a multi-photo job takes one session per photo via `--job-id`.
+
+## 2026-11-24: Queue load-test harness
+
+- **Plan said:** PLAN 16B.2 load test with k6/Locust-style tooling and a fake worker. **Done:** no HTTP API
+  exists, so `countonce/loadtest.py` (`countonce loadtest`, `scripts/load_test.py`) drives `SqliteJobStore`
+  directly with stdlib `multiprocessing` (spawn): N submitter and M fake-worker processes, sleep-based stages,
+  injected reported failures and `os._exit` crashes recovered through heartbeat timeout. Crashed workers are
+  respawned; crashes are capped by `max_crashes`.
+- **Lock retries:** the stock store waits inside sqlite's busy timeout, which can't be counted. The harness
+  uses a `CountingStore` subclass that connects with `timeout=0`, counts each `SQLITE_BUSY`, and retries with
+  jitter. Its contention profile therefore differs a little from the production store's.
+- **Reconciliation:** `reconciled` requires submitted = done + dead_letter + failed (`failed` is the
+  stale-heartbeat exhaustion state), no duplicate completion events and one result row per done job.
+- **Numbers:** throughput, latency percentiles and error rates are `TODO: fill from results` until a run on the
+  target machine appends to `results/load_test.csv` (gitignored). Tests carry the `loadtest` marker.

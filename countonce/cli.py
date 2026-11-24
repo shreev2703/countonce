@@ -229,6 +229,9 @@ def _parser() -> argparse.ArgumentParser:
     )
     rt.add_argument("--config", type=Path, default=Path("configs/retrain.yaml"))
 
+    lt = sub.add_parser("loadtest", help="queue load test with fake workers (sqlite job store)")
+    lt.add_argument("--config", type=Path, default=Path("configs/loadtest.yaml"))
+
     m = sub.add_parser("models", help="matcher checkpoint registry")
     m.add_argument("--root", type=Path, default=Path("models"))
     msub = m.add_subparsers(dest="models_cmd", required=True)
@@ -408,6 +411,19 @@ def _correct(args: argparse.Namespace) -> int:
         write_training_pairs_jsonl(pairs, args.pairs)
         print(f"correct: wrote {len(pairs)} consented pairs to {args.pairs}")
     return 0
+
+
+def _loadtest(args: argparse.Namespace) -> int:
+    from countonce.loadtest import LoadTestConfig, format_summary, run_load_test
+
+    try:
+        cfg = LoadTestConfig.from_yaml(args.config)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    summary = run_load_test(cfg)
+    print(format_summary(summary))
+    return 0 if summary["reconciled"] else 1
 
 
 def _worker(args: argparse.Namespace) -> int:
@@ -897,6 +913,8 @@ def main(argv: list[str] | None = None) -> int:
         return _sites(args)
     if args.cmd == "worker":
         return _worker(args)
+    if args.cmd == "loadtest":
+        return _loadtest(args)
     if args.cmd == "admin-stats":
         return _admin_stats(args)
     if args.cmd == "submit":

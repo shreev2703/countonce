@@ -68,6 +68,7 @@ addopts = "-ra"
 markers = [
     "slow: long-running tests (excluded from hosted CI)",
     "gpu: tests that need a CUDA GPU (self-hosted runner or local)",
+    "loadtest: multi-process queue load tests (several seconds; deselect with -m 'not loadtest')",
     "golden: CPU golden synthetic-geometry regression tests",
 ]
 pythonpath = ["."]
