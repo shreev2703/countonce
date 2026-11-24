@@ -99,6 +99,12 @@ def _parser() -> argparse.ArgumentParser:
     d.add_argument("--warn", type=float, default=0.1, help="PSI warn threshold")
     d.add_argument("--alert", type=float, default=0.25, help="PSI alert threshold")
 
+    sr = sub.add_parser("shadow-report", help="summarize shadow-vs-live agreement from a log")
+    sr.add_argument("log", type=Path, help="shadow_log.jsonl")
+    sr.add_argument("--json", action="store_true", help="print the report as JSON")
+    sr.add_argument("--boot", type=int, default=2000, help="bootstrap resamples")
+    sr.add_argument("--seed", type=int, default=0)
+
     x = sub.add_parser("explain", help="explain why two detections were or were not merged")
     x.add_argument("out_dir", type=Path, help="directory holding result.json")
     x.add_argument("det_a")
@@ -281,6 +287,20 @@ def _explain(args: argparse.Namespace) -> int:
         print(f"countonce: error: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(exp.to_dict(), indent=2) if args.json else exp.to_text())
+    return 0
+
+
+def _shadow_report(args: argparse.Namespace) -> int:
+    import json
+
+    from countonce.routing import format_report, load_log, summarize
+
+    try:
+        rep = summarize(load_log(args.log), n_boot=args.boot, seed=args.seed)
+    except (FileNotFoundError, ValueError, KeyError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(rep, indent=2) if args.json else format_report(rep))
     return 0
 
 
@@ -467,6 +487,8 @@ def main(argv: list[str] | None = None) -> int:
         return _profile(args)
     if args.cmd == "drift":
         return _drift(args)
+    if args.cmd == "shadow-report":
+        return _shadow_report(args)
     if args.cmd == "explain":
         return _explain(args)
     if args.cmd == "correct":

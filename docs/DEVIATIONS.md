@@ -325,3 +325,9 @@ One entry per decision: date, what the plan said, what was done, why.
 - `episodes` converts each clean recipe into a geometry episode (seed = recipe seed) with view and instance counts pinned to the recipe; recipe randomization knobs are not used by the geometry generator.
 - Dataset version for the DAG is a sha256 content hash of the episode set (train, val), passed to `TrainConfig.data_version`; checkpoints now carry it in `meta` (`checkpoint_meta`). `evaluate` scores `best.pt` on the test episodes and runs the ablation grid only when `ablate:` is non-empty.
 - Fixed 11 latent mypy errors in `synth/` and `bench/` that became visible once the CLI imported `synth.dag`.
+
+## Shadow-mode model routing (`countonce/routing.py`)
+- Shadow runs synchronously after the live result is computed (before `run_with_shadow` returns) instead of in a background thread: the live result is snapshotted first, so it cannot be affected, and tests stay deterministic. Callers wanting zero added latency can call it from their own worker.
+- Bucket = sha256(`shadow name` + job id) mod 10000, so shadows sample independently; the first shadow whose percentage covers the bucket wins. Jobs without a shadow are not logged.
+- Stage sharing: both runs use the same `Config.cache_dir` (recon/detection caches are keyed by model identity, so matching stages hit); injected live detector/reconstructor objects are reused when the shadow's stage matches. Shadow writes to `<out_dir>/shadow/<name>` with `export=False`.
+- Report: per-shadow mean |delta count|, interval overlap rate, shadow-minus-live wall latency, percentile bootstrap 95% CIs over jobs; failed shadow runs are counted, not averaged.
