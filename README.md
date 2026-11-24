@@ -99,6 +99,19 @@ countonce run --images path/to/photos --prompt "apple" --assoc v2 --out results/
 countonce run --video path/to/clip.mp4 --prompt "apple" --fps 2 --out results/run1
 ```
 
+Or from Python (`import countonce` is light; torch loads only when `run` is first used):
+
+```python
+from pathlib import Path
+
+import countonce
+
+cfg = countonce.Config(out_dir="results/run1")
+result = countonce.run(Path("path/to/photos"), "apple", cfg)   # -> countonce.CountResult
+print(result.count, result.interval)
+again = countonce.load_result("results/run1")                   # reads results/run1/result.json
+```
+
 No GPU or weights? `examples/tiny_scene/` bundles five rendered views of five red spheres (plus
 blue and green distractors) with known cameras and depth. The test-only `color_blob` detector and
 `fixture` backbone count it on CPU (expected: 5):

@@ -19,7 +19,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - Memory guard (`profiling.py`) placed in `countonce/recon/profiling.py`; `torch` is imported at module top, so it needs the `recon` extra.
 - Plotting: ported only generic helpers (style, `save`, `depth_to_rgb`, `point_cloud_preview`, `vram_vs_frames`). Benchmark-specific plots (`band_lines`, `scene_type_bars`) were left behind; they belong to Track B.
 - Env check: Python pin relaxed from `==3.11` to `>=3.11` to match `pyproject.toml`.
-- Frame extraction: dropped the unused `EXAMPLES` constant. `configs/colmap.yaml` copied verbatim.
+- Frame extraction: dropped the unused `EXAMPLES` constant. `countonce/configs/colmap.yaml` copied verbatim.
 - Added `recon` optional-dependency extra and `pythonpath = ["."]` for pytest. `ruff`/`pytest` were run from `~/vggtProject/.venv` (3.11, has torch/pycolmap) since countonce has no venv yet.
 - Video-clip helper (`clip.py`) was not ported: it is demo-site specific and not in the task list.
 
@@ -373,7 +373,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - `training_opt_in` lives in a new `users` table; `export_training_pairs(..., opted_in_users=)` is an extra gate on top of per-correction `consent` (None keeps the old behaviour).
 
 ## Cost per job (admin metrics)
-- Rates live in a new `configs/cost.yaml` (`cost_per_hour.laptop|cloud`, both null; `admin-stats --cost`), not in the pipeline `Config`, since they are ops settings. No default rate; null rate gives null cost, shown as `TODO: set rate` in HTML.
+- Rates live in a new `countonce/configs/cost.yaml` (`cost_per_hour.laptop|cloud`, both null; `admin-stats --cost`), not in the pipeline `Config`, since they are ops settings. No default rate; null rate gives null cost, shown as `TODO: set rate` in HTML.
 - GPU-seconds per job = sum of all stored stage `timings` (the store does not mark which stages are GPU). Worker kind comes from `workers.kind` via `jobs.worker_id`; jobs from unknown workers group as `unknown` with no rate. Frames = `n_frames` or `len(per_frame_counts)` in `result_json`; cost per 1,000 frames covers only jobs with a frame count.
 - `cost_per_job` alert: mean cost of done jobs finished in `window_s` > `max_cost`; disabled while `max_cost` is null (shipped state).
 
@@ -382,3 +382,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - Stage spans reuse the pipeline's `timings` readings via `tracing.record_span` (one clock). A failing stage gets an error span from the end of the last finished stage.
 - With `exporter: otlp` and no `opentelemetry` installed, a warning is logged and nothing is exported (no jsonl fallback). The OTLP path is untested against the real package; it uses `OTLPSpanExporter` (http/proto) with default env config. `opentelemetry.*` added to the mypy missing-imports override.
 - OTLP spans get fresh OTel ids (our ids go in the JSONL only).
+
+## Public API and packaged configs
+- `colmap.yaml`, `alerts.yaml`, `cost.yaml` moved from `configs/` to `countonce/configs/` (package data). `countonce.resources.resolve_config` checks the CWD path first, then the packaged copy, then raises a clear error. Benchmark/train/synth/dag/profile/match configs stay in the repo `configs/` (their packages are not meant for the wheel); the CLI exits 2 with a message when they are missing outside a checkout.
+- Top-level `countonce.load_result` is `explain.load_result_dir` (reads `<out_dir>/result.json`).
+- The wheel test builds with `--no-build-isolation` and inspects the wheel contents rather than installing into a venv (dependencies cannot install offline).

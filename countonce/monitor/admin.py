@@ -2,7 +2,8 @@
 
 ``compute_metrics`` reads a ``JobStore`` (``list_jobs`` / ``get_result``; feedback rows through the
 optional ``feedback`` table of a ``SqliteJobStore``) and returns plain dicts. ``load_rules`` +
-``evaluate_alerts`` turn ``configs/alerts.yaml`` into a typed ``Alert`` list. ``render_html`` writes
+``evaluate_alerts`` turn ``countonce/configs/alerts.yaml`` into a typed ``Alert`` list.
+``render_html`` writes
 a static page; when a drift report is given its PSI table is included.
 
 Definitions: success rate = done / (done + failed + dead_letter). Total time = ``finished_at -
@@ -86,7 +87,7 @@ def _feedback_accuracy(store: JobStore) -> dict[str, Any] | None:
 
 
 def load_cost_rates(path: str | Path) -> dict[str, float | None]:
-    """``cost_per_hour`` per worker kind from ``configs/cost.yaml``; missing/null stays None."""
+    """``cost_per_hour`` per worker kind from ``cost.yaml``; missing/null stays None."""
     raw = yaml.safe_load(Path(path).read_text()) or {}
     rates = raw.get("cost_per_hour") or {}
     unknown = set(rates) - set(WORKER_KINDS)

@@ -71,7 +71,7 @@ def test_null_rate_gives_null_not_zero(store: SqliteJobStore) -> None:
 
 
 def test_config_ships_null_rates() -> None:
-    assert admin.load_cost_rates("configs/cost.yaml") == {"laptop": None, "cloud": None}
+    assert admin.load_cost_rates("countonce/configs/cost.yaml") == {"laptop": None, "cloud": None}
 
 
 def test_bad_rates_rejected(tmp_path: Path) -> None:
@@ -100,7 +100,8 @@ def test_cost_alert(store: SqliteJobStore) -> None:
 
 
 def test_shipped_rule_is_disabled() -> None:
-    rule = next(r for r in admin.load_rules("configs/alerts.yaml") if r.type == "cost_per_job")
+    rules = admin.load_rules("countonce/configs/alerts.yaml")
+    rule = next(r for r in rules if r.type == "cost_per_job")
     assert rule.max_cost is None
 
 

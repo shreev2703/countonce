@@ -30,6 +30,7 @@ import pycolmap
 import yaml
 
 from countonce.recon.result import Recon
+from countonce.resources import packaged_config
 
 DEFAULT_CONFIG = Path("configs/colmap.yaml")
 MIN_REGISTERED = 3  # spec section 6.2: fewer than this counts as a failure
@@ -89,6 +90,8 @@ class ColmapConfig:
         """
         explicit = path is not None
         path = DEFAULT_CONFIG if path is None else Path(path)
+        if not explicit and not path.exists():
+            path = packaged_config(path.name) or path
         if not path.exists():
             if explicit:
                 raise FileNotFoundError(f"COLMAP config not found: {path}")

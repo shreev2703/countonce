@@ -52,7 +52,7 @@ countonce-mcp = "countonce.integrations.mcp_server:main"
 include = ["countonce*", "synth*"]
 
 [tool.setuptools.package-data]
-countonce = ["py.typed"]
+countonce = ["py.typed", "configs/*.yaml"]
 
 [tool.ruff]
 line-length = 100

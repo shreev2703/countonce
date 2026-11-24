@@ -102,7 +102,7 @@ def test_empty_store_has_no_rates(tmp_path: Path) -> None:
 def test_alerts_fire_and_stay_quiet(store: SqliteJobStore) -> None:
     rules = [
         dataclasses.replace(r, min_jobs=3) if r.type == "p95_regression" else r
-        for r in admin.load_rules("configs/alerts.yaml")
+        for r in admin.load_rules("countonce/configs/alerts.yaml")
     ]
     alerts = {a.rule: a for a in admin.evaluate_alerts(store, rules, NOW)}
     # recent: 3 done + 2 failed -> 40% vs baseline 0% -> fires

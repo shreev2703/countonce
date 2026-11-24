@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from countonce.oom import configure_allocator
+from countonce.resources import resolve_config
 
 configure_allocator()  # before anything can import torch
 
@@ -248,6 +249,14 @@ def _review_queue(args: argparse.Namespace) -> int:
     return 0
 
 
+def _find_config(path: Path) -> Path | None:
+    """``path`` if it exists, else the packaged copy of a ``configs/<name>`` default, else None."""
+    try:
+        return resolve_config(path)
+    except FileNotFoundError:
+        return None
+
+
 def _read_doc(path: Path | None) -> dict[str, Any]:
     import yaml
 
@@ -387,8 +396,9 @@ def _admin_stats(args: argparse.Namespace) -> int:
     store = SqliteJobStore(args.db)
     now = time.time()
     try:
-        rules = admin.load_rules(args.alerts) if args.alerts.exists() else []
-        rates = admin.load_cost_rates(args.cost) if args.cost.exists() else None
+        alerts_p, cost_p = _find_config(args.alerts), _find_config(args.cost)
+        rules = admin.load_rules(alerts_p) if alerts_p else []
+        rates = admin.load_cost_rates(cost_p) if cost_p else None
         drift = None
         if args.reference:
             from countonce.monitor.drift import run_drift
@@ -744,6 +754,13 @@ def _profile(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     configure_allocator()
     args = _parser().parse_args(argv)
+    cfg_arg = getattr(args, "config", None)
+    if isinstance(cfg_arg, Path) and not cfg_arg.exists():
+        try:
+            args.config = resolve_config(cfg_arg)
+        except FileNotFoundError as exc:
+            print(f"countonce: error: {exc}", file=sys.stderr)
+            return 2
     if args.cmd == "env":
         from countonce import env_check
 
