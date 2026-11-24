@@ -92,3 +92,9 @@ One entry per decision: date, what the plan said, what was done, why.
 - **Bootstrap:** percentile, 10,000 resamples of scenes, NaNs dropped. Paired p-value is twice the smaller tail of the bootstrap distribution of the mean difference; Wilcoxon is two-sided and returns 1.0 for all-zero differences.
 - **Splits:** assignment ranks scenes by `sha256(seed:id)`, so it is order-independent; `write_splits` refuses to overwrite a frozen file. Only `val` and `test` splits are written; `verify_splits` also flags scenes on disk missing from the file.
 - **Runner:** error rows are written with `status=error` and retried on resume; only `status=ok` keys are skipped. Provenance (git commit/dirty, UTC time, torch/GPU if present) is captured once per `run_jobs` call. Plain `csv` module, no pandas dependency.
+
+## 2026-11-24: Fuji-SfM loader, Sim(3), GT matching
+- **Sim(3) location:** `countonce/recon/align.py` (`umeyama`, `Sim3`, `camera_centers`, `align_by_camera_centers`, `transform_extrinsics`) so chunk stitching (§8.3) and the benchmark share it. Convention `dst = s R src + t`.
+- **Loader layout is a guess:** all file names live in `bench/datasets/fuji_sfm.py::_read_layout`; format TODOs from DATASETS.md are in the module docstring. Never run against real data.
+- **Matching** (`bench/gt_matching.py`): nearest projected GT within a pixel threshold (default 20, `TODO: tune`); no occlusion test (no GT depth), so a detection on an occluded apple may take a hidden GT's id; many-to-one allowed within a frame (a within-frame duplicate). Detection reference = point, else box centre.
+- **Download script** `scripts/download_fuji_sfm.sh` lists files via the Zenodo API, verifies md5, requires an empty target dir. Not run.
