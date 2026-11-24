@@ -40,6 +40,18 @@ def _parser() -> argparse.ArgumentParser:
         "--figures", type=Path, metavar="DIR", help="render figures/gallery from the CSV"
     )
 
+    b.add_argument(
+        "--synth-assoc",
+        nargs="?",
+        const=Path("configs/synth_assoc.yaml"),
+        type=Path,
+        metavar="CONFIG",
+        help="run v1/v2/sync/v3 on held-out synthetic episodes (association metrics)",
+    )
+
+    a = sub.add_parser("ablate", help="v3 arm and feature-group ablation on synthetic episodes")
+    a.add_argument("--config", type=Path, default=Path("configs/synth_ablation.yaml"))
+
     t = sub.add_parser("train", help="train the CountOnce-Match v3 matcher")
     t.add_argument("--config", type=Path, default=Path("configs/match.yaml"))
 
@@ -87,7 +99,34 @@ def _synth(args: argparse.Namespace) -> int:
     return 0
 
 
+def _synth_assoc(args: argparse.Namespace) -> int:
+    from bench.synth_assoc import SynthAssocConfig, run_synth_assoc
+
+    try:
+        cfg = SynthAssocConfig.from_yaml(args.synth_assoc)
+        ran, skipped, errored = run_synth_assoc(cfg)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    print(f"synth-assoc: ran {ran}, skipped {skipped}, errored {errored} -> {cfg.csv}")
+    return 0
+
+
+def _ablate(args: argparse.Namespace) -> int:
+    from bench.synth_ablation import AblationConfig, run_ablation
+
+    try:
+        summary, per_seed = run_ablation(AblationConfig.from_yaml(args.config))
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    print(f"ablate: summary -> {summary}, per-seed -> {per_seed}")
+    return 0
+
+
 def _bench(args: argparse.Namespace) -> int:
+    if args.synth_assoc is not None:
+        return _synth_assoc(args)
     from bench.sweep import BenchConfig, build_jobs, discover_scenes, run_bench
 
     cfg = BenchConfig.from_yaml(args.config)
@@ -137,6 +176,8 @@ def main(argv: list[str] | None = None) -> int:
         return env_check.main(args.out)
     if args.cmd == "bench":
         return _bench(args)
+    if args.cmd == "ablate":
+        return _ablate(args)
     if args.cmd == "train":
         return _train(args)
     if args.cmd == "synth":

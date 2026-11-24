@@ -1,0 +1,18 @@
+# v3 ablation (arms + feature groups). Run: countonce ablate --config configs/synth_ablation.yaml
+# Trains 4 models x seeds; needs episodes from `countonce synth`. Nothing here is a result.
+train_dir: data/synth/train
+val_dir: data/synth/val
+test_dir: data/synth/test
+work_dir: runs/ablation
+out_csv: results/synth_ablation.csv
+per_seed_csv: results/synth_ablation_per_seed.csv
+seeds: [0, 1, 2]
+arms: [pairwise, cycle, sync, both]
+feature_groups: ["3d", "3d_rays", "full"]
+cycle_weight: 0.5
+epochs: 30
+batch_size: 8
+lr: 0.0003
+device: auto
+model: {width: 128, layers: 4, heads: 4}
+n_boot: 2000

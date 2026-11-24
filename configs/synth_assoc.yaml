@@ -1,0 +1,7 @@
+# Synthetic association bench. Run: countonce bench --synth-assoc
+# Needs test episodes from `countonce synth`. Nothing here is a result.
+test_dir: data/synth/test
+csv: results/bench_synth_assoc.csv
+methods: [v1, v2, sync, v3]
+v3_checkpoint: runs/match/best.pt   # rows are skipped_no_checkpoint while this file is absent
+v3_synchronize: false

@@ -15,8 +15,10 @@ from typing import Any
 import numpy as np
 
 from countonce.match.instances import form_instances
-from countonce.match.model import DetInputs, load_checkpoint
+from countonce.match.model import DetInputs, load_checkpoint, mask_inputs
 from countonce.merge.base import ClusterResult
+from countonce.merge.sync import SyncConfig
+from countonce.merge.sync import synchronize as spectral_sync
 from countonce.types import Detection, Frame, Instance, LiftedDetection, MatchEvidence, Recon
 
 
@@ -120,12 +122,16 @@ class V3Associator:
         threshold: float = 0.5,
         frame_to_view: Mapping[int, int] | None = None,
         device: str = "cpu",
+        synchronize: bool = False,
+        feature_group: str = "full",
     ):
         if model is None:
             model = load_checkpoint(require_checkpoint(checkpoint), device)
         self.model = model
         self.threshold = threshold
         self.frame_to_view = frame_to_view
+        self.synchronize = synchronize  # spectral sync of the match matrix (§10.3 fix 2)
+        self.feature_group = feature_group
 
     def associate(
         self,
@@ -148,20 +154,27 @@ class V3Associator:
         if recon is None:
             raise ValueError("assoc: v3 needs the reconstruction (cameras) to build features")
 
-        inputs = build_inputs(ok, recon, frames, self.frame_to_view)
+        inputs = mask_inputs(
+            build_inputs(ok, recon, frames, self.frame_to_view),
+            self.feature_group,
+            int(self.model.hparams.get("appearance_dim", 0)),
+        )
         was_training = self.model.training
         self.model.eval()
         with torch.no_grad():
             probs = self.model.match_probs(inputs).cpu().numpy()
         self.model.train(was_training)
-        labels = form_instances(probs, inputs.view, self.threshold)
+        if self.synchronize:
+            labels = spectral_sync(probs, inputs.view, SyncConfig())
+        else:
+            labels = form_instances(probs, inputs.view, self.threshold)
 
         xyz = np.stack([ld.xyz for ld in ok]).astype(float)
         known = [ld.size for ld in ok if ld.size is not None and ld.size > 0]
         fallback = float(np.median(known)) if known else 1.0
         sizes = np.array([ld.size if ld.size else fallback for ld in ok], dtype=float)
-        for k in range(int(labels.max()) + 1):
-            idxs = np.flatnonzero(labels == k)
+        for k, lab in enumerate(np.unique(labels)):
+            idxs = np.flatnonzero(labels == lab)
             members = [ok[i] for i in idxs]
             n_views = len({m.det.frame_id for m in members})
             mean_conf = float(np.mean([m.lift_conf for m in members]))

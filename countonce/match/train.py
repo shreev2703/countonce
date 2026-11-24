@@ -24,7 +24,13 @@ from typing import Any
 import numpy as np
 import yaml
 
-from countonce.match.model import DetInputs, episode_inputs, make_model, save_checkpoint
+from countonce.match.model import (
+    DetInputs,
+    episode_inputs,
+    make_model,
+    mask_inputs,
+    save_checkpoint,
+)
 from countonce.provenance import git_commit, git_is_dirty
 from synth.geometry import Episode, load_episode
 
@@ -46,6 +52,7 @@ class TrainConfig:
     cycle_weight: float = 0.0  # 0 disables the cycle loss (the "pairwise only" ablation)
     max_triplets: int = 8  # view triplets sampled per episode per step
     match_threshold: float = 0.5  # for validation association F1
+    feature_group: str = "full"  # 3d | 3d_rays | full (§10.5 attribution ablation)
     seed: int = 0
     device: str = "auto"  # auto | cpu | cuda
     resume: bool = True
@@ -157,11 +164,16 @@ def _total(terms: dict[str, Any], cfg: TrainConfig) -> Any:
 
 
 # ------------------------------------------------------------------ data + validation
-def load_split(directory: str | Path) -> list[tuple[Episode, DetInputs]]:
+def load_split(
+    directory: str | Path, feature_group: str = "full", appearance_dim: int = 0
+) -> list[tuple[Episode, DetInputs]]:
     files = sorted(Path(directory).glob("*.npz"))
     if not files:
         raise FileNotFoundError(f"no .npz episodes in {directory} (run `countonce synth` first)")
-    return [(ep, episode_inputs(ep)) for ep in map(load_episode, files)]
+    return [
+        (ep, mask_inputs(episode_inputs(ep), feature_group, appearance_dim))
+        for ep in map(load_episode, files)
+    ]
 
 
 def data_version(*directories: str | Path) -> str:
@@ -263,8 +275,9 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
     """Run (or resume) training; returns the per-epoch metric history."""
     import torch
 
-    train_set = load_split(cfg.train_dir)
-    val_set = load_split(cfg.val_dir)
+    adim = int(cfg.model.get("appearance_dim", 0))
+    train_set = load_split(cfg.train_dir, cfg.feature_group, adim)
+    val_set = load_split(cfg.val_dir, cfg.feature_group, adim)
     out = Path(cfg.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     last, best = out / "last.pt", out / "best.pt"

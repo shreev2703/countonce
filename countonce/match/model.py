@@ -72,6 +72,38 @@ class DetInputs:
         )
 
 
+FEATURE_GROUPS = ("3d", "3d_rays", "full")
+
+
+def mask_inputs(d: DetInputs, group: str = "full", appearance_dim: int = 0) -> DetInputs:
+    """Zero the input groups outside ``group`` (PLAN §10.5 feature-group attribution).
+
+    ``3d``: lifted position and size only. ``3d_rays``: adds ray direction and camera centre.
+    ``full``: everything. The log-depth column is derived from position and camera, so under
+    ``3d`` it degrades to distance from the scene centre. When the model has an appearance
+    slot (``appearance_dim`` > 0) and the detections carry none, the slot is masked with zeros.
+    """
+    if group not in FEATURE_GROUPS:
+        raise ValueError(f"unknown feature group {group!r}; expected one of {FEATURE_GROUPS}")
+    app = d.appearance
+    if appearance_dim and app is None:
+        app = np.zeros((d.n, appearance_dim))
+    if group == "full":
+        return DetInputs(d.xyz, d.size, d.box, d.score, d.lift_conf, d.ray, d.cam, d.view, app)
+    keep_rays = group == "3d_rays"
+    return DetInputs(
+        xyz=d.xyz,
+        size=d.size,
+        box=np.zeros_like(d.box),
+        score=np.zeros_like(d.score),
+        lift_conf=np.zeros_like(d.lift_conf),
+        ray=d.ray if keep_rays else np.zeros_like(d.ray),
+        cam=d.cam if keep_rays else np.zeros_like(d.cam),
+        view=d.view,
+        appearance=None if app is None else np.zeros_like(app),
+    )
+
+
 def episode_inputs(ep: Any) -> DetInputs:
     """Model inputs from a ``synth.geometry.Episode`` (unprojects uv + depth with K, R, t)."""
     v = ep.view
