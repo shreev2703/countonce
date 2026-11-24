@@ -2,6 +2,8 @@
 
 import numpy as np
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from countonce.lift import compute_scene_scale, lift_detections
 from countonce.merge.cluster import cluster_detections
@@ -136,3 +138,21 @@ def test_count_nonincreasing_in_k():
     lifted = [_ld(f"{i % 4}:{i}", i % 4, rng.normal(0, 2, 3)) for i in range(60)]
     counts = [len(cluster_detections(lifted, k=k).instances) for k in (0.1, 0.3, 0.5, 1.0, 2.0)]
     assert counts == sorted(counts, reverse=True)
+
+
+@settings(max_examples=60, deadline=None)
+@given(
+    seed=st.integers(0, 10_000),
+    n=st.integers(1, 40),
+    n_frames=st.integers(1, 5),
+    ks=st.lists(st.floats(0.05, 5.0), min_size=2, max_size=6),
+)
+def test_v1_count_never_increases_with_k(seed, n, n_frames, ks):
+    """Property: a larger merge radius can only merge more, so the v1 count never grows."""
+    rng = np.random.default_rng(seed)
+    lifted = [
+        _ld(f"{i % n_frames}:{i}", i % n_frames, rng.normal(0, 2, 3), size=rng.uniform(0.3, 1.5))
+        for i in range(n)
+    ]
+    counts = [len(cluster_detections(lifted, k=k).instances) for k in sorted(ks)]
+    assert all(a >= b for a, b in zip(counts, counts[1:], strict=False))

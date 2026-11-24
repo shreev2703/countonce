@@ -107,3 +107,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - **Figures** (§9.7 items 1, 2, 3, 8): points are means over scenes (samples averaged within scene first), 95% bootstrap CI over scenes (2000 resamples). MAPE excludes gt = 0 scenes. Headline and tier plots use ordered runs only. Figures 4-7, 9 (rendering), 10-11 are out of scope here.
 - **Failure gallery:** worst 10% per method by relative error (absolute error when gt = 0), ceil, deterministic tie-break; written as a Markdown table with a coarse over/under-count label only (true cause needs the overlay). `countonce bench --figures DIR` renders all of it.
 - Smoke tests use a synthetic CSV in `tmp_path`; nothing under `results/` is committed.
+
+## Ingest-to-original pixel mapping (overnight)
+- `Frame` gains optional `pixel_map: PixelMap` and `original_path`; `resize_to_grid_mapped` returns the maps and `resize_to_grid` keeps its old signature. Overlays draw on `original_path` in original pixels when both are set, otherwise on `frame.path` as before.
+- `pipeline.make_frames` does not resize today (frames are used at native size), so it leaves `pixel_map` unset; it must be populated once a backbone-grid resize step is wired into `run()`.

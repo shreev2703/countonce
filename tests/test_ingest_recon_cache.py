@@ -157,6 +157,46 @@ def test_cache_hit_miss_and_key_sensitivity(tmp_path):
     assert input_hash(frames) == input_hash(_frames())
 
 
+def test_new_prompt_same_frames_reuses_reconstruction(tmp_path):
+    """Reconstruction is keyed on frames, not prompt: a new prompt is a cache hit, same geometry."""
+    from countonce.config import Config
+    from countonce.detect.base import FakeDetector
+    from countonce.pipeline import run
+    from tests.test_pipeline import PlaneRecon, make_scene
+
+    img_dir, script = make_scene(tmp_path)
+    cfg = Config(out_dir=tmp_path / "out", cache_dir=tmp_path / "cache", max_frames=0)
+
+    class CountingRecon(PlaneRecon):
+        calls = 0
+
+        def reconstruct(self, frames):
+            type(self).calls += 1
+            return super().reconstruct(frames)
+
+    def go(prompt):
+        det = FakeDetector(script)
+        return run(img_dir, prompt, cfg, detector=det, reconstructor=CountingRecon())
+
+    first, second = go("widgets"), go("gadgets")
+    assert not first.recon_cache_hit and second.recon_cache_hit
+    assert CountingRecon.calls == 1  # the second prompt never reconstructed
+    assert first.recon_cache_key == second.recon_cache_key
+    assert first.input_hash == second.input_hash
+    cache = ReconCache(tmp_path / "cache" / "recon")
+    stored = cache.get(first.recon_cache_key)
+    assert stored is not None
+    again = CachedReconstructor(MethodReconstructor(FakeMethod()), cache, "v1")
+    assert again.key_for(_frames()) != first.recon_cache_key  # distinct frames, distinct key
+    # identical geometry on a hit (direct, same frames twice)
+    frames = _frames()
+    cr = CachedReconstructor(MethodReconstructor(FakeMethod()), ReconCache(tmp_path / "c2"), "v1")
+    r1 = cr.reconstruct_cached(frames).recon
+    r2 = cr.reconstruct_cached(frames).recon
+    for name in ("extrinsics", "intrinsics", "depth", "world_points"):
+        assert np.array_equal(getattr(r1, name), getattr(r2, name))
+
+
 def test_corrupt_cache_entry_is_a_miss(tmp_path):
     cache = ReconCache(tmp_path)
     cr = CachedReconstructor(MethodReconstructor(FakeMethod()), cache, "v1")

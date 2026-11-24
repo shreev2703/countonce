@@ -16,6 +16,8 @@ import numpy as np
 from PIL import Image
 from scipy.ndimage import laplace
 
+from countonce.types import PixelMap
+
 IMAGE_EXTS = {".png", ".jpg", ".jpeg"}
 
 
@@ -101,13 +103,35 @@ def drop_blurry(paths: list[Path], threshold: float) -> tuple[list[Path], dict[s
     return [p for p in paths if scores[p.name] >= threshold], scores
 
 
+def grid_pixel_map(width: int, height: int) -> PixelMap:
+    """Map from a frame's `vggt_grid_size` pixels back to the original (width, height) image.
+
+    Mirrors `resize_to_grid`: a uniform scale of `VGGT_SIZE / width`, then a vertical centre crop
+    of `top` scaled pixels for tall frames. So `sx = sy = width / VGGT_SIZE`, `ox = 0`, and `oy`
+    is the cropped-off `top` expressed in original pixels.
+    """
+    new_h = _scaled_height(width, height)
+    _, h = vggt_grid_size(width, height)
+    top = (new_h - h) // 2
+    inv = width / VGGT_SIZE
+    return PixelMap(sx=inv, sy=inv, ox=0.0, oy=top * inv, orig_width=width, orig_height=height)
+
+
 def resize_to_grid(paths: list[Path], out_dir: Path) -> list[Path]:
     """Write each frame as a PNG at its vggt_grid_size, centre-cropping tall frames."""
+    return resize_to_grid_mapped(paths, out_dir)[0]
+
+
+def resize_to_grid_mapped(
+    paths: list[Path], out_dir: Path
+) -> tuple[list[Path], list[PixelMap]]:
+    """`resize_to_grid` plus, per frame, the `PixelMap` back to its original pixels."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = []
+    out, maps = [], []
     for p in paths:
         with Image.open(p) as im:
             rgb = im.convert("RGB")
+            maps.append(grid_pixel_map(*rgb.size))
             w, h = vggt_grid_size(*rgb.size)
             new_h = _scaled_height(rgb.width, rgb.height)
             rgb = rgb.resize((w, new_h), Image.Resampling.BICUBIC)
@@ -116,4 +140,4 @@ def resize_to_grid(paths: list[Path], out_dir: Path) -> list[Path]:
             dest = out_dir / f"{p.stem}.png"
             rgb.save(dest)
         out.append(dest)
-    return out
+    return out, maps

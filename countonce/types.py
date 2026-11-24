@@ -20,6 +20,25 @@ INTERVAL_METHODS = ("sensitivity", "split_conformal", "jackknife_plus")
 CONFIDENCE_METHODS = ("heuristic", "sensitivity", "temperature_scaled", "learned")
 
 
+@dataclass(frozen=True)
+class PixelMap:
+    """Affine map from a frame's working pixels back to its original image (PLAN 8.1).
+
+    ``x_orig = x * sx + ox``, ``y_orig = y * sy + oy``. ``orig_width``/``orig_height`` are the
+    original image size, so overlays can be drawn in the image the user actually supplied.
+    """
+
+    sx: float
+    sy: float
+    ox: float
+    oy: float
+    orig_width: int
+    orig_height: int
+
+    def to_original(self, x: float, y: float) -> tuple[float, float]:
+        return x * self.sx + self.ox, y * self.sy + self.oy
+
+
 @dataclass
 class Frame:
     id: int
@@ -29,9 +48,13 @@ class Frame:
     sha256: str  # content hash (stage caching)
     privacy_mask: np.ndarray | None = None  # HxW bool, blurred faces/plates
     blur_score: float = 0.0
+    pixel_map: PixelMap | None = None  # working pixels -> original pixels (set by resize_to_grid)
+    original_path: Path | None = None  # the un-resized image that ``pixel_map`` maps onto
 
     def __post_init__(self) -> None:
         self.path = Path(self.path)
+        if self.original_path is not None:
+            self.original_path = Path(self.original_path)
         if self.width <= 0 or self.height <= 0:
             raise ValueError("Frame width/height must be positive")
         if self.privacy_mask is not None and self.privacy_mask.shape != (self.height, self.width):

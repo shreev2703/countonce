@@ -95,6 +95,16 @@ def test_zero_detections_gives_zero_count(tmp_path):
     assert res.count == 0 and res.zero_count
 
 
+@pytest.mark.parametrize("assoc", ["v1", "v2"])
+def test_empty_scene_counts_zero_with_interval_containing_zero(tmp_path, assoc):
+    img_dir, _ = make_scene(tmp_path)
+    cfg = Config(out_dir=tmp_path / "out", max_frames=0, assoc=assoc)
+    res = run(img_dir, "nothing", cfg, detector=FakeDetector({}), reconstructor=PlaneRecon())
+    assert res.count == 0 and res.zero_count and not res.instances
+    assert res.interval.low == 0 and res.interval.low <= 0 <= res.interval.high
+    assert res.interval.high >= res.count
+
+
 def test_end_to_end_v2_counts_each_object_once(tmp_path):
     img_dir, script = make_scene(tmp_path)
     cfg = Config(out_dir=tmp_path / "out", max_frames=0, assoc="v2")
