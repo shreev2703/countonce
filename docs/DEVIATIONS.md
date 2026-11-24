@@ -468,3 +468,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - `countonce release synth-dataset` repacks a subset of existing DAG shards (`--shards`, default `data/dag/shard`, `--n-scenes`, `--split`) instead of rendering new scenes; run `countonce dag run` first.
 - License is a flag, default `other` (the datasheet says `TODO: decide`); the card marks it as undecided. Model card likewise.
 - Model-card metric rows fill only from `--results` JSON (or registry `metrics`); CI column stays `TODO: fill from results` unless a `<key>_ci` entry exists. Space `requirements.txt` leaves the countonce pin as TODO. Nothing uploads; `sdk_version` in the Space front-matter is unverified.
+
+## Paper and project-page scaffolding
+- `paper/refs.bib` entries carry titles/IDs only from `docs/RELATED_WORK.md` and `docs/MODEL_SURVEY.md`; authors are `TODO: verify authors` because no paper was read in full. Several titles are the short names used in those docs and are tagged `TODO: verify title`.
+- `paper/tables/` and `site/` are generated and gitignored; `make paper` skips the PDF when `latexmk` is absent. Ablation rows are methods whose names contain `+` or `-` (the sweep's `<base>+<field>=<value>` naming).
+- The site inlines images as base64 (one file, no network); the Links section is a placeholder until URLs exist.

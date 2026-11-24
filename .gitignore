@@ -33,3 +33,15 @@ weights/
 .vscode/
 .idea/
 .DS_Store
+
+# Generated paper/site outputs
+paper/tables/
+paper/*.aux
+paper/*.log
+paper/*.bbl
+paper/*.blg
+paper/*.out
+paper/*.fls
+paper/*.fdb_latexmk
+paper/main.pdf
+site/

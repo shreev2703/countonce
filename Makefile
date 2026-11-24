@@ -1,8 +1,9 @@
 # Thin targets over the rerunnable synthetic-data DAG (stamps decide what actually reruns).
+PYTHON ?= $(shell command -v python3 || command -v python)
 DAG_CONFIG ?= configs/dag.yaml
 CLI = countonce dag
 
-.PHONY: dag dag-status dag-force recipe validate episodes train evaluate lint test
+.PHONY: paper site dag dag-status dag-force recipe validate episodes train evaluate lint test
 
 dag:
 	$(CLI) run --config $(DAG_CONFIG)
@@ -21,3 +22,13 @@ lint:
 
 test:
 	pytest
+
+# Render paper tables from results/bench.csv; builds paper/main.pdf only if latexmk is installed.
+paper:
+	$(PYTHON) scripts/make_paper_tables.py --out paper/tables
+	@if command -v latexmk >/dev/null; then cd paper && latexmk -pdf -interaction=nonstopmode main.tex; \
+	else echo "latexmk not found: tables rendered, PDF skipped"; fi
+
+# Static project page (self-contained, placeholders where results are missing).
+site:
+	$(PYTHON) scripts/make_site.py --out site/index.html
