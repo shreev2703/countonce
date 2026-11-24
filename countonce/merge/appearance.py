@@ -64,8 +64,12 @@ class DinoV2Extractor:
             else:
                 ys, xs = np.nonzero(d.mask)
                 x0, y0, x1, y1 = xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
-            box = (max(0, int(x0)), max(0, int(y0)), min(img.width, int(x1) + 1),
-                   min(img.height, int(y1) + 1))
+            box = (
+                max(0, int(x0)),
+                max(0, int(y0)),
+                min(img.width, int(x1) + 1),
+                min(img.height, int(y1) + 1),
+            )
             crop = img.crop(box).resize((self.crop_size, self.crop_size))
             arr = (np.asarray(crop, dtype=np.float32) / 255.0 - mean) / std
             crops.append(arr.transpose(2, 0, 1))

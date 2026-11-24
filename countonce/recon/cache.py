@@ -106,5 +106,3 @@ class CachedReconstructor:
 
     def config(self) -> dict[str, Any]:
         return self.inner.config()
-
-

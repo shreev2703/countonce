@@ -122,9 +122,7 @@ def resize_to_grid(paths: list[Path], out_dir: Path) -> list[Path]:
     return resize_to_grid_mapped(paths, out_dir)[0]
 
 
-def resize_to_grid_mapped(
-    paths: list[Path], out_dir: Path
-) -> tuple[list[Path], list[PixelMap]]:
+def resize_to_grid_mapped(paths: list[Path], out_dir: Path) -> tuple[list[Path], list[PixelMap]]:
     """`resize_to_grid` plus, per frame, the `PixelMap` back to its original pixels."""
     out_dir.mkdir(parents=True, exist_ok=True)
     out, maps = [], []

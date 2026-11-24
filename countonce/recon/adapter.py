@@ -66,9 +66,7 @@ def to_dense_recon(res: SparseRecon, backbone: str | None = None) -> DenseRecon:
         if res.depth_conf is None
         else np.asarray(res.depth_conf, dtype=np.float32)
     )
-    registered = (
-        np.ones(depth.shape[0], dtype=bool) if res.registered is None else res.registered
-    )
+    registered = np.ones(depth.shape[0], dtype=bool) if res.registered is None else res.registered
     world = unproject_depth(depth, res.intrinsics, res.extrinsics)
     bad = ~np.isfinite(world).all(-1) | ~np.isfinite(depth) | ~registered[:, None, None]
     world[bad] = 0.0

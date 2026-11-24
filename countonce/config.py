@@ -26,6 +26,11 @@ class Config(BaseModel):
     dedup_threshold: float = Field(0.02, ge=0)  # near-duplicate frame filter; 0 = off
     blur_threshold: float = Field(0.0, ge=0)  # Laplacian variance floor; 0 = off
 
+    # Chunked reconstruction (PLAN 8.3): stitch overlapping chunks when frames exceed the cap
+    chunked_recon: bool = False
+    chunk_size: int = Field(0, ge=0)  # 0 = use the memory-guard calibration (no chunking if none)
+    chunk_overlap: int = Field(4, ge=2)  # shared frames between adjacent chunks
+
     # Detect / lift / associate
     score_threshold: float = Field(0.3, ge=0, le=1)
     merge_k: float = Field(0.5, gt=0)  # v1 distance threshold, in object sizes

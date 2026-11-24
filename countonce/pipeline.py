@@ -19,6 +19,7 @@ from countonce.merge.match import V2Associator, V2Config
 from countonce.provenance import run_metadata
 from countonce.recon.base import Reconstructor
 from countonce.recon.cache import CachedReconstructor, ReconCache
+from countonce.recon.chunked import ChunkedReconstructor
 from countonce.types import CountResult, Frame, ModelVersions
 from countonce.types import Recon as DenseRecon
 from countonce.warnings import assess_quality
@@ -79,6 +80,16 @@ def build_reconstructor(config: Config) -> Reconstructor:
     raise NotImplementedError(f"backbone {config.backbone!r} is not implemented yet")
 
 
+def _chunk_cap(config: Config) -> int | None:
+    """Frames per chunk: explicit ``chunk_size``, else the memory-guard calibration, else None."""
+    if config.chunk_size > 0:
+        return config.chunk_size
+    from countonce.recon.profiling import max_frames_from_profile
+
+    dtype = config.backbone_options.get("weights_dtype", "bf16")
+    return max_frames_from_profile(dtype)
+
+
 def _make_associator(config: Config, k: float):
     """Associator at strictness ``k``: v1 uses it directly, v2 scales its reprojection gate."""
     if config.assoc == "v1":
@@ -132,6 +143,10 @@ def run(
     # Reconstruct
     t = time.perf_counter()
     rec = reconstructor if reconstructor is not None else build_reconstructor(config)
+    if config.chunked_recon:
+        cap = _chunk_cap(config)
+        if cap is not None:
+            rec = ChunkedReconstructor(rec, cap, config.chunk_overlap)
     cache_key: str | None = None
     cache_hit = False
     recon: DenseRecon

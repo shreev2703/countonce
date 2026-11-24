@@ -61,6 +61,7 @@ def cluster_detections(lifted: Sequence[LiftedDetection], k: float = DEFAULT_K) 
     diff = np.linalg.norm(xyz[:, None, :] - xyz[None, :, :], axis=-1)
     norm = diff / ((sizes[:, None] + sizes[None, :]) / 2.0)
     ii, jj = np.where(np.triu(norm < k, 1))
+
     def tie_key(p: tuple[int, int]):  # order-independent: distance, then detection ids
         return (norm[p], *sorted((ok[p[0]].det.id, ok[p[1]].det.id)))
 
