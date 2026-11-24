@@ -506,6 +506,11 @@ def _correct(args: argparse.Namespace) -> int:
 def _add_store_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--store", choices=["sqlite", "postgres"], default="sqlite")
     p.add_argument("--pg-url", help="postgres URL (default: $COUNTONCE_PG_URL; db extra)")
+    p.add_argument(
+        "--storage",
+        choices=["local", "s3"],
+        help="blob backend (default: $COUNTONCE_STORAGE, else local; s3 needs the storage extra)",
+    )
 
 
 def _serve_api(args: argparse.Namespace) -> int:
@@ -525,6 +530,7 @@ def _serve_api(args: argparse.Namespace) -> int:
             request_rate_limit=args.request_rate_limit,
             store_kind=args.store,
             pg_url=args.pg_url,
+            blobs=_worker_blobs(args),
         )
     except (ValueError, ImportError) as exc:
         print(f"countonce: error: {exc}", file=sys.stderr)
@@ -611,12 +617,25 @@ def _pilot_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _worker_blobs(args: argparse.Namespace) -> Any:
+    """Blob store for ``--storage`` / ``COUNTONCE_STORAGE``; None keeps plain local paths."""
+    import os
+
+    from countonce.storage import open_blobstore
+
+    kind = args.storage or os.environ.get("COUNTONCE_STORAGE") or "local"
+    if kind == "local":
+        return None
+    return open_blobstore(kind)
+
+
 def _worker(args: argparse.Namespace) -> int:
     from countonce.jobs.store import open_store
     from countonce.jobs.worker import Worker, pipeline_runner
 
     try:
-        store = open_store(args.store, args.db, pg_url=args.pg_url)
+        blobs = _worker_blobs(args)
+        store = open_store(args.store, args.db, pg_url=args.pg_url, blobs=blobs)
     except (ValueError, ImportError) as exc:
         print(f"countonce: error: {exc}", file=sys.stderr)
         return 2
@@ -624,7 +643,9 @@ def _worker(args: argparse.Namespace) -> int:
     from countonce.monitor.tracing import TracingConfig
 
     tcfg = TracingConfig(args.tracing, args.trace_dir)
-    worker = Worker(store, pipeline_runner(out), tracing_cfg=tcfg)
+    worker = Worker(
+        store, pipeline_runner(out), tracing_cfg=tcfg, blobs=blobs, out_root=out if blobs else None
+    )
     try:
         n = worker.run_loop(until_idle=args.once, poll_s=args.poll)
     except KeyboardInterrupt:

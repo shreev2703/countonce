@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import tempfile
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
 
 from countonce.detect.base import Detector, Exemplar
+from countonce.storage import BlobNotFound, BlobStore, LocalBlobStore, expire_prefix
 from countonce.types import Detection, Frame
 
 
@@ -51,15 +51,37 @@ def _to_json(d: Detection) -> dict[str, object]:
 
 
 class DetectionCache:
-    def __init__(self, root: Path) -> None:
-        self.root = Path(root)
+    """Detections as ``<prefix>/<key>.json`` blobs (local directory by default, or ``blobs``)."""
+
+    def __init__(
+        self,
+        root: Path | None = None,
+        *,
+        blobs: BlobStore | None = None,
+        prefix: str = "",
+        ttl_s: float | None = None,
+    ) -> None:
+        if blobs is None:
+            if root is None:
+                raise ValueError("DetectionCache needs a root directory or a blob store")
+            blobs = LocalBlobStore(root)
+        self.root = Path(root) if root is not None else None
+        self.blobs = blobs
+        self.prefix = prefix.strip("/")
+        self.ttl_s = ttl_s
+
+    def _key(self, key: str) -> str:
+        return f"{self.prefix}/{key}.json" if self.prefix else f"{key}.json"
 
     def path(self, key: str) -> Path:
-        return self.root / f"{key}.json"
+        """Local file for ``key`` (local backend only)."""
+        if not isinstance(self.blobs, LocalBlobStore):
+            raise TypeError("path() is only meaningful for the local backend")
+        return self.blobs.path(self._key(key))
 
     def get(self, key: str, frame_id: int) -> list[Detection] | None:
         try:
-            raw = json.loads(self.path(key).read_text())
+            raw = json.loads(self.blobs.get(self._key(key)))
             return [
                 Detection(
                     id=Detection.make_id(frame_id, k),
@@ -70,16 +92,21 @@ class DetectionCache:
                 )
                 for k, r in enumerate(raw)
             ]
-        except (OSError, ValueError, KeyError, TypeError):
+        except (BlobNotFound, OSError, ValueError, KeyError, TypeError):
             return None  # missing or corrupt: a miss
 
-    def put(self, key: str, dets: Sequence[Detection]) -> Path:
-        self.root.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=self.root, suffix=".tmp")
-        with os.fdopen(fd, "w") as fh:
-            json.dump([_to_json(d) for d in dets], fh)
-        os.replace(tmp, self.path(key))
-        return self.path(key)
+    def put(self, key: str, dets: Sequence[Detection]) -> str:
+        self.blobs.put(self._key(key), json.dumps([_to_json(d) for d in dets]).encode())
+        return self._key(key)
+
+    def expire(self, now: float | None = None) -> int:
+        """Delete entries older than ``ttl_s``; returns how many (0 if no TTL is set)."""
+        if self.ttl_s is None:
+            return 0
+        return expire_prefix(
+            self.blobs, self.prefix + "/" if self.prefix else "", self.ttl_s,
+            (lambda: now) if now is not None else time.time,
+        )  # fmt: skip
 
 
 class CachedDetector:

@@ -21,12 +21,19 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Header, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from pydantic import BaseModel, Field
 
 from countonce.errors import CountOnceError, ErrorCode, is_retryable, user_tip
 from countonce.jobs.store import TERMINAL, RateLimitError, SqliteJobStore
 from countonce.jobs.uploads import UploadLimits, UploadService
+from countonce.storage import BlobStore, LocalBlobStore
 
 HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.ERR_INVALID_INPUT: 400,
@@ -341,10 +348,17 @@ def create_app(
         )
 
     @app.get("/jobs/{job_id}/files/{file_id}")
-    def get_file(job_id: str, file_id: str, user: str = User) -> FileResponse:
+    def get_file(job_id: str, file_id: str, user: str = User) -> Response:
         own_job(job_id, user)
+        blobs = store.blobs
         for f in store.job_files(job_id, "output"):
-            if f["id"] == file_id and Path(f["key"]).is_file():
+            if f["id"] != file_id:
+                continue
+            if blobs is not None and not isinstance(blobs, LocalBlobStore):
+                # object storage: hand out a short-lived signed URL, never proxy or expose keys
+                if blobs.exists(f["key"]):
+                    return RedirectResponse(blobs.presign_get(f["key"]), status_code=307)
+            elif Path(f["key"]).is_file():
                 return FileResponse(f["key"], filename=Path(f["key"]).name)
         raise ApiError(404, "ERR_NOT_FOUND", f"no such output file: {file_id}")
 
@@ -454,6 +468,7 @@ def open_app(
     limits_path: Path | None = None,
     store_kind: str = "sqlite",
     pg_url: str | None = None,
+    blobs: BlobStore | None = None,
 ) -> FastAPI:
     """App for a job database; upload limits from ``configs/uploads.yaml``.
 
@@ -469,6 +484,7 @@ def open_app(
         pg_url=pg_url,
         rate_limit=rate_limit,
         output_root=Path(db).parent / "outputs",
+        blobs=blobs,
     )
     limits = UploadLimits.from_yaml(resolve_config(limits_path or Path("configs/uploads.yaml")))
     return create_app(

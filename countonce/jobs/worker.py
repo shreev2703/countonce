@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
+import tempfile
 import threading
 import time
 import uuid
@@ -16,6 +18,7 @@ from typing import Any
 from countonce.errors import CountOnceError, ErrorCode
 from countonce.jobs.store import HEARTBEAT_INTERVAL_S, JobStore
 from countonce.monitor import tracing
+from countonce.storage import BlobStore, LocalBlobStore
 from countonce.types import CountResult
 
 log = logging.getLogger("countonce.jobs")
@@ -87,7 +90,14 @@ class Worker:
         heartbeat_interval_s: float = HEARTBEAT_INTERVAL_S,
         info: dict[str, Any] | None = None,
         tracing_cfg: tracing.TracingConfig | None = None,
+        blobs: BlobStore | None = None,
+        out_root: Path | None = None,
     ) -> None:
+        """With ``blobs``, inputs are fetched from it (keys are blob keys) and the files the
+        runner wrote under ``out_root/<job id>`` are uploaded to ``outputs/<job id>/``. Without
+        it ``job_files.key`` is a plain local path, as before."""
+        self.blobs = blobs
+        self.out_root = out_root
         self.store = store
         self.runner = runner
         self.tracing_cfg = tracing_cfg  # None or exporter 'none': no spans, no files
@@ -121,17 +131,19 @@ class Worker:
         hb = threading.Thread(target=beat, daemon=True)
         hb.start()
         try:
-            with tracing.span("download"):
-                inputs = [Path(f["key"]) for f in self.store.job_files(jid, "input")]
+            with tempfile.TemporaryDirectory(prefix=f"countonce-{jid[:8]}-") as scratch:
+                with tracing.span("download"):
+                    inputs = self._download(jid, Path(scratch))
 
-            def progress(stage: str, frac: float) -> None:
-                self.store.set_progress(jid, self.worker_id, stage, frac)
+                def progress(stage: str, frac: float) -> None:
+                    self.store.set_progress(jid, self.worker_id, stage, frac)
 
-            with tracing.span("run"):  # pipeline stages (and export) nest under this span
-                res = self.runner(job, inputs, progress)
-            with tracing.span("upload"):
-                if not self.store.complete(jid, self.worker_id, result_row(res)):
-                    log.warning("job %s was reassigned; dropping result", jid)
+                with tracing.span("run"):  # pipeline stages (and export) nest under this span
+                    res = self.runner(job, inputs, progress)
+                with tracing.span("upload"):
+                    self._upload_outputs(jid)
+                    if not self.store.complete(jid, self.worker_id, result_row(res)):
+                        log.warning("job %s was reassigned; dropping result", jid)
         except Exception as exc:  # BaseException (e.g. a killed worker) leaves the job running
             tracing.mark_error(exc)
             code = classify(exc)
@@ -139,6 +151,37 @@ class Worker:
             log.info("job %s failed %s -> %s", jid, code.value, outcome.status)
         finally:
             stop.set()
+
+    def _download(self, jid: str, scratch: Path) -> list[Path]:
+        """Local paths of the job's inputs: the stored paths, or blobs fetched into ``scratch``."""
+        files = self.store.job_files(jid, "input")
+        if self.blobs is None:
+            return [Path(f["key"]) for f in files]
+        paths = []
+        for i, f in enumerate(files):
+            if isinstance(self.blobs, LocalBlobStore):
+                paths.append(self.blobs.path(f["key"]))  # already on disk: no copy
+                continue
+            dest = scratch / f"{i:03d}" / Path(f["key"]).name
+            dest.parent.mkdir()
+            dest.write_bytes(self.blobs.get(f["key"]))
+            paths.append(dest)
+        return paths
+
+    def _upload_outputs(self, jid: str) -> None:
+        """Upload ``out_root/<jid>`` to ``outputs/<jid>/`` and record each file."""
+        if self.blobs is None or self.out_root is None:
+            return
+        root = self.out_root / jid
+        record = getattr(self.store, "record_file", None)
+        for p in sorted(root.rglob("*")) if root.is_dir() else []:
+            if not p.is_file():
+                continue
+            data = p.read_bytes()
+            key = f"outputs/{jid}/{p.relative_to(root).as_posix()}"
+            self.blobs.put(key, data)
+            if record is not None:
+                record(jid, "output", key, len(data), hashlib.sha256(data).hexdigest())
 
     def run_loop(
         self,

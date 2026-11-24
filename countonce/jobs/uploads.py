@@ -12,17 +12,18 @@ HTTP layer implements the same four methods (and R2 multipart or TUS can replace
 there, see docs/DEVIATIONS.md). ``upload_file`` is the client loop and only sees the transport.
 
 Tables are created additively (``CREATE TABLE IF NOT EXISTS``) on first use, so an existing job
-database upgrades in place. Chunks live under ``<root>/sessions/<id>``; the finished, sanitized
-file under ``<root>/files/<id>``, which job retention (not session purge) governs.
+database upgrades in place. Chunks live under blob prefix ``sessions/<id>/``; the finished,
+sanitized file under ``files/<id>/`` (a ``BlobStore``: local disk under ``<root>``, or S3/R2),
+which job retention (not session purge) governs.
 """
 
 from __future__ import annotations
 
 import hashlib
 import math
-import os
 import re
 import shutil
+import tempfile
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -41,6 +42,7 @@ from countonce.ingest.sanitize import (
     validate_video,
 )
 from countonce.jobs.store import SqliteJobStore
+from countonce.storage import BlobStore, LocalBlobStore, delete_prefix
 
 UPLOAD_SCHEMA = [
     """CREATE TABLE IF NOT EXISTS upload_sessions (
@@ -118,9 +120,14 @@ class UploadService:
         root: str | Path | None = None,
         limits: UploadLimits | None = None,
         media_limits: MediaLimits = DEFAULT_LIMITS,
+        blobs: BlobStore | None = None,
     ) -> None:
+        """Chunks and finished files go through ``blobs`` (default: the store's, else a
+        ``LocalBlobStore`` at ``root``); keys are ``sessions/<id>/<n>.part`` and
+        ``files/<id>/<name>``."""
         self.store = store
         self.root = Path(root) if root is not None else store.path.parent / "uploads"
+        self.blobs: BlobStore = blobs or store.blobs or LocalBlobStore(self.root)
         self.limits = limits or UploadLimits()
         self.media_limits = media_limits
         with store._tx() as conn:
@@ -191,8 +198,7 @@ class UploadService:
                 f"{n_chunks} chunks exceeds the {lim.max_chunks} limit; use a larger chunk_size",
             )
         sid = uuid.uuid4().hex
-        sdir = self.root / "sessions" / sid
-        sdir.mkdir(parents=True, exist_ok=True)
+        sdir = self._local_ref(f"sessions/{sid}")
         now = self.store.clock()
         with self.store._tx() as conn:
             conn.execute(
@@ -206,7 +212,7 @@ class UploadService:
                     sha256,
                     chunk_size,
                     n_chunks,
-                    str(sdir),
+                    sdir,
                     now,
                     now + lim.session_ttl_s,
                 ),
@@ -240,10 +246,7 @@ class UploadService:
                     f"chunk {index} was already stored with different content",
                 )
             return {**self.status(session_id), "duplicate": True}
-        path = Path(sess["dir"]) / f"{index:06d}.part"
-        tmp = path.with_suffix(".tmp")
-        tmp.write_bytes(data)
-        os.replace(tmp, path)  # a chunk file is either absent or complete
+        self.blobs.put(self._chunk_key(session_id, index), data)  # a chunk is absent or complete
         with self.store._tx() as conn:
             conn.execute(
                 "INSERT INTO upload_chunks (session_id, idx, size, sha256) VALUES (?,?,?,?) "
@@ -303,46 +306,45 @@ class UploadService:
         if job_id is not None:
             self._check_job(job_id, sess["user_id"])
 
-        sdir = Path(sess["dir"])
-        raw_dir = sdir / "raw"
-        raw_dir.mkdir(exist_ok=True)
-        raw = raw_dir / sess["filename"]
-        h = hashlib.sha256()
-        with raw.open("wb") as out:
-            for i in range(sess["n_chunks"]):
-                piece = (sdir / f"{i:06d}.part").read_bytes()
-                h.update(piece)
-                out.write(piece)
-        if h.hexdigest() != sess["sha256"]:
-            self._fail(sess)
-            raise _err(
-                ErrorCode.ERR_CORRUPT_MEDIA,
-                "assembled file does not match the declared sha256; upload it again",
-            )
-
-        final_dir = self.root / "files" / session_id
-        report = SanitizeReport()
-        try:
-            if check_extension(raw) == "image":
-                final = sanitize_image(raw, final_dir, self.media_limits, report)
-            else:
-                validate_video(raw, self.media_limits, report)
-                final_dir.mkdir(parents=True, exist_ok=True)
-                final = final_dir / raw.name
-                shutil.move(raw, final)
-        except CountOnceError:
-            self._fail(sess)
-            shutil.rmtree(final_dir, ignore_errors=True)
-            raise
-        digest = hashlib.sha256(final.read_bytes()).hexdigest()
+        with tempfile.TemporaryDirectory(prefix="countonce-upload-") as tmp_name:
+            tmp = Path(tmp_name)
+            raw = tmp / "raw" / sess["filename"]
+            raw.parent.mkdir()
+            h = hashlib.sha256()
+            with raw.open("wb") as out:
+                for i in range(sess["n_chunks"]):
+                    piece = self.blobs.get(self._chunk_key(session_id, i))
+                    h.update(piece)
+                    out.write(piece)
+            if h.hexdigest() != sess["sha256"]:
+                self._fail(sess)
+                raise _err(
+                    ErrorCode.ERR_CORRUPT_MEDIA,
+                    "assembled file does not match the declared sha256; upload it again",
+                )
+            report = SanitizeReport()
+            try:
+                if check_extension(raw) == "image":
+                    final = sanitize_image(raw, tmp / "clean", self.media_limits, report)
+                else:
+                    validate_video(raw, self.media_limits, report)
+                    final = raw
+            except CountOnceError:
+                self._fail(sess)
+                raise
+            data = final.read_bytes()
+            blob_key = f"files/{session_id}/{final.name}"
+            self.blobs.put(blob_key, data)
+        digest = hashlib.sha256(data).hexdigest()
+        file_ref = self._local_ref(blob_key)
         exif_stripped = bool(report.images)
         if job_id is None:
             job_id, _ = self.store.submit(
-                sess["user_id"], prompt or "", [final], idempotency_key=f"upload:{session_id}"
+                sess["user_id"], prompt or "", [file_ref], idempotency_key=f"upload:{session_id}"
             )
-            self._tag_file(job_id, final, digest, exif_stripped)
+            self._tag_file(job_id, file_ref, len(data), digest, exif_stripped)
         else:
-            self._attach(job_id, final, digest, exif_stripped)
+            self._attach(job_id, file_ref, len(data), digest, exif_stripped)
         with self.store._tx() as conn:
             conn.execute(
                 "UPDATE upload_sessions SET status = 'finalized', job_id = ?, expires_at = ? "
@@ -350,23 +352,33 @@ class UploadService:
                 (job_id, self.store.clock() + self.limits.session_ttl_s, session_id),
             )
             conn.execute("DELETE FROM upload_chunks WHERE session_id = ?", (session_id,))
-        shutil.rmtree(sdir, ignore_errors=True)
+        delete_prefix(self.blobs, f"sessions/{session_id}/")
         return {
             "session_id": session_id,
             "job_id": job_id,
-            "path": str(final),
-            "bytes": final.stat().st_size,
+            "path": file_ref,
+            "bytes": len(data),
             "sha256": digest,
             "sanitize": report.to_dict(),
             "already_finalized": False,
         }
 
     # -- internals ------------------------------------------------------------------------
+    def _chunk_key(self, session_id: str, index: int) -> str:
+        return f"sessions/{session_id}/{index:06d}.part"
+
+    def _local_ref(self, blob_key: str) -> str:
+        """What goes in ``job_files.key`` / ``upload_sessions.dir``: the absolute file path on the
+        local backend (as before), the blob key otherwise."""
+        if isinstance(self.blobs, LocalBlobStore):
+            return str(self.blobs.path(blob_key))
+        return blob_key
+
     def _fail(self, sess: dict[str, Any]) -> None:
         with self.store._tx() as conn:
             conn.execute("UPDATE upload_sessions SET status = 'failed' WHERE id = ?", (sess["id"],))
             conn.execute("DELETE FROM upload_chunks WHERE session_id = ?", (sess["id"],))
-        shutil.rmtree(sess["dir"], ignore_errors=True)
+        delete_prefix(self.blobs, f"sessions/{sess['id']}/")
 
     def _check_job(self, job_id: str, user_id: str) -> None:
         job = self.store.get(job_id)
@@ -377,7 +389,7 @@ class UploadService:
         if job["status"] not in ("draft", "queued"):
             raise _err(ErrorCode.ERR_INVALID_INPUT, f"job is {job['status']}; cannot add files")
 
-    def _attach(self, job_id: str, path: Path, digest: str, exif_stripped: bool) -> None:
+    def _attach(self, job_id: str, key: str, size: int, digest: str, exif_stripped: bool) -> None:
         with self.store._tx() as conn:
             conn.execute(
                 "INSERT INTO job_files (id, job_id, kind, key, bytes, sha256, exif_stripped) "
@@ -385,19 +397,19 @@ class UploadService:
                 (
                     uuid.uuid4().hex,
                     job_id,
-                    str(path),
-                    path.stat().st_size,
+                    key,
+                    size,
                     digest,
                     int(exif_stripped),
                 ),
             )
 
-    def _tag_file(self, job_id: str, path: Path, digest: str, exif_stripped: bool) -> None:
+    def _tag_file(self, job_id: str, key: str, size: int, digest: str, exif_stripped: bool) -> None:
         with self.store._tx() as conn:
             conn.execute(
                 "UPDATE job_files SET bytes = ?, sha256 = ?, exif_stripped = ? "
                 "WHERE job_id = ? AND key = ?",
-                (path.stat().st_size, digest, int(exif_stripped), job_id, str(path)),
+                (size, digest, int(exif_stripped), job_id, key),
             )
 
 
@@ -418,7 +430,10 @@ def purge_upload_sessions(store: SqliteJobStore, now: float | None = None) -> in
             conn.execute("DELETE FROM upload_chunks WHERE session_id = ?", (r["id"],))
             conn.execute("DELETE FROM upload_sessions WHERE id = ?", (r["id"],))
     for r in rows:
-        shutil.rmtree(r["dir"], ignore_errors=True)
+        if store.blobs is not None:
+            delete_prefix(store.blobs, f"sessions/{r['id']}/")
+        if Path(r["dir"]).is_absolute():  # sessions made before BlobStore, or on local disk
+            shutil.rmtree(r["dir"], ignore_errors=True)
     return len(rows)
 
 
@@ -503,13 +518,16 @@ def upload_file(
 
 
 def open_service(
-    db: Path, root: Path | None = None, limits_path: Path | None = None
+    db: Path,
+    root: Path | None = None,
+    limits_path: Path | None = None,
+    blobs: BlobStore | None = None,
 ) -> UploadService:
     """Service for a job database; limits from ``configs/uploads.yaml`` (CWD, else packaged)."""
     from countonce.resources import resolve_config
 
     limits = UploadLimits.from_yaml(resolve_config(limits_path or Path("configs/uploads.yaml")))
-    return UploadService(SqliteJobStore(db), root, limits)
+    return UploadService(SqliteJobStore(db), root, limits, blobs=blobs)
 
 
 __all__ = [

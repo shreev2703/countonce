@@ -33,6 +33,9 @@ api = [
     "httpx>=0.27",
     "uvicorn>=0.29",
 ]
+storage = [
+    "boto3>=1.34",
+]
 data = [
     "pyarrow>=15",
     "duckdb>=1.0",
@@ -44,6 +47,8 @@ test = [
     "opencv-python-headless",
     "pillow",
     "safetensors",
+    "boto3>=1.34",
+    "moto[s3]>=5",
     "httpx2",  # starlette TestClient backend (httpx is deprecated there)
 ]
 dev = [
@@ -100,5 +105,5 @@ files = ["countonce", "bench", "synth"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*", "sam2.*", "opentelemetry.*", "uvicorn.*", "pyarrow.*", "alembic.*", "psycopg.*", "duckdb.*"]
+module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*", "sam2.*", "opentelemetry.*", "uvicorn.*", "pyarrow.*", "alembic.*", "psycopg.*", "duckdb.*", "boto3.*", "botocore.*", "moto.*"]
 ignore_missing_imports = true

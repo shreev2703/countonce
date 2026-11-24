@@ -32,6 +32,7 @@ from countonce.jobs.store import (
     SqliteJobStore,
     build_claim_sql,
 )
+from countonce.storage import BlobStore
 
 CLAIM_LOCK_PG = "FOR UPDATE SKIP LOCKED"
 
@@ -73,9 +74,11 @@ class PostgresJobStore(SqliteJobStore):
         rate_limit: int | None = None,
         rate_window_s: float = 60.0,
         output_root: str | Path | None = None,
+        blobs: BlobStore | None = None,
     ) -> None:
         """``data_dir`` anchors on-disk uploads/outputs (``<data_dir>/uploads``, ``outputs``)."""
         self.url = psycopg_url(url)
+        self.blobs = blobs
         self.rate_limit = rate_limit
         self.rate_window_s = rate_window_s
         data = Path(data_dir)

@@ -187,3 +187,6 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   the worker image build (Docker), the v3 GPU training run, the cloud worker, the OTLP endpoint, HF uploads, the LICENSE choice, captures, hand counts, identity labels,
   interviews, the professor meeting, the pilot, the human baseline study, the frontier-VLM baseline run (API keys and spend), the demo video and the paper venue.
 - **After this batch the autonomous backlog is truly exhausted.** The next audit should only queue bugs or regressions.
+
+## Object storage against real R2 (human gate)
+- `S3BlobStore` and the cache/upload/worker routing pass the contract suite on `moto` only. To verify on Cloudflare R2: create a bucket and an API token, set `COUNTONCE_STORAGE=s3`, `COUNTONCE_S3_BUCKET`, `COUNTONCE_S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com`, `COUNTONCE_S3_ACCESS_KEY_ID`, `COUNTONCE_S3_SECRET_ACCESS_KEY` (`COUNTONCE_S3_REGION=auto`), install `.[storage]`, then run a worker with `--storage s3` and fetch a presigned URL by hand. Also set a bucket CORS rule before browser uploads use `presign_put`.

@@ -46,6 +46,7 @@ from countonce.provenance import run_metadata
 from countonce.recon.base import Reconstructor
 from countonce.recon.cache import CachedReconstructor, ReconCache
 from countonce.recon.chunked import ChunkedReconstructor
+from countonce.storage.factory import cache_kwargs
 from countonce.types import CountResult, Detection, Frame, Interval, ModelVersions
 from countonce.types import Recon as DenseRecon
 from countonce.warnings import assess_quality, negatives_ignored_warning, zero_count_warning
@@ -341,7 +342,9 @@ def _run(
     base_det = det  # wrappers hide capability flags
     det = wrap_detector(det, config)
     if config.cache_dir is not None:
-        det = CachedDetector(det, DetectionCache(Path(config.cache_dir) / "detect"))
+        det = CachedDetector(
+            det, DetectionCache(Path(config.cache_dir) / "detect", **cache_kwargs("detect"))
+        )
 
     parsed = parse_prompt(prompt) if config.negative_prompts else ParsedPrompt([prompt], [], prompt)
     neg_warnings: list[dict[str, str]] = []
@@ -414,9 +417,9 @@ def _run(
             if cap is not None:
                 r = ChunkedReconstructor(r, cap, config.chunk_overlap, config.chunk_stitch)
         if cache_dir is not None:
-            got = CachedReconstructor(r, ReconCache(cache_dir / "recon"), "0").reconstruct_cached(
-                stage_frames
-            )
+            got = CachedReconstructor(
+                r, ReconCache(cache_dir / "recon", **cache_kwargs("recon")), "0"
+            ).reconstruct_cached(stage_frames)
             return got.recon, got.key, got.hit, stage_frames
         return r.reconstruct(stage_frames), None, False, stage_frames
 

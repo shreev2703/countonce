@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
-import os
-import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -14,6 +14,7 @@ import numpy as np
 
 from countonce.oom import RungUnavailable
 from countonce.recon.base import Reconstructor
+from countonce.storage import BlobNotFound, BlobStore, LocalBlobStore, expire_prefix
 from countonce.types import Frame, Recon
 
 _ARRAYS = (
@@ -44,34 +45,63 @@ def recon_cache_key(
 
 
 class ReconCache:
-    def __init__(self, root: Path) -> None:
-        self.root = Path(root)
+    """Recon entries as ``<prefix>/<key>.npz`` blobs. ``ReconCache(dir)`` is the on-disk cache;
+    pass ``blobs`` (e.g. an ``S3BlobStore``) to keep entries in object storage instead.
+    ``ttl_s`` makes ``expire()`` drop entries older than that (PLAN 13 item 6b)."""
+
+    def __init__(
+        self,
+        root: Path | None = None,
+        *,
+        blobs: BlobStore | None = None,
+        prefix: str = "",
+        ttl_s: float | None = None,
+    ) -> None:
+        if blobs is None:
+            if root is None:
+                raise ValueError("ReconCache needs a root directory or a blob store")
+            blobs = LocalBlobStore(root)
+        self.root = Path(root) if root is not None else None
+        self.blobs = blobs
+        self.prefix = prefix.strip("/")
+        self.ttl_s = ttl_s
+
+    def _key(self, key: str) -> str:
+        return f"{self.prefix}/{key}.npz" if self.prefix else f"{key}.npz"
 
     def path(self, key: str) -> Path:
-        return self.root / f"{key}.npz"
+        """Local file for ``key`` (local backend only)."""
+        if not isinstance(self.blobs, LocalBlobStore):
+            raise TypeError("path() is only meaningful for the local backend")
+        return self.blobs.path(self._key(key))
 
     def get(self, key: str) -> Recon | None:
-        p = self.path(key)
-        if not p.exists():
-            return None
         try:
-            with np.load(p, allow_pickle=False) as z:
+            raw = self.blobs.get(self._key(key))
+            with np.load(io.BytesIO(raw), allow_pickle=False) as z:
                 kwargs: dict[str, Any] = {name: z[name] for name in _ARRAYS}
                 kwargs.update({name: float(z[name]) for name in _SCALARS})
                 return Recon(backbone=str(z["backbone"]), **kwargs)
-        except (OSError, ValueError, KeyError):
-            return None  # corrupt entry: treat as a miss and recompute
+        except (BlobNotFound, OSError, ValueError, KeyError):
+            return None  # missing or corrupt entry: treat as a miss and recompute
 
-    def put(self, key: str, recon: Recon) -> Path:
-        self.root.mkdir(parents=True, exist_ok=True)
+    def put(self, key: str, recon: Recon) -> str:
         data: dict[str, Any] = {name: getattr(recon, name) for name in _ARRAYS}
         data.update({name: np.float64(getattr(recon, name)) for name in _SCALARS})
         data["backbone"] = np.array(recon.backbone)
-        fd, tmp = tempfile.mkstemp(dir=self.root, suffix=".tmp")
-        with os.fdopen(fd, "wb") as fh:
-            np.savez_compressed(fh, **data)
-        os.replace(tmp, self.path(key))  # atomic: a crash never leaves a half-written entry
-        return self.path(key)
+        buf = io.BytesIO()
+        np.savez_compressed(buf, **data)
+        self.blobs.put(self._key(key), buf.getvalue())  # atomic per backend
+        return self._key(key)
+
+    def expire(self, now: float | None = None) -> int:
+        """Delete entries older than ``ttl_s``; returns how many (0 if no TTL is set)."""
+        if self.ttl_s is None:
+            return 0
+        return expire_prefix(
+            self.blobs, self.prefix + "/" if self.prefix else "", self.ttl_s,
+            (lambda: now) if now is not None else time.time,
+        )  # fmt: skip
 
 
 @dataclass

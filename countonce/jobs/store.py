@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from countonce.errors import ErrorCode, retry_decision
+from countonce.storage import BlobStore, delete_prefix
 
 HEARTBEAT_INTERVAL_S = 15.0
 HEARTBEAT_TIMEOUT_S = 120.0
@@ -261,11 +262,15 @@ class SqliteJobStore:
         rate_limit: int | None = None,
         rate_window_s: float = 60.0,
         output_root: str | Path | None = None,
+        blobs: BlobStore | None = None,
     ) -> None:
-        """``rate_limit`` submits per ``rate_window_s`` per user (token bucket; None = off).
+        """``blobs`` is the object store holding input/output files (None: plain local paths).
+
+        ``rate_limit`` submits per ``rate_window_s`` per user (token bucket; None = off).
 
         ``output_root`` is where the worker writes ``<output_root>/<job_id>``.
         """
+        self.blobs = blobs
         self.rate_limit = rate_limit
         self.rate_window_s = rate_window_s
         self.output_root = Path(output_root) if output_root is not None else None
@@ -588,6 +593,28 @@ class SqliteJobStore:
         )
 
     # -- deletion and retention -----------------------------------------------------------
+    def _delete_blob(self, key: str) -> int:
+        """Remove one stored file via the blob store, or as a plain path if it is outside it."""
+        if self.blobs is not None:
+            try:
+                return int(self.blobs.delete(key))
+            except ValueError:  # a legacy absolute path outside the local blob root
+                pass
+        try:
+            Path(key).unlink()
+            return 1
+        except FileNotFoundError:
+            return 0
+
+    def record_file(self, job_id: str, kind: str, key: str, size: int, sha256: str) -> None:
+        """Register a stored file (e.g. an uploaded output) in ``job_files``."""
+        with self._tx() as conn:
+            conn.execute(
+                "INSERT INTO job_files (id, job_id, kind, key, bytes, sha256) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (uuid.uuid4().hex, job_id, kind, key, size, sha256),
+            )
+
     def _remove_files(self, conn: Any, job_id: str, kinds: Sequence[str]) -> int:
         """Delete a job's files on disk and their rows; returns the number of files removed."""
         n = 0
@@ -597,14 +624,12 @@ class SqliteJobStore:
             (job_id, *kinds),
         ).fetchall()
         for r in rows:
-            try:
-                Path(r["key"]).unlink()
-                n += 1
-            except FileNotFoundError:
-                pass
+            n += self._delete_blob(r["key"])
         conn.execute(
             f"DELETE FROM job_files WHERE job_id = ? AND kind IN ({marks})", (job_id, *kinds)
         )
+        if "output" in kinds and self.blobs is not None:
+            n += delete_prefix(self.blobs, f"outputs/{job_id}/")
         if "output" in kinds and self.output_root is not None:
             out = self.output_root / job_id
             if out.is_dir():
