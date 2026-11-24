@@ -473,3 +473,9 @@ One entry per decision: date, what the plan said, what was done, why.
 - `paper/refs.bib` entries carry titles/IDs only from `docs/RELATED_WORK.md` and `docs/MODEL_SURVEY.md`; authors are `TODO: verify authors` because no paper was read in full. Several titles are the short names used in those docs and are tagged `TODO: verify title`.
 - `paper/tables/` and `site/` are generated and gitignored; `make paper` skips the PDF when `latexmk` is absent. Ablation rows are methods whose names contain `+` or `-` (the sweep's `<base>+<field>=<value>` naming).
 - The site inlines images as base64 (one file, no network); the Links section is a placeholder until URLs exist.
+
+## Lint gate and test-env hygiene (twelfth audit)
+- Orchestrator files excluded via `[tool.ruff] extend-exclude`; `logs/` gitignored.
+- `safetensors` added to the `test` extra (CI `full-cpu` installs `.[dev,test,...]`, so it gets it).
+- `StarletteDeprecationWarning` fixed by adding `httpx2` to the `test` extra (Starlette's supported TestClient backend) instead of a `filterwarnings` entry.
+- Another process committed these edits together with the orchestrator files in `5be3433`; history was not rewritten.
