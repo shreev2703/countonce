@@ -195,3 +195,6 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 `dvc.yaml`/`params.yaml` are committed but no DVC remote is configured. Needs a human: create the
 R2 bucket, then `dvc remote add -d r2 s3://<bucket>/dvc`, set the endpoint URL and credentials
 (local, not committed), `dvc push`. Until then `dvc.lock`/data stay local.
+
+## Real CountGD fine-tune (Track D)
+- **Gate:** CountGD weights (and the real MinneApple/WGISD/Fuji-SfM downloads). The harness (`countonce finetune-detector`, `scripts/make_detector_adaptation_report.py`) is tested with a tiny fake torch detector only. Needs a human to fetch the weights and supply a module factory; layer names in `configs/finetune.yaml` are `TODO: verify`.

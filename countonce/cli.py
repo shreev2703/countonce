@@ -324,6 +324,18 @@ def _parser() -> argparse.ArgumentParser:
     cs.add_argument("--worker-kind", default="cloud")
     cs.add_argument("--out", type=Path, default=Path("results/coldstart.csv"))
 
+    fd = sub.add_parser(
+        "finetune-detector", help="LoRA / head-only fine-tune of a torch density detector"
+    )
+    fd.add_argument("--config", type=Path, default=Path("configs/finetune.yaml"))
+    fd.add_argument(
+        "--module",
+        metavar="PKG.MOD:FACTORY",
+        help="factory returning the torch density module (real CountGD weights are gated)",
+    )
+    fd.add_argument("--limit", type=int, help="first N images per dataset entry")
+    fd.add_argument("--no-register", action="store_true")
+
     m = sub.add_parser("models", help="matcher checkpoint registry")
     m.add_argument("--root", type=Path, default=Path("models"))
     msub = m.add_subparsers(dest="models_cmd", required=True)
@@ -559,6 +571,65 @@ def _loadtest(args: argparse.Namespace) -> int:
     summary = run_load_test(cfg)
     print(format_summary(summary))
     return 0 if summary["reconciled"] else 1
+
+
+def _finetune_detector(args: argparse.Namespace) -> int:
+    import importlib
+
+    from bench.detector_sanity import load_images
+    from countonce.detect import finetune as ft
+
+    try:
+        cfg = ft.FinetuneConfig.from_yaml(args.config)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    if not args.module or ":" not in args.module:
+        print(
+            "countonce: error: --module PKG.MOD:FACTORY is required; the real CountGD weights "
+            "are gated (see docs/GATES.md)",
+            file=sys.stderr,
+        )
+        return 2
+    mod_name, _, fn_name = args.module.partition(":")
+    model = getattr(importlib.import_module(mod_name), fn_name)()
+
+    def gather(key: str) -> list[object]:
+        out: list[object] = []
+        for e in cfg.splits.get(key, []):
+            if e["dataset"] == "fuji_sfm":
+                continue  # scene-level GT only; scored end to end by the pipeline, not here
+            out += load_images(e["dataset"], e["root"], e.get("split"), args.limit)
+        return out
+
+    try:
+        train_imgs, train_den, _ = ft.load_image_set(gather("train"), cfg.image_size, cfg.sigma)
+        evals: dict[str, tuple[str, Any, list[int]]] = {}
+        for split, key in (("seen", "seen_eval"), ("unseen", "unseen_eval")):
+            imgs = gather(key)
+            if imgs:
+                x, _, gts = ft.load_image_set(imgs, cfg.image_size, cfg.sigma)
+                evals[split] = (cfg.splits[key][0]["dataset"], x, gts)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    from countonce.provenance import git_commit
+
+    out = ft.run_adaptation(
+        model,
+        cfg,
+        (train_imgs, train_den),
+        evals,
+        dataset_version=f"finetune-splits@{git_commit()}",
+        register=not args.no_register,
+    )
+    r = out["train"]
+    print(
+        f"loss {r.losses[0]:.4g} -> {r.losses[-1]:.4g}; trainable "
+        f"{r.n_trainable_params}/{r.n_total_params}; registered "
+        f"{out['registry_entry'].get('version', '-')}; rows in {cfg.report_csv}"
+    )
+    return 0
 
 
 def _coldstart(args: argparse.Namespace) -> int:
@@ -1264,6 +1335,8 @@ def main(argv: list[str] | None = None) -> int:
         return _serve_api(args)
     if args.cmd == "coldstart":
         return _coldstart(args)
+    if args.cmd == "finetune-detector":
+        return _finetune_detector(args)
     if args.cmd == "loadtest":
         return _loadtest(args)
     if args.cmd == "etl":

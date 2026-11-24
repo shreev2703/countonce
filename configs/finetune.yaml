@@ -1,0 +1,26 @@
+# Detector adaptation (PLAN §11 Track D). Run: countonce finetune-detector --config configs/finetune.yaml
+# --module pkg.mod:factory. Real CountGD weights are gated (docs/GATES.md); nothing here is a result.
+mode: lora                 # lora | head
+target_layers: ["*fusion*.q_proj", "*fusion*.v_proj"]   # globs over nn.Linear names (TODO: verify)
+head_layers: ["head"]      # used when mode: head
+rank: 4
+alpha: 4
+lr: 0.0005
+epochs: 10
+batch_size: 4
+sigma: 2.0
+seed: 0
+image_size: 256
+prompt: apple
+splits:
+  train:                   # seen orchards
+    - {dataset: minneapple, root: data/minneapple, split: train}
+    - {dataset: wgisd, root: data/wgisd, split: train}
+  seen_eval:               # held-out images of the seen orchards
+    - {dataset: minneapple, root: data/minneapple, split: val}
+    - {dataset: wgisd, root: data/wgisd, split: val}
+  unseen_eval:             # never trained on; scored end to end (no per-image 2D GT assumed)
+    - {dataset: fuji_sfm, root: data/fuji_sfm}
+registry_root: models/detector_adapters
+out_dir: runs/finetune
+report_csv: results/detector_adaptation.csv
