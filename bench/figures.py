@@ -1,4 +1,4 @@
-"""Figure scripts for PLAN §9.7 (1, 2, 3, 4, 6, 7, 8), all read from ``results/bench.csv``.
+"""Figure scripts for PLAN §9.7 (1-4, 6-8; 11 takes coverage curves), from ``results/bench.csv``.
 
 Every point is a mean over *scenes* (rows of one scene/method/condition are averaged first),
 with a 95% scene-level bootstrap CI as the error bar. Style comes from ``countonce.plotting``.
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -327,6 +327,29 @@ def fig_ablation(rows: Sequence[Row], out: Path, base: str | None = None) -> Pat
     ax.set_yticks(ys, [d.method.split("+", 1)[1] for d in deltas])
     ax.set_xlabel("Δ MAPE vs. base (percentage points; < 0 is better; paired bootstrap 95% CI)")
     ax.set_title(f"One-factor ablations vs. {deltas[0].method.split('+', 1)[0]}")
+    save(fig, out)
+    return out
+
+
+def fig_conformal_coverage(
+    curves: Mapping[str, Mapping[float, float]], out: Path, n_test: Mapping[str, int] | None = None
+) -> Path | None:
+    """Figure 11: empirical coverage vs. target level, one line per domain (real, synthetic).
+    ``curves[domain][level] = coverage`` on held-out scenes; the diagonal is perfect calibration."""
+    curves = {d: c for d, c in curves.items() if c}
+    if not curves:
+        return None
+    apply_style()
+    fig, ax = plt.subplots(figsize=(5, 4.5))
+    ax.plot([0.5, 1], [0.5, 1], color="grey", linestyle="--", label="target")
+    for i, (dom, c) in enumerate(sorted(curves.items())):
+        lv = sorted(c)
+        n = f" (n={n_test[dom]})" if n_test and dom in n_test else ""
+        ax.plot(lv, [c[x] for x in lv], marker="o", color=color_for(dom, i), label=dom + n)
+    ax.set_xlabel("target level (1 - alpha)")
+    ax.set_ylabel("empirical coverage on held-out scenes")
+    ax.set_title("Conformal coverage vs. target level")
+    ax.legend()
     save(fig, out)
     return out
 

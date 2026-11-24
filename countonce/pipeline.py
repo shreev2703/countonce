@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from countonce.confidence import k_grid, sensitivity_range, threshold_grid
 from countonce.config import Config
+from countonce.conformal import CalibrationArtifact, interval_from_artifact, resolve_method
 from countonce.detect.base import Detector, filter_by_score
 from countonce.detect.cache import CachedDetector, DetectionCache
 from countonce.export import export_all
@@ -22,7 +24,7 @@ from countonce.provenance import run_metadata
 from countonce.recon.base import Reconstructor
 from countonce.recon.cache import CachedReconstructor, ReconCache
 from countonce.recon.chunked import ChunkedReconstructor
-from countonce.types import CountResult, Frame, ModelVersions
+from countonce.types import CountResult, Frame, Interval, ModelVersions
 from countonce.types import Recon as DenseRecon
 from countonce.warnings import assess_quality
 
@@ -211,6 +213,24 @@ def run(
         config.merge_k,
         config.score_threshold,
     )
+    interval = sens.to_interval()
+    interval_warnings: list[dict[str, str]] = []
+    if config.interval_method != "sensitivity":
+        art = _load_calibration(config)
+        res = resolve_method(config.interval_method, art)
+        if res.warning:
+            interval_warnings.append(res.warning)
+        if res.method != "sensitivity" and art is not None:
+            lo, hi = interval_from_artifact(
+                res.method,
+                art,
+                len(clustered.instances),
+                sens.low,
+                sens.high,
+                config.interval_level,
+                mu_at=lambda theta: _mu_at(art, theta, config, count_at),
+            )
+            interval = Interval(lo, hi, config.interval_level, res.method, art.n_calibration)
     timings["confidence"] = time.perf_counter() - t
 
     per_frame: dict[int, int] = {f.id: 0 for f in frames}
@@ -231,9 +251,9 @@ def run(
     result = CountResult(
         prompt=prompt,
         count=count,
-        interval=sens.to_interval(),
+        interval=interval,
         confidence_method="sensitivity",
-        warnings=quality,
+        warnings=quality + interval_warnings,
         model_versions=ModelVersions(
             detector=f"{det.name}@{det.version}", backbone=recon.backbone, associator=config.assoc
         ),
@@ -261,6 +281,24 @@ def run(
             scene_scale=compute_scene_scale(recon),
         )
     return result
+
+
+def _load_calibration(config: Config) -> CalibrationArtifact | None:
+    if config.calibration_path is None:
+        return None
+    return CalibrationArtifact.load(config.calibration_path)
+
+
+def _mu_at(
+    art: CalibrationArtifact, theta: float, config: Config, count_at: Callable[[float, float], int]
+) -> float:
+    """Count under the Jackknife+ tuned parameter (``k``: factor of ``merge_k``; ``scale``:
+    multiplier of the default count)."""
+    if art.tuned == "k":
+        return float(count_at(config.merge_k * theta, config.score_threshold))
+    if art.tuned == "scale":
+        return theta * count_at(config.merge_k, config.score_threshold)
+    raise ValueError(f"unknown tuned parameter {art.tuned!r}")
 
 
 def _input_hash(frames: list[Frame]) -> str:

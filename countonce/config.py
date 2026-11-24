@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 DetectorName = Literal["countgd", "gdino", "countgdpp"]
 BackboneName = Literal["vggt", "vggt_omega", "vggt_t3", "colmap"]
 AssocName = Literal["v1", "v2", "v3", "sync"]
+IntervalMethodName = Literal["sensitivity", "conformal", "jackknife_plus"]
 
 
 class Config(BaseModel):
@@ -39,6 +40,10 @@ class Config(BaseModel):
     lift_min_pixels: int | None = Field(None, ge=1)
     lift_conf_percentile: float | None = Field(None, ge=0, le=100)
     interval_level: float = Field(0.9, gt=0, lt=1)
+    # Interval method (PLAN 8.8). "conformal"/"jackknife_plus" need a calibration artifact
+    # (bench.calibration + countonce.conformal.CalibrationArtifact JSON).
+    interval_method: IntervalMethodName = "sensitivity"
+    calibration_path: Path | None = None
 
     # Backend options passed to the real detector / reconstructor (paths, device, ...)
     detector_options: dict[str, Any] = Field(default_factory=dict)
