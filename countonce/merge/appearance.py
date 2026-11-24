@@ -41,7 +41,10 @@ class DinoV2Extractor:
         import torch
 
         if self._model is None:
-            self._model = torch.hub.load("facebookresearch/dinov2", self.model_name)
+            # torch.hub.load is untyped in torch stubs.
+            self._model = torch.hub.load(  # type: ignore[no-untyped-call]
+                "facebookresearch/dinov2", self.model_name
+            )
             self._model.eval().to(self.device)
         return self._model
 

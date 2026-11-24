@@ -107,7 +107,8 @@ class OpenCVRegionDetector:
                     str(self.model_path), "", (320, 320), self.score_threshold
                 )
             else:
-                clf = cv2.CascadeClassifier(str(self.model_path))
+                # cv2 5.x stubs omit CascadeClassifier, though it still exists at runtime.
+                clf = cv2.CascadeClassifier(str(self.model_path))  # type: ignore[attr-defined]
                 if clf.empty():
                     raise ValueError(f"could not load cascade: {self.model_path}")
                 self._model = clf

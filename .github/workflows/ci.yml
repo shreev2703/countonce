@@ -45,6 +45,8 @@ jobs:
         run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Install
         run: pip install -e .[dev,test]
+      - name: Type check
+        run: mypy countonce
       - name: Test (report skips)
         run: pytest -m "not slow and not gpu" -rs | tee pytest-full-cpu.log
       - name: Fail on unexpected skips

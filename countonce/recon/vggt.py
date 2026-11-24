@@ -13,7 +13,7 @@ from __future__ import annotations
 import copy
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import torch
@@ -182,7 +182,10 @@ class VGGTMethod:
             ]
             if len({tuple(t.shape) for t in one}) == 1:
                 return torch.cat(one)
-        return load_and_preprocess_images([str(p) for p in image_paths], mode="crop")
+        # load_and_preprocess_images comes from an untyped third-party package.
+        return cast(
+            torch.Tensor, load_and_preprocess_images([str(p) for p in image_paths], mode="crop")
+        )
 
     def forward(self, images: torch.Tensor) -> dict[str, torch.Tensor]:
         """Raw model forward on a (S, 3, H, W) tensor already on the GPU."""
