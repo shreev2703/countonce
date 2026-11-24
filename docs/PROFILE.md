@@ -42,3 +42,27 @@ Rungs: 0 initial, 1 free cache, 2 smaller chunks, 3 lower resolution, then `ERR_
 | Frames | Rung that succeeded | Peak VRAM (MB) |
 |---|---|---|
 | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+
+## Activation checkpointing memory (matcher training)
+
+`activation_checkpointing: none|attention|all` in `configs/match.yaml` recomputes the attention
+(and, for `all`, the MLP) of each matcher block in the backward pass. It only applies in training
+mode with grad enabled, so eval and inference are unchanged (PLAN §13 item 11).
+
+CPU check, no GPU needed:
+
+```
+countonce train --config configs/match.yaml --profile-memory
+```
+
+It runs one forward and backward step per mode on the first training episode and prints
+`saved` (MB of tensors autograd keeps for backward, counted with `saved_tensors_hooks`),
+step time, and the CUDA peak when a GPU is used. `saved` should fall from `none` to `attention`
+to `all`, while the extra recompute raises step time. Gradients match the baseline to 1e-5
+(`tests/test_activation_checkpointing.py`).
+
+| Mode | Saved activations CPU (MB) | Step time CPU (s) | Peak VRAM GPU (MB) | Max batch / views in 8-12 GB |
+|---|---|---|---|---|
+| none | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+| attention | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+| all | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |

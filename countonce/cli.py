@@ -80,6 +80,12 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help="JSONL of consented correction pairs (countonce correct --pairs) to mix in",
     )
+    t.add_argument(
+        "--profile-memory",
+        action="store_true",
+        help="one step per activation_checkpointing mode; print saved-activation MB, no training",
+    )
+    t.add_argument("--activation-checkpointing", choices=["none", "attention", "all"])
 
     f = sub.add_parser("profile", help="time each pipeline stage and record peak VRAM")
     f.add_argument("--config", type=Path, default=Path("configs/profile.yaml"))
@@ -440,7 +446,19 @@ def _train(args: argparse.Namespace) -> int:
         tcfg = TrainConfig.from_yaml(args.config)
         if args.corrections:
             tcfg = dataclasses.replace(tcfg, corrections=str(args.corrections))
-        history = train(tcfg)
+        if args.activation_checkpointing:
+            tcfg = dataclasses.replace(tcfg, activation_checkpointing=args.activation_checkpointing)
+        if args.profile_memory:
+            from countonce.match.train import profile_memory
+
+            for row in profile_memory(tcfg.validated()):
+                vram = "n/a" if row["peak_vram_mb"] is None else f"{row['peak_vram_mb']:.1f}"
+                print(
+                    f"profile-memory: {row['mode']:<9} saved={row['saved_mb']:.2f} MB "
+                    f"step={row['step_s']:.3f}s peak_vram_mb={vram}"
+                )
+            return 0
+        history = train(tcfg.validated())
     except (FileNotFoundError, ValueError) as exc:
         print(f"countonce: error: {exc}", file=sys.stderr)
         return 2

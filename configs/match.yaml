@@ -16,3 +16,4 @@ seed: 0
 device: auto
 resume: true
 model: {width: 128, layers: 4, heads: 4}
+activation_checkpointing: none   # none | attention | all; recompute blocks in backward to save memory (training only)

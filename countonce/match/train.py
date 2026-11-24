@@ -60,6 +60,7 @@ class TrainConfig:
     resume: bool = True
     stop_after_epoch: int | None = None  # pause a run early (the cosine horizon stays `epochs`)
     model: dict[str, Any] = field(default_factory=dict)  # make_model kwargs
+    activation_checkpointing: str = "none"  # none | attention | all (training memory only)
 
     @classmethod
     def from_yaml(cls, path: Path | str) -> TrainConfig:
@@ -68,7 +69,17 @@ class TrainConfig:
         bad = sorted(set(raw) - known)
         if bad:
             raise ValueError(f"unknown train config keys: {bad}")
-        return cls(**raw)
+        return cls(**raw).validated()
+
+    def validated(self) -> TrainConfig:
+        from countonce.match.model import CHECKPOINT_MODES
+
+        if self.activation_checkpointing not in CHECKPOINT_MODES:
+            raise ValueError(
+                f"activation_checkpointing must be one of {CHECKPOINT_MODES}, "
+                f"got {self.activation_checkpointing!r}"
+            )
+        return self
 
 
 # ------------------------------------------------------------------ losses
@@ -294,7 +305,10 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
         version = f"{version}+corr-{file_sha256(cfg.corrections)[:8]}"
 
     torch.manual_seed(cfg.seed)
-    model = make_model(**cfg.model).to(device)
+    cfg.validated()
+    model = make_model(**cfg.model, activation_checkpointing=cfg.activation_checkpointing).to(
+        device
+    )
     steps_per_epoch = math.ceil(len(train_set) / cfg.batch_size)
     opt, sched = _make_optim(model, cfg, cfg.epochs * steps_per_epoch)
 
@@ -319,6 +333,7 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
                 "git_commit": git_commit(),
                 "git_dirty": git_is_dirty(),
                 "data_version": version,
+                "activation_checkpointing": cfg.activation_checkpointing,
                 "device": device,
             },
         )
@@ -369,7 +384,15 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
         history.append(rec)
         if rec["val_f1"] > best_f1:
             best_f1 = rec["val_f1"]
-            save_checkpoint(model, best, meta={"data_version": version, "seed": cfg.seed})
+            save_checkpoint(
+                model,
+                best,
+                meta={
+                    "data_version": version,
+                    "seed": cfg.seed,
+                    "activation_checkpointing": cfg.activation_checkpointing,
+                },
+            )
         torch.save(
             {
                 "model": model.state_dict(),
@@ -422,3 +445,51 @@ def _fit_calibration(
             indent=2,
         )
     )
+
+
+def profile_memory(cfg: TrainConfig) -> list[dict[str, Any]]:
+    """One training step on the first train episode per checkpointing mode.
+
+    Reports bytes autograd keeps for backward (counted with ``saved_tensors_hooks``, so it works
+    on CPU) and the CUDA peak when a GPU is in use. Same seed and weights for every mode.
+    """
+    import time
+
+    import torch
+
+    from countonce.match.model import CHECKPOINT_MODES, episode_loss
+
+    adim = int(cfg.model.get("appearance_dim", 0))
+    eps = load_split(cfg.train_dir, cfg.feature_group, adim)
+    if not eps:
+        raise ValueError(f"no episodes in {cfg.train_dir}")
+    ep, d = eps[0]
+    device = _device(cfg.device)
+    rows: list[dict[str, Any]] = []
+    for mode in CHECKPOINT_MODES:
+        torch.manual_seed(cfg.seed)
+        model = make_model(**cfg.model, activation_checkpointing=mode).to(device).train()
+        saved = 0
+
+        def pack(t: Any) -> Any:
+            nonlocal saved
+            saved += t.numel() * t.element_size()
+            return t
+
+        if device == "cuda":
+            torch.cuda.reset_peak_memory_stats()
+        t0 = time.perf_counter()
+        with torch.autograd.graph.saved_tensors_hooks(pack, lambda t: t):
+            loss = episode_loss(model, ep, d)
+        loss.backward()
+        rows.append(
+            {
+                "mode": mode,
+                "saved_mb": saved / 2**20,
+                "step_s": time.perf_counter() - t0,
+                "peak_vram_mb": torch.cuda.max_memory_allocated() / 2**20
+                if device == "cuda"
+                else None,
+            }
+        )
+    return rows

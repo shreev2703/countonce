@@ -349,3 +349,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - Unknown exceptions are classed `ERR_NO_RECON` (permanent) so a code bug never burns GPU retries; `ValueError`/`FileNotFoundError`/`NotImplementedError` -> `ERR_INVALID_INPUT`, `TimeoutError` -> `ERR_WORKER_TIMEOUT`, other `OSError` -> `ERR_STORAGE_TRANSIENT`.
 - `countonce worker --once` drains every currently claimable job and exits (jobs still in backoff are left queued). Heartbeats run from a background thread every 15 s during a job. No download/upload step: inputs are local paths stored in `job_files.key`; outputs go to `<db dir>/outputs/<job id>`.
 - The 'killed worker' in the load test is simulated with a `BaseException` that the worker deliberately does not catch.
+
+## Activation checkpointing (matcher)
+- `activation_checkpointing` is a `make_model` argument and `TrainConfig` field but not in the model `hparams`: it changes memory only, so old checkpoints and the registry hash stay valid. The setting is recorded in checkpoint `meta` and the `run` event of `log.jsonl`.
+- `attention` wraps each block's attention sub-layer; `all` also wraps the MLP. Both skip checkpointing under `torch.no_grad()` as well as eval mode.
+- `countonce train --profile-memory` measures bytes saved for backward with `saved_tensors_hooks` (works on CPU) rather than RSS; GPU numbers stay `TODO: fill from results`.

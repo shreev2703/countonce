@@ -122,12 +122,13 @@ def _pair_stats(model, eps):
 
 
 @pytest.mark.slow
-def test_overfits_ten_episodes():
+@pytest.mark.parametrize("ckpt", ["none", "all"])
+def test_overfits_ten_episodes(ckpt):
     torch.manual_seed(0)
     torch.set_num_threads(max(1, min(4, torch.get_num_threads())))
     eps = [generate_episode(s, SMALL) for s in range(10)]
     inputs = [episode_inputs(e) for e in eps]
-    model = make_model()  # width 128, 4 layers, as specified
+    model = make_model(activation_checkpointing=ckpt)  # width 128, 4 layers, as specified
     opt = torch.optim.AdamW(model.parameters(), lr=5e-3)
     t0 = time.perf_counter()
     acc = 0.0

@@ -23,6 +23,7 @@ from countonce.match.sinkhorn import log_sinkhorn
 NOMINAL_OBJECT_SIZE = 0.1  # world units; the synthetic generator has no per-object size
 # xyz 3, size 1, box 4, score 1, lift_conf 1, ray 3, camera centre 3, log-depth 1
 BASE_FEATURES = 17
+CHECKPOINT_MODES = ("none", "attention", "all")
 
 
 @dataclass
@@ -135,6 +136,7 @@ def episode_inputs(ep: Any) -> DetInputs:
 
 def _torch() -> Any:
     import torch
+    import torch.utils.checkpoint  # noqa: F401
 
     return torch
 
@@ -146,8 +148,20 @@ def make_model(
     appearance_dim: int = 0,
     init_bin: float = 1.0,
     sinkhorn_iters: int = 30,
+    activation_checkpointing: str = "none",
 ) -> Any:
-    """Build the v3 network (a ``torch.nn.Module``). ``layers`` alternate self / cross."""
+    """Build the v3 network (a ``torch.nn.Module``). ``layers`` alternate self / cross.
+
+    ``activation_checkpointing`` (``none|attention|all``) recomputes the attention part, or the
+    attention and MLP parts, of every block in the backward pass, and only while the module is
+    in training mode with grad enabled. It changes memory, not the maths, so it is not part of
+    ``hparams``; record it in the checkpoint meta instead.
+    """
+    if activation_checkpointing not in CHECKPOINT_MODES:
+        raise ValueError(
+            f"activation_checkpointing must be one of {CHECKPOINT_MODES}, "
+            f"got {activation_checkpointing!r}"
+        )
     torch = _torch()
     nn = torch.nn
     functional = torch.nn.functional
@@ -166,6 +180,8 @@ def make_model(
         def __init__(self, cross: bool) -> None:
             super().__init__()
             self.cross = cross
+            self.ckpt_attn = activation_checkpointing in ("attention", "all")
+            self.ckpt_mlp = activation_checkpointing == "all"
             self.qkv = nn.Linear(width, 3 * width)
             self.out = nn.Linear(width, width)
             self.bias = nn.Sequential(nn.Linear(4, 32), nn.ReLU(), nn.Linear(32, heads))
@@ -175,7 +191,7 @@ def make_model(
                 nn.Linear(width, 2 * width), nn.GELU(), nn.Linear(2 * width, width)
             )
 
-        def forward(self, x: Any, rel: Any, allow: Any, has_key: Any) -> Any:
+        def _attn(self, x: Any, rel: Any, allow: Any, has_key: Any) -> Any:
             n = x.shape[0]
             q, k, v = self.qkv(x).view(n, 3, heads, width // heads).permute(1, 2, 0, 3)
             bias = self.bias(rel).permute(2, 0, 1)  # (H,N,N)
@@ -183,8 +199,20 @@ def make_model(
             h = functional.scaled_dot_product_attention(q, k, v, attn_mask=bias)
             h = h.permute(1, 0, 2).reshape(n, width)
             h = self.out(h) * has_key.unsqueeze(-1)  # no valid partner -> no update
-            x = self.norm1(x + h)
+            return self.norm1(x + h)
+
+        def _mlp(self, x: Any) -> Any:
             return self.norm2(x + self.ffn(x))
+
+        def _run(self, fn: Any, wrap: bool, *args: Any) -> Any:
+            # checkpoint only when training with grad on: eval / no_grad never recompute
+            if wrap and self.training and torch.is_grad_enabled():
+                return torch.utils.checkpoint.checkpoint(fn, *args, use_reentrant=False)
+            return fn(*args)
+
+        def forward(self, x: Any, rel: Any, allow: Any, has_key: Any) -> Any:
+            x = self._run(self._attn, self.ckpt_attn, x, rel, allow, has_key)
+            return self._run(self._mlp, self.ckpt_mlp, x)
 
     class MatchNet(nn.Module):  # type: ignore[misc,name-defined]
         def __init__(self) -> None:
@@ -200,6 +228,7 @@ def make_model(
             self.pair_head = nn.Sequential(nn.Linear(4, 32), nn.ReLU(), nn.Linear(32, 1))
             self.bin_score = nn.Parameter(torch.tensor(float(init_bin)))
             self.iters = sinkhorn_iters
+            self.activation_checkpointing = activation_checkpointing
 
         def encode(self, d: DetInputs) -> Any:
             dev = self.bin_score.device
