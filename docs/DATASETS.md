@@ -113,14 +113,18 @@ sources are listed as conflicts; resolve against the primary record before any r
 | RGBD-VideoCount | `bench/datasets/rgbd_videocount.py` | top level from README, rest assumed | `scripts/download_rgbd_videocount.sh` | scaffold, unverified against real data |
 | VideoCount | `bench/datasets/videocount.py` | fully assumed | `scripts/download_videocount.sh` (URLs TODO) | scaffold, unverified |
 | OneScene-Bench | `bench/datasets/onescene.py` | fully assumed | `scripts/download_onescene.sh` (URLs TODO) | scaffold, unverified |
+| AppleGrowthVision (10 counted trees) | `bench/datasets/applegrowthvision.py::load_applegrowthvision` | fully assumed (`trees/counts.json`, `trees/<id>/images/`) | `scripts/download_applegrowthvision.sh` (mirror `TODO: verify`, not run) | scaffold, unverified; opt-in `datasets:` entry `applegrowthvision` in `configs/bench.yaml` (`enabled: false`), feeds `bench.sweep` / `bench.evaluate` like the other scenes |
 
 ## Loader status (single-image)
 
 | Dataset | Loader | Layout | Download script | Status |
 |---|---|---|---|---|
 | FSC-147 | `bench/datasets/fsc147.py` | fully assumed (`images_384_VarV2/`, `annotation_FSC147_384.json`, `Train_Test_Val_FSC_147.json`, `ImageClasses_FSC147.txt`) | `scripts/download_fsc147.sh` (mirror `TODO: verify`, not run) | scaffold, unverified against real data |
+| WGISD | `bench/datasets/wgisd.py` | fully assumed (`data/<stem>.{jpg,txt,npz}`, `train.txt`, `test.txt`) | `scripts/download_wgisd.sh` (HF mirror `TODO: verify`, not run) | scaffold, unverified; license CONFLICT, treated as non-commercial |
+| MinneApple | `bench/datasets/minneapple.py` | fully assumed (`{detection,counting}/<split>/{images,masks}/`; count = mask instances) | `scripts/download_minneapple.sh` (bitstream URLs `TODO: verify`, not run) | scaffold, unverified; UMN ToU, non-commercial |
+| AppleGrowthVision (annotated images) | `bench/datasets/applegrowthvision.py::load_applegrowthvision_images` | fully assumed (`images/`, `labels/`, `splits.json`) | `scripts/download_applegrowthvision.sh` (not run) | scaffold, unverified; boxes are sparse so counts are lower bounds; original license `TODO: verify` |
 
-Detector sanity only (PLAN §9.1), not part of the dedup bench: `countonce bench detector-sanity --dataset fsc147
+Detector sanity only (PLAN §9.1), not part of the dedup bench: `countonce bench detector-sanity --dataset fsc147|wgisd|minneapple|applegrowthvision
 --split val --limit N --detector <name> [--root DIR]` yields image, class-name prompt, GT points and exemplar boxes,
 counts detections above `--score-threshold`, and appends per-image rows plus one summary row (MAE/RMSE, image-level
 bootstrap CI) to `results/detector_sanity.csv` (append-only schema, `bench/detector_sanity.py::SCHEMA`). Results:
@@ -128,6 +132,7 @@ bootstrap CI) to `results/detector_sanity.csv` (append-only schema, `bench/detec
 TODO: fill from results
 
 Layout assumptions (file names, JSON keys, box corner order, point order) are marked `TODO: verify` in `_read_layout`.
+The WGISD / MinneApple / AppleGrowthVision loaders yield `CropImage` (`bench/datasets/crop_common.py`, duck-compatible with `FscImage`; points are box or mask-instance centres) and run the shared validation (`countonce bench validate --dataset wgisd|minneapple|applegrowthvision|applegrowthvision_images`). Each loader module records its license in its docstring and a `LICENSE` constant. These sets have no multi-view identity GT (except AppleGrowthVision's 10 counted trees); they are Track D data, not dedup measurements. MinneApple/WGISD have no `val` split: use `--split train|test`.
 
 Each loader yields `BenchScene`s (frames, GT count, prompt, split). `configs/bench.yaml` `datasets:` entries are
 opt-in (`enabled: false`); enabled ones are symlinked into `<csv dir>/datasets/<name>/` as scene dirs

@@ -107,7 +107,12 @@ def test_adapters_feed_sweep_and_evaluate(tmp_path):
 
 def test_bench_config_opt_in(tmp_path):
     cfg = BenchConfig.from_yaml(CFG)
-    assert [d.name for d in cfg.datasets] == ["rgbd_videocount", "videocount", "onescene"]
+    assert [d.name for d in cfg.datasets] == [
+        "rgbd_videocount",
+        "videocount",
+        "onescene",
+        "applegrowthvision",
+    ]
     assert not any(d.enabled for d in cfg.datasets)
     assert dataset_scenes(cfg) == []  # nothing loaded, no download needed
 

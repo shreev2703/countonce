@@ -48,7 +48,8 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument(
         "--dataset",
         default="fsc147",
-        help="dataset name (fsc147 for detector-sanity; any loader for validate)",
+        help="dataset name (fsc147, wgisd, minneapple, applegrowthvision for detector-sanity; "
+        "any loader for validate)",
     )
     b.add_argument("--root", type=Path, help="detector-sanity dataset root (default data/<name>)")
     b.add_argument("--split", default="val", help="detector-sanity split")
@@ -1071,14 +1072,25 @@ def _ablate(args: argparse.Namespace) -> int:
 
 
 def _detector_sanity(args: argparse.Namespace) -> int:
-    from bench.detector_sanity import run
+    from bench.detector_sanity import SANITY_DATASETS, run
 
-    if args.dataset != "fsc147":
-        print(f"error: unknown sanity dataset {args.dataset!r} (expected fsc147)", file=sys.stderr)
+    if args.dataset not in SANITY_DATASETS:
+        print(
+            f"error: unknown sanity dataset {args.dataset!r} (expected one of {SANITY_DATASETS})",
+            file=sys.stderr,
+        )
         return 2
     root = args.root or Path("data") / args.dataset
     try:
-        s = run(root, args.split, args.limit, args.detector, args.sanity_out, args.score_threshold)
+        s = run(
+            root,
+            args.split,
+            args.limit,
+            args.detector,
+            args.sanity_out,
+            args.score_threshold,
+            args.dataset,
+        )
     except (FileNotFoundError, ValueError, KeyError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

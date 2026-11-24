@@ -58,7 +58,7 @@ class DatasetSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: Literal["rgbd_videocount", "videocount", "onescene"]
+    name: Literal["rgbd_videocount", "videocount", "onescene", "applegrowthvision"]
     root: Path
     enabled: bool = False  # opt-in: nothing is loaded unless set true
     max_frames: int | None = None  # None = loader default (20 for videos, all for onescene)

@@ -46,7 +46,17 @@ REASONS = (
     DUPLICATE_IMAGE,
     OUT_OF_BOUNDS,
 )
-DATASETS = ("fuji_sfm", "onescene", "rgbd_videocount", "videocount", "fsc147")
+DATASETS = (
+    "fuji_sfm",
+    "onescene",
+    "rgbd_videocount",
+    "videocount",
+    "fsc147",
+    "wgisd",
+    "minneapple",
+    "applegrowthvision",
+    "applegrowthvision_images",
+)
 
 
 @dataclass(frozen=True)
@@ -194,14 +204,18 @@ def _validate_fuji(s: Any) -> list[Issue]:
 
 
 def _validate_fsc(s: Any) -> list[Issue]:
-    sid = f"fsc147:{s.name}"
+    sid = f"{getattr(s, 'dataset', 'fsc147')}:{s.name}"
     issues: list[Issue] = []
     if s.count == 0:
         issues.append(Issue(sid, EMPTY_GT, "no GT points"))
     if not Path(s.path).is_file():
         return [*issues, Issue(sid, UNREADABLE_IMAGE, "image missing")]
     img_issues, size = _check_images(sid, [s.path])
-    return [*issues, *img_issues, *_oob(sid, s.points_xy, s.exemplar_boxes_xyxy, size)]
+    return [
+        *issues,
+        *img_issues,
+        *_oob(sid, s.points_xy, getattr(s, "boxes_xyxy", s.exemplar_boxes_xyxy), size),
+    ]
 
 
 def validate_scene(scene: Any) -> list[Issue]:
@@ -300,6 +314,10 @@ def validate_dataset(
         from bench.datasets.fsc147 import load_fsc147
 
         scenes = list(load_fsc147(root, validate=False))
+    elif name in ("wgisd", "minneapple", "applegrowthvision_images"):
+        from bench.detector_sanity import load_images
+
+        scenes = list(load_images(name, root, validate=False))
     else:
         from bench.datasets import load_dataset
 

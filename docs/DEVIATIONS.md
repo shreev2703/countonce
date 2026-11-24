@@ -521,3 +521,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - `evaluate` tracks the whole `train` param section (DVC fails on missing dotted keys such as `train.match_threshold`).
 - Stamp JSONs are DVC outs with `cache: false`; `episodes` is included in `dvc.yaml` as it is a real DAG stage.
 - Version string is `dvc:<sha256[:12] of dvc.lock>`, looked up in the CWD; fallback is the episode content hash.
+
+## Crop dataset loaders (WGISD, MinneApple, AppleGrowthVision)
+- New `CropImage` type (`bench/datasets/crop_common.py`) instead of reusing `FscImage`: these sets have boxes/masks and no exemplar boxes or class file. It is duck-compatible, so `bench/detector_sanity.py` (now `load_images(dataset, ...)`, `--dataset wgisd|minneapple|applegrowthvision`) and `validate_scene` take both. Validation ids are now `<dataset>:<name>`; the OOB rule checks `boxes_xyxy` when present.
+- MinneApple count = number of instances in the mask (images without a mask, e.g. hidden test labels, are skipped). AppleGrowthVision exposes two views: annotated images (sanity, sparse boxes so counts are lower bounds) and the 10 counted trees as `BenchScene`s (`load_dataset("applegrowthvision")`, opt-in `datasets:` entry, `enabled: false`).
+- Every layout is assumed (`TODO: verify`); licenses per loader are in module docstrings. Download scripts not run.

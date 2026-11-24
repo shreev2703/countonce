@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from bench.datasets.crop_common import CropImage
 from bench.datasets.fsc147 import FscImage, load_fsc147
 from bench.stats import bootstrap_ci
 from countonce.detect.base import Detector, Exemplar, filter_by_score
@@ -75,7 +76,7 @@ def summarize(
     return SanitySummary(m.n, m.estimate, m.low, m.high, r.estimate, r.low, r.high)
 
 
-def _frame(img: FscImage, idx: int) -> Frame:
+def _frame(img: FscImage | CropImage, idx: int) -> Frame:
     with Image.open(img.path) as im:
         w, h = im.size
     return Frame(
@@ -89,7 +90,7 @@ def _frame(img: FscImage, idx: int) -> Frame:
 
 def run_detector_sanity(
     detector: Detector,
-    images: Sequence[FscImage],
+    images: Sequence[FscImage | CropImage],
     *,
     dataset: str = "fsc147",
     split: str = "val",
@@ -172,6 +173,35 @@ def build_detector(name: str) -> Detector:
     return _build(Config(detector=name))
 
 
+SANITY_DATASETS = ("fsc147", "wgisd", "minneapple", "applegrowthvision")
+
+
+def load_images(
+    dataset: str,
+    root: str | Path,
+    split: str | None = None,
+    limit: int | None = None,
+    *,
+    validate: bool = True,
+) -> list[FscImage] | list[CropImage]:
+    """Single-image loader by dataset name (``applegrowthvision`` = its annotated images)."""
+    if dataset == "fsc147":
+        return load_fsc147(root, split=split, limit=limit, validate=validate)
+    if dataset == "wgisd":
+        from bench.datasets.wgisd import load_wgisd
+
+        return load_wgisd(root, split, limit, validate=validate)
+    if dataset == "minneapple":
+        from bench.datasets.minneapple import load_minneapple
+
+        return load_minneapple(root, split, limit, validate=validate)
+    if dataset in ("applegrowthvision", "applegrowthvision_images"):
+        from bench.datasets.applegrowthvision import load_applegrowthvision_images
+
+        return load_applegrowthvision_images(root, split, limit, validate=validate)
+    raise ValueError(f"unknown sanity dataset {dataset!r}; expected one of {SANITY_DATASETS}")
+
+
 def run(
     root: str | Path,
     split: str,
@@ -179,11 +209,13 @@ def run(
     detector_name: str,
     out_csv: str | Path = CSV_PATH,
     score_threshold: float = 0.3,
+    dataset: str = "fsc147",
 ) -> SanitySummary:
-    images = load_fsc147(root, split=split, limit=limit)
+    images = load_images(dataset, root, split=split, limit=limit)
     return run_detector_sanity(
         build_detector(detector_name),
         images,
+        dataset=dataset,
         split=split,
         score_threshold=score_threshold,
         out_csv=out_csv,

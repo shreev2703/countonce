@@ -14,6 +14,7 @@ datasets:
   - {name: rgbd_videocount, root: data/RGBD-VideoCount, enabled: false, max_frames: 20}
   - {name: videocount, root: data/VideoCount, enabled: false, max_frames: 20}
   - {name: onescene, root: data/OneScene-Bench, enabled: false}
+  - {name: applegrowthvision, root: data/AppleGrowthVision, enabled: false}  # the 10 counted trees
 
 views: [3, 5, 10, 20, 40]   # 40 is VRAM-capped by the backbone
 random_samples: 3           # random draws per view count ...
