@@ -27,3 +27,18 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 - **Baselines 5-6 (C-DOG, CountVid) and 7 (DG-Net):** these need their repos and weights cloned and downloaded on a networked session, plus the RGBD-VideoCount/VideoCount data. They are not queued until that is done. Once it is, log failures to run in DEVIATIONS (PLAN §9.3).
 - **Labeling tool for identity labels (PLAN Phase 2):** this is useful only once real captures exist. It will be queued after the first captures land.
 - **CI:** the workflow file will be added locally. Pushing it and enabling Actions on GitHub is a human step.
+
+## 2026-11-24: Third tech-lead audit (human actions, not queued as overnight tasks)
+- All 22 earlier overnight tasks are checked. `pytest` passes (157 tests) and `ruff check .` is clean, both
+  still run from `~/vggtProject/.venv`. mypy is still not installed anywhere, so the countonce venv item above stays open.
+- **Frontier VLM baseline (PLAN §9.3 item 8):** needs API keys (Anthropic, Google, OpenAI), a spending cap
+  and your approval of the prompt and the scene subset before any paid call. The harness can be built with a fake
+  client later, but no real run happens without you.
+- **Kubric / BlenderProc rendering (PLAN §10.2, Phase 3):** needs Docker in WSL2 and a GPU-render test on the
+  RTX 5070. This has to be done interactively. Until it is, the matcher trains on numpy geometry episodes only.
+- **Golden GPU regression runner (PLAN §16B.2):** setting up the self-hosted runner (a separate low-privilege
+  WSL distro and a GitHub registration token) is a human step.
+- **Web product (PLAN §14, §17):** mockups need your approval before any frontend code. The API/DB work waits
+  until the Core benchmark has real numbers.
+- **Real-data numbers:** every queued task is tested only on synthetic or tmp fixtures. Results tables and figures stay
+  `TODO: fill from results` until the Fuji-SfM download, the detector weights and your own captures exist.
