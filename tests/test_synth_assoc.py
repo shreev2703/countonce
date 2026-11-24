@@ -66,6 +66,7 @@ def test_synth_assoc_rows_and_v3_skip(splits: Path) -> None:
 
 
 def test_synth_assoc_v3_cli(splits: Path) -> None:
+    pytest.importorskip("torch")
     import torch
 
     torch.manual_seed(0)
@@ -88,6 +89,7 @@ def test_ablation_needs_three_seeds() -> None:
 
 
 def test_ablation_smoke(splits: Path) -> None:
+    pytest.importorskip("torch")
     cfg = AblationConfig(
         train_dir=str(splits / "train"),
         val_dir=str(splits / "val"),

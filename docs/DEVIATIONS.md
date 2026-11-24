@@ -291,3 +291,8 @@ One entry per decision: date, what the plan said, what was done, why.
 ## MCP tool error contract (overnight)
 - `count_objects` returns `{"ok": false, "error": {code, message, tip, retryable}}` instead of raising, since an agent needs a readable result. Added `ERR_INVALID_INPUT` (non-retryable) for empty prompts, missing paths and bad config keys. Typed `CountOnceError`s from the pipeline keep their own code.
 - `out_dir` defaults to a fresh temp dir so `result_path` is always valid. The server is FastMCP over stdio; the `mcp>=1.0` pin is unverified because `mcp` is not installed here, so the registration test skips.
+
+## Lazy plotting and torch imports for `.[dev]`-only CI (overnight)
+- `countonce.plotting` no longer imports matplotlib at import time: `plt` is a small lazy proxy that imports matplotlib (and selects `Agg`) on first attribute access; `Figure` is a `TYPE_CHECKING` import. `bench/figures.py` and `bench/vlm/fig10.py` import that proxy, so modules that only compute numbers load without matplotlib. This keeps every call site unchanged, versus rewriting each to a local import.
+- `countonce/recon/profiling.py` imports torch inside each GPU helper, so the pure `frame_cap` works without torch.
+- Tests that really plot, use torch or need cv2 call `pytest.importorskip` inside the test; non-plotting tests in the same files still run. `types-PyYAML` added to the `dev` extra.

@@ -62,6 +62,7 @@ def _synthetic_csv(path: Path) -> None:
 
 
 def test_figures_and_gallery_on_synthetic_csv(tmp_path):
+    pytest.importorskip("matplotlib")
     csv_path = tmp_path / "bench.csv"
     _synthetic_csv(csv_path)
     rows = load_rows(csv_path)
@@ -97,6 +98,7 @@ def test_worst_fraction_is_ranked_and_deterministic(tmp_path):
 
 
 def test_run_bench_resumes_and_cli(tmp_path, capsys):
+    pytest.importorskip("matplotlib")
     scenes = tmp_path / "scenes" / "a"
     (scenes / "images").mkdir(parents=True)
     (scenes / "gt.json").write_text(json.dumps({"count": 7, "tier": "hard"}))

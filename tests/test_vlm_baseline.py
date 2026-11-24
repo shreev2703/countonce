@@ -178,6 +178,7 @@ def test_skiprun_status_exported():
 
 
 def test_fig10_smoke(tmp_path):
+    pytest.importorskip("matplotlib")
     path = tmp_path / "bench.csv"
     rng = np.random.default_rng(0)
     jobs = []

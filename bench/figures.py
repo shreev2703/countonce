@@ -12,12 +12,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from bench.runner import read_rows
 from bench.stats import bootstrap_ci, paired_bootstrap
-from countonce.plotting import apply_style, color_for, save
+from countonce.plotting import apply_style, color_for, plt, save
 
 TIER_ORDER = ["easy", "medium", "hard"]
 

@@ -11,11 +11,9 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-import matplotlib.pyplot as plt
-
 from bench.figures import Row, load_rows, point, rel_error
 from bench.runner import read_rows
-from countonce.plotting import apply_style, color_for, save
+from countonce.plotting import apply_style, color_for, plt, save
 
 
 def _group_key(g: str) -> tuple[int, float | str]:

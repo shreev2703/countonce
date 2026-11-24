@@ -5,6 +5,7 @@ import re
 import shutil
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from countonce.cli import main
@@ -22,6 +23,7 @@ def _setup(tmp_path: Path, version: str = "1.0", overlays: bool = True) -> Path:
 
 
 def test_report_from_1_0_fixture(tmp_path):
+    pytest.importorskip("matplotlib")
     out = _setup(tmp_path)
     doc_json = json.loads((out / "result.json").read_text())
     (path,) = write_report(out)
@@ -36,12 +38,14 @@ def test_report_from_1_0_fixture(tmp_path):
 
 
 def test_report_without_overlays_and_1_1(tmp_path):
+    pytest.importorskip("matplotlib")
     out = _setup(tmp_path, "1.1", overlays=False)
     (path,) = write_report(out)
     assert "Annotated overlays" not in path.read_text()
 
 
 def test_cli_report_and_pdf_skips_cleanly(tmp_path, capsys):
+    pytest.importorskip("matplotlib")
     out = _setup(tmp_path)
     assert main(["report", str(out), "--pdf"]) == 0
     assert (out / "report.html").is_file()

@@ -96,6 +96,7 @@ def test_foreign_prefix_header_rejected(tmp_path):
 
 
 def test_core_figures_and_ablation_deltas(tmp_path):
+    pytest.importorskip("matplotlib")
     p = _synthetic_csv(tmp_path)
     rows = figures.load_rows(p)
     deltas = {d.method: d for d in figures.ablation_deltas(rows, "co_v2")}
@@ -111,6 +112,7 @@ def test_core_figures_and_ablation_deltas(tmp_path):
 
 
 def test_optional_figures_skip_without_data(tmp_path):
+    pytest.importorskip("matplotlib")
     p = tmp_path / "b.csv"
     run_jobs([Job("a", "m", 3), Job("b", "m", 3)], lambda j: RunOutput(5.0, 5.0), p)
     names = {o.name for o in figures.make_all(p, tmp_path / "figs")}

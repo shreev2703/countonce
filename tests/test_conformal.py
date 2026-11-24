@@ -173,6 +173,7 @@ def test_run_records_interval_method(tmp_path):
 
 
 def test_figure_conformal_coverage(tmp_path):
+    pytest.importorskip("matplotlib")
     rng = np.random.default_rng(3)
     from countonce.conformal import build_artifact
 

@@ -5,13 +5,27 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-import matplotlib
+import numpy as np
 
-matplotlib.use("Agg")  # headless: write files, never open windows
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-from matplotlib.figure import Figure  # noqa: E402
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+
+
+class _LazyPyplot:
+    """Import matplotlib on first attribute access so number-only modules never need it."""
+
+    def __getattr__(self, name: str) -> Any:
+        import matplotlib
+
+        matplotlib.use("Agg")  # headless: write files, never open windows
+        import matplotlib.pyplot as _plt
+
+        return getattr(_plt, name)
+
+
+plt = _LazyPyplot()
 
 METHOD_COLORS = {"vggt": "#1D9E75", "colmap": "#534AB7"}
 METHOD_LABELS = {"vggt": "VGGT (GPU)", "colmap": "COLMAP (CPU SIFT)"}

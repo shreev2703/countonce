@@ -100,6 +100,7 @@ def test_detection_mostly_inside_mask_fails_with_privacy_mask(tmp_path):
 
 
 def test_opencv_detector_is_lazy_and_never_downloads(tmp_path):
+    pytest.importorskip("cv2")
     det = OpenCVRegionDetector(tmp_path / "missing.xml")  # constructing must not touch the disk
     with pytest.raises(FileNotFoundError):
         det.regions(_noise())

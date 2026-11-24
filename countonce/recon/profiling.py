@@ -9,30 +9,38 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-import torch
-
 MB = 2**20
 DEFAULT_PROFILE = Path("results/memory_profile.json")
 
 
 def total_vram_mb() -> float:
+    import torch
+
     return float(torch.cuda.get_device_properties(0).total_memory / MB)
 
 
 def allocated_mb() -> float:
+    import torch
+
     return float(torch.cuda.memory_allocated() / MB)
 
 
 def reset_peak() -> None:
+    import torch
+
     torch.cuda.synchronize()
     torch.cuda.reset_peak_memory_stats()
 
 
 def peak_allocated_mb() -> float:
+    import torch
+
     return float(torch.cuda.max_memory_allocated() / MB)
 
 
 def peak_reserved_mb() -> float:
+    import torch
+
     return float(torch.cuda.max_memory_reserved() / MB)
 
 
@@ -43,6 +51,8 @@ def gpu_timer() -> Iterator[dict[str, float]]:
     CUDA calls are asynchronous, so without synchronize() the timer would stop
     before the GPU has actually finished.
     """
+    import torch
+
     result: dict[str, float] = {}
     torch.cuda.synchronize()
     start = time.perf_counter()
@@ -54,6 +64,8 @@ def gpu_timer() -> Iterator[dict[str, float]]:
 
 
 def free_gpu_memory() -> None:
+    import torch
+
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
 
