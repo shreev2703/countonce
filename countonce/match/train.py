@@ -54,6 +54,7 @@ class TrainConfig:
     match_threshold: float = 0.5  # for validation association F1
     corrections: str = ""  # JSONL of consented correction pairs mixed in as hard pos/neg
     corrections_weight: float = 1.0
+    init_checkpoint: str = ""  # fine-tune from this checkpoint (hparams + weights), not fresh
     feature_group: str = "full"  # 3d | 3d_rays | full (§10.5 attribution ablation)
     seed: int = 0
     device: str = "auto"  # auto | cpu | cuda
@@ -287,6 +288,9 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
     import torch
 
     adim = int(cfg.model.get("appearance_dim", 0))
+    if cfg.init_checkpoint:
+        init_hp = torch.load(cfg.init_checkpoint, map_location="cpu", weights_only=True)["hparams"]
+        adim = int(init_hp.get("appearance_dim", 0))
     train_set = load_split(cfg.train_dir, cfg.feature_group, adim)
     val_set = load_split(cfg.val_dir, cfg.feature_group, adim)
     out = Path(cfg.out_dir)
@@ -306,9 +310,15 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
 
     torch.manual_seed(cfg.seed)
     cfg.validated()
-    model = make_model(**cfg.model, activation_checkpointing=cfg.activation_checkpointing).to(
-        device
-    )
+    if cfg.init_checkpoint:
+        blob = torch.load(cfg.init_checkpoint, map_location="cpu", weights_only=True)
+        model = make_model(**blob["hparams"], activation_checkpointing=cfg.activation_checkpointing)
+        model.load_state_dict(blob["state_dict"])
+        model = model.to(device)
+    else:
+        model = make_model(**cfg.model, activation_checkpointing=cfg.activation_checkpointing).to(
+            device
+        )
     steps_per_epoch = math.ceil(len(train_set) / cfg.batch_size)
     opt, sched = _make_optim(model, cfg, cfg.epochs * steps_per_epoch)
 

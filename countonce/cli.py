@@ -209,6 +209,11 @@ def _parser() -> argparse.ArgumentParser:
     q.add_argument("--top", type=int, help="keep only the N most uncertain jobs")
     q.add_argument("--include-reviewed", action="store_true", help="keep jobs with corrected/")
 
+    rt = sub.add_parser(
+        "retrain", help="fine-tune the promoted matcher on opted-in corrections, gate, promote"
+    )
+    rt.add_argument("--config", type=Path, default=Path("configs/retrain.yaml"))
+
     m = sub.add_parser("models", help="matcher checkpoint registry")
     m.add_argument("--root", type=Path, default=Path("models"))
     msub = m.add_subparsers(dest="models_cmd", required=True)
@@ -261,6 +266,42 @@ def _read_doc(path: Path | None) -> dict[str, Any]:
     import yaml
 
     return (yaml.safe_load(path.read_text()) or {}) if path else {}
+
+
+def _retrain(args: argparse.Namespace) -> int:
+    from countonce.errors import CountOnceError
+    from countonce.match.registry import RegistryError
+    from countonce.match.retrain import (
+        RetrainConfig,
+        RetrainError,
+        evaluators_from_config,
+        retrain,
+    )
+
+    try:
+        cfg = RetrainConfig.from_yaml(args.config)
+        frozen, golden = evaluators_from_config(cfg)
+        out = retrain(cfg, frozen_evals=frozen, golden_eval=golden)
+    except (
+        FileNotFoundError,
+        ValueError,
+        KeyError,
+        RegistryError,
+        RetrainError,
+        CountOnceError,
+    ) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    row = out.row
+    print(
+        f"retrain: {out.incumbent} -> {out.candidate} "
+        f"corrections={row['n_corrections']} promoted={out.decision.passed}; log {cfg.log_csv}"
+    )
+    if out.decision.passed:
+        return 0
+    for r in out.decision.reasons:
+        print(f"  - {r}", file=sys.stderr)
+    return 1
 
 
 def _models(args: argparse.Namespace) -> int:
@@ -787,6 +828,8 @@ def main(argv: list[str] | None = None) -> int:
         return _correct(args)
     if args.cmd == "models":
         return _models(args)
+    if args.cmd == "retrain":
+        return _retrain(args)
     if args.cmd == "review-queue":
         return _review_queue(args)
     if args.cmd == "preflight":

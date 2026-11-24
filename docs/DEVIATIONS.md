@@ -387,3 +387,11 @@ One entry per decision: date, what the plan said, what was done, why.
 - `colmap.yaml`, `alerts.yaml`, `cost.yaml` moved from `configs/` to `countonce/configs/` (package data). `countonce.resources.resolve_config` checks the CWD path first, then the packaged copy, then raises a clear error. Benchmark/train/synth/dag/profile/match configs stay in the repo `configs/` (their packages are not meant for the wheel); the CLI exits 2 with a message when they are missing outside a checkout.
 - Top-level `countonce.load_result` is `explain.load_result_dir` (reads `<out_dir>/result.json`).
 - The wheel test builds with `--no-build-isolation` and inspects the wheel contents rather than installing into a venv (dependencies cannot install offline).
+
+## Retrain and promotion loop (`countonce retrain`)
+- The gate is the existing `Registry.promote` (point estimates with tolerances). The CIs from `bench.evaluate` are recorded in `results/retrain_log.csv` (`*_lo`, `*_hi`) but do not drive the decision; golden metrics are scene means without CIs. A CI-aware gate is a later change.
+- The gate runs on `gate_split` (default `val`); `test` is scored and logged only, so promotion never selects on test.
+- Corrections count as used only with the per-correction `consent` flag AND the user in `jobs_db` `training_opt_in`; with no `jobs_db` nobody is opted in. Rejects are exported and counted (`n_false_positive`) but the pairwise matcher loss does not use them. `n_corrections` counts eligible corrections, not pairs.
+- The default frozen evaluator reads `<predictions>/<version>.json`; nothing here generates those predictions for a new candidate, and `bench/splits.json` is not frozen yet. Until both exist, `countonce retrain` exits 2 with a clear message (`frozen:` missing or predictions file not found). Tests inject evaluators.
+- `TrainConfig.init_checkpoint` fine-tunes from a checkpoint; its hparams (including `appearance_dim`) override `model:`.
+- Log columns are results only; `configs/retrain.yaml` carries no numbers. Real before/after values: TODO: fill from results.

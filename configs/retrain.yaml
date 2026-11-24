@@ -1,0 +1,23 @@
+# Correction-driven retrain + promotion. Run: countonce retrain --config configs/retrain.yaml
+# Fine-tunes the promoted checkpoint on synthetic episodes + opted-in corrections, then promotes
+# the candidate only if the frozen-split / golden gate passes. Nothing here is a result.
+registry_root: models
+out_dir: runs/retrain
+log_csv: results/retrain_log.csv       # before/after row per run (TODO: fill from results)
+corrections_file: ""                    # JSON list of corrections (countonce.corrections format)
+results_root: ""                        # <job_id>/result.json of the ORIGINAL (uncorrected) results
+jobs_db: ""                             # job store with users.training_opt_in; empty = nobody opted in
+train:                                  # TrainConfig overrides for the fine-tune
+  train_dir: data/synth/train
+  val_dir: data/synth/val
+  epochs: 5
+  lr: 0.0001
+  seed: 0
+frozen:                                 # per frozen split: GT JSON + dir of <version>.json predictions
+  # val: {gt: bench/gt/val.json, predictions: runs/retrain/predictions/val}
+  # test: {gt: bench/gt/test.json, predictions: runs/retrain/predictions/test}
+gate_split: val                         # the gate uses this split; the others are only reported
+golden: true
+golden_config: ""                       # default: configs/golden.yaml
+n_boot: 1000
+gate: {}                                # GateConfig overrides, e.g. {frozen_mae_rel: 0.05}
