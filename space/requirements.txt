@@ -1,0 +1,3 @@
+# Space runtime deps. The countonce version is pinned at release time (TODO: pin).
+gradio>=4.0
+countonce

@@ -99,6 +99,23 @@ def _parser() -> argparse.ArgumentParser:
     y = sub.add_parser("synth", help="write synthetic geometry episodes for the matcher")
     y.add_argument("--config", type=Path, default=Path("configs/synth.yaml"))
 
+    rl = sub.add_parser("release", help="Hugging Face release scaffolding (local files only)")
+    rsub = rl.add_subparsers(dest="release_cmd", required=True)
+    rd = rsub.add_parser("synth-dataset", help="pack a synth subset + dataset card")
+    rd.add_argument("--out", type=Path, required=True)
+    rd.add_argument("--shards", type=Path, default=Path("data/dag/shard"))
+    rd.add_argument("--n-scenes", type=int)
+    rd.add_argument("--split", choices=["train", "val", "test"])
+    rd.add_argument("--datasheet", type=Path, default=Path("docs/DATASHEET.md"))
+    rd.add_argument("--license", dest="license_id", default="other")
+    rm = rsub.add_parser("model-card", help="render an HF model card from the registry")
+    rm.add_argument("--out", type=Path, default=Path("release/MODEL_CARD.md"))
+    rm.add_argument("--root", type=Path, default=Path("models"))
+    rm.add_argument("--version")
+    rm.add_argument("--template", type=Path, default=Path("docs/MODEL_CARD.md"))
+    rm.add_argument("--results", type=Path, help="results JSON; absent => TODO: fill from results")
+    rm.add_argument("--license", dest="license_id", default="other")
+
     ct = sub.add_parser("catalog", help="DuckDB catalog over synthetic scenes and features")
     ct.add_argument("catalog_cmd", choices=["query"])
     ct.add_argument("sql", help="SQL over the `scenes` (and `detections`) views")
@@ -872,6 +889,36 @@ def _train(args: argparse.Namespace) -> int:
     return 0
 
 
+def _release(args: argparse.Namespace) -> int:
+    from countonce import release
+
+    try:
+        if args.release_cmd == "synth-dataset":
+            info = release.build_synth_dataset(
+                args.out,
+                args.shards,
+                n_scenes=args.n_scenes,
+                split=args.split,
+                datasheet=args.datasheet,
+                license_id=args.license_id,
+            )
+            print(f"release: {info['n_scenes']} scenes, {info['shards']} shards -> {args.out}")
+        else:
+            path = release.build_model_card(
+                args.out,
+                registry_root=args.root,
+                version=args.version,
+                template=args.template,
+                results=args.results,
+                license_id=args.license_id,
+            )
+            print(f"release: model card -> {path}")
+    except (release.ReleaseError, OSError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
 def _catalog(args: argparse.Namespace) -> int:
     from synth.catalog import CatalogError, connect, format_table, run_query
 
@@ -1057,6 +1104,8 @@ def main(argv: list[str] | None = None) -> int:
         return _dag(args)
     if args.cmd == "catalog":
         return _catalog(args)
+    if args.cmd == "release":
+        return _release(args)
     if args.cmd == "synth":
         return _synth(args)
     if args.cmd == "profile":

@@ -463,3 +463,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - `safetensors` is not installed in `.venv`, so the mmap test skips here; it is imported lazily. TODO: add to a `serve` extra when the image is first built.
 - Cost per 1,000 frames counts one warm inference as one frame; rates in `cost.yaml` are still null, so the report shows `TODO: set rate`.
 - The default `countonce coldstart` warm call only touches loaded weights; real pipeline inference needs injected loaders (`run_coldstart`). No numbers recorded.
+
+## HF release scaffolding (overnight)
+- `countonce release synth-dataset` repacks a subset of existing DAG shards (`--shards`, default `data/dag/shard`, `--n-scenes`, `--split`) instead of rendering new scenes; run `countonce dag run` first.
+- License is a flag, default `other` (the datasheet says `TODO: decide`); the card marks it as undecided. Model card likewise.
+- Model-card metric rows fill only from `--results` JSON (or registry `metrics`); CI column stays `TODO: fill from results` unless a `<key>_ci` entry exists. Space `requirements.txt` leaves the countonce pin as TODO. Nothing uploads; `sdk_version` in the Space front-matter is unverified.
