@@ -170,3 +170,20 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   gated or large weights and datasets (Fuji-SfM, CountGD/GroundingDINO/SAM, VGGT-Ω/VGG-T³/CountGD++, video datasets, C-DOG/CountVid/DG-Net), the OTLP endpoint,
   cost rates, captures, hand counts, identity labels, interviews, the professor meeting, the pilot, the human baseline study, the demo video and the paper venue.
 - **After this batch the autonomous backlog is empty.** Everything left in PLAN.md needs data, weights, GPU or Docker time, accounts or your approval.
+
+## 2026-11-24: Twelfth tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state: all 89 earlier overnight tasks are checked. In the countonce `.venv`, `pytest` gives 708 passed and 4 skipped (safetensors, mcp, pycolmap x2),
+  and `mypy countonce` reports no issues (91 files). **`ruff check .` fails (9 errors) and `ruff format --check .` flags 1 file, all in the untracked
+  orchestrator script `scripts/hud.py`.** That breaks every task's lint gate, so the fix (ruff `extend-exclude`, not edits to your file) is queued first.
+  The system PATH still has no `ruff` or `pytest`, so use `.venv/bin/…`.
+- **Still yours (unchanged):** the formatter-only `docs/PLAN.md` diff (keep or `git checkout docs/PLAN.md`), whether to commit `uv.lock`, and whether to
+  commit your orchestrator scripts (`scripts/hud.py`, `dashboard.sh`, `morning_review.sh`, `overnight_orchestrator.sh`). The queued task only excludes them from ruff.
+- **New queued tasks that end at a human gate:** the Postgres store needs a real database URL (`COUNTONCE_PG_URL`, local Docker or Neon/Supabase) before its
+  contract tests run for real. The S3/R2 storage backend needs R2 credentials and a bucket. The DVC scaffold needs you to choose and configure a remote.
+  The FSC-147, WGISD, MinneApple and AppleGrowthVision download scripts are written but not run, so download them and check their licenses yourself.
+  The detector fine-tuning harness needs CountGD weights plus those datasets and GPU time.
+- **Still unqueued (unchanged):** frontend, 3D viewer and Google sign-in (mockup approval), deploys (Vercel/Render/Neon accounts), Gaussian-splat view toggle
+  (gsplat GPU pipeline and mockup), Triton kernel and FP8/NVFP4 (interactive GPU), VGGT-Ω/VGG-T³/CountGD++ and real detector/SAM forward passes (weights), Kubric and
+  the worker image build (Docker), the v3 GPU training run, the cloud worker, the OTLP endpoint, HF uploads, the LICENSE choice, captures, hand counts, identity labels,
+  interviews, the professor meeting, the pilot, the human baseline study, the frontier-VLM baseline run (API keys and spend), the demo video and the paper venue.
+- **After this batch the autonomous backlog is truly exhausted.** The next audit should only queue bugs or regressions.
