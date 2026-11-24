@@ -107,9 +107,9 @@ from pathlib import Path
 import countonce
 
 cfg = countonce.Config(out_dir="results/run1")
-result = countonce.run(Path("path/to/photos"), "apple", cfg)   # -> countonce.CountResult
+result = countonce.run(Path("path/to/photos"), "apple", cfg)  # -> countonce.CountResult
 print(result.count, result.interval)
-again = countonce.load_result("results/run1")                   # reads results/run1/result.json
+again = countonce.load_result("results/run1")  # reads results/run1/result.json
 ```
 
 No GPU or weights? `examples/tiny_scene/` bundles five rendered views of five red spheres (plus
