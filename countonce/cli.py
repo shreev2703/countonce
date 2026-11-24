@@ -38,6 +38,19 @@ def _parser() -> argparse.ArgumentParser:
     e.add_argument("--out", type=Path, default=Path("results/env.json"))
 
     b = sub.add_parser("bench", help="run the benchmark sweep, or render figures from its CSV")
+    b.add_argument(
+        "action",
+        nargs="?",
+        choices=["detector-sanity"],
+        help="detector-sanity: per-image count error of one detector on FSC-147",
+    )
+    b.add_argument("--dataset", default="fsc147", help="detector-sanity dataset (fsc147)")
+    b.add_argument("--root", type=Path, help="detector-sanity dataset root (default data/<name>)")
+    b.add_argument("--split", default="val", help="detector-sanity split")
+    b.add_argument("--limit", type=int, help="detector-sanity: first N images")
+    b.add_argument("--detector", default="color_blob", help="detector-sanity detector name")
+    b.add_argument("--score-threshold", type=float, default=0.3)
+    b.add_argument("--sanity-out", type=Path, default=Path("results/detector_sanity.csv"))
     b.add_argument("--config", type=Path, default=Path("configs/bench.yaml"))
     b.add_argument("--dry-run", action="store_true", help="print the job grid size and exit")
     b.add_argument(
@@ -999,7 +1012,29 @@ def _ablate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _detector_sanity(args: argparse.Namespace) -> int:
+    from bench.detector_sanity import run
+
+    if args.dataset != "fsc147":
+        print(f"error: unknown sanity dataset {args.dataset!r} (expected fsc147)", file=sys.stderr)
+        return 2
+    root = args.root or Path("data") / args.dataset
+    try:
+        s = run(root, args.split, args.limit, args.detector, args.sanity_out, args.score_threshold)
+    except (FileNotFoundError, ValueError, KeyError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    print(
+        f"detector-sanity {args.detector} on {args.dataset}/{args.split}: n={s.n} "
+        f"MAE {s.mae:.2f} [{s.mae_lo:.2f}, {s.mae_hi:.2f}] "
+        f"RMSE {s.rmse:.2f} [{s.rmse_lo:.2f}, {s.rmse_hi:.2f}] -> {args.sanity_out}"
+    )
+    return 0
+
+
 def _bench(args: argparse.Namespace) -> int:
+    if args.action == "detector-sanity":
+        return _detector_sanity(args)
     if args.synth_assoc is not None:
         return _synth_assoc(args)
     from bench.sweep import (

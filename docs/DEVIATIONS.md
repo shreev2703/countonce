@@ -479,3 +479,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - `safetensors` added to the `test` extra (CI `full-cpu` installs `.[dev,test,...]`, so it gets it).
 - `StarletteDeprecationWarning` fixed by adding `httpx2` to the `test` extra (Starlette's supported TestClient backend) instead of a `filterwarnings` entry.
 - Another process committed these edits together with the orchestrator files in `5be3433`; history was not rewritten.
+
+## FSC-147 detector sanity harness
+- `countonce bench` gained an optional positional `detector-sanity` (flags `--dataset/--root/--split/--limit/--detector/--score-threshold/--sanity-out`) rather than a new top-level command.
+- The CSV holds per-image rows plus one `summary` row per run in a single fixed schema; the bootstrap resamples images (each FSC-147 image is its own scene). Default score threshold 0.3 and no exemplars passed to the detector (`use_exemplars=False`); both are my choices.
+- Whole FSC-147 layout is assumed (`TODO: verify`); download script uses `huggingface-cli` with `FSC147_REPO` default `isentropic/FSC147` and was not run. `docs/DATASETS.md` results stay `TODO: fill from results`.

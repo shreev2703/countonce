@@ -114,6 +114,21 @@ sources are listed as conflicts; resolve against the primary record before any r
 | VideoCount | `bench/datasets/videocount.py` | fully assumed | `scripts/download_videocount.sh` (URLs TODO) | scaffold, unverified |
 | OneScene-Bench | `bench/datasets/onescene.py` | fully assumed | `scripts/download_onescene.sh` (URLs TODO) | scaffold, unverified |
 
+## Loader status (single-image)
+
+| Dataset | Loader | Layout | Download script | Status |
+|---|---|---|---|---|
+| FSC-147 | `bench/datasets/fsc147.py` | fully assumed (`images_384_VarV2/`, `annotation_FSC147_384.json`, `Train_Test_Val_FSC_147.json`, `ImageClasses_FSC147.txt`) | `scripts/download_fsc147.sh` (mirror `TODO: verify`, not run) | scaffold, unverified against real data |
+
+Detector sanity only (PLAN §9.1), not part of the dedup bench: `countonce bench detector-sanity --dataset fsc147
+--split val --limit N --detector <name> [--root DIR]` yields image, class-name prompt, GT points and exemplar boxes,
+counts detections above `--score-threshold`, and appends per-image rows plus one summary row (MAE/RMSE, image-level
+bootstrap CI) to `results/detector_sanity.csv` (append-only schema, `bench/detector_sanity.py::SCHEMA`). Results:
+
+TODO: fill from results
+
+Layout assumptions (file names, JSON keys, box corner order, point order) are marked `TODO: verify` in `_read_layout`.
+
 Each loader yields `BenchScene`s (frames, GT count, prompt, split). `configs/bench.yaml` `datasets:` entries are
 opt-in (`enabled: false`); enabled ones are symlinked into `<csv dir>/datasets/<name>/` as scene dirs
 (`images/` + `gt.json`) and swept like any scene, with `max_frames`/`stride` subsampling. `to_gt_doc` writes a GT
