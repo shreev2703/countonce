@@ -24,6 +24,7 @@ class ErrorCode(StrEnum):
     ERR_NO_OVERLAP = "ERR_NO_OVERLAP"
     ERR_CANNOT_LINK = "ERR_CANNOT_LINK"
     ERR_INVALID_CORRECTION = "ERR_INVALID_CORRECTION"
+    ERR_INVALID_INPUT = "ERR_INVALID_INPUT"
 
 
 @dataclass(frozen=True)
@@ -76,6 +77,9 @@ ERROR_INFO: dict[ErrorCode, ErrorInfo] = {
     ),
     ErrorCode.ERR_INVALID_CORRECTION: ErrorInfo(
         False, "The correction refers to detections that do not exist or cannot be changed."
+    ),
+    ErrorCode.ERR_INVALID_INPUT: ErrorInfo(
+        False, "Check the image paths, the prompt and the config keys, then call the tool again."
     ),
 }
 

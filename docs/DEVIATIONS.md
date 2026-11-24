@@ -287,3 +287,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - **Tree fallback:** if edges == chunks - 1 (no redundant edge) the chain result is used; `ChunkedReconstructor` then takes its original sequential path, so output is bit-identical to `chain`. A disconnected graph raises `ChunkAlignmentError`.
 - **Merge:** shared frames still keep the earlier chunk's copy; only the Sim(3)s differ. All chunks are reconstructed before stitching in this mode (chain streams them), so peak host memory is higher.
 - **Evidence:** CPU synthetic tests only (per-chunk camera-centre noise plus a loop-closing chunk: pose-graph RMS camera error below chain). No real VGGT run and no drift numbers: `TODO: fill from results`.
+
+## MCP tool error contract (overnight)
+- `count_objects` returns `{"ok": false, "error": {code, message, tip, retryable}}` instead of raising, since an agent needs a readable result. Added `ERR_INVALID_INPUT` (non-retryable) for empty prompts, missing paths and bad config keys. Typed `CountOnceError`s from the pipeline keep their own code.
+- `out_dir` defaults to a fresh temp dir so `result_path` is always valid. The server is FastMCP over stdio; the `mcp>=1.0` pin is unverified because `mcp` is not installed here, so the registration test skips.

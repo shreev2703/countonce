@@ -25,6 +25,9 @@ recon = [
     "pyyaml",
     "pycolmap",
 ]
+mcp = [
+    "mcp>=1.0",
+]
 dev = [
     "ruff>=0.5",
     "pytest>=8",
@@ -34,6 +37,7 @@ dev = [
 
 [project.scripts]
 countonce = "countonce.cli:main"
+countonce-mcp = "countonce.integrations.mcp_server:main"
 
 [tool.setuptools.packages.find]
 include = ["countonce*", "synth*"]
