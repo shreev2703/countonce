@@ -71,8 +71,8 @@ def _multiview_fraction(run_dir: str) -> float:
         inst = json.loads(p.read_text()).get("instances") or []
         if not inst:
             return float("nan")
-        return sum(len(i.get("views", [])) >= 2 or i.get("n_views", 0) >= 2 for i in inst) / len(
-            inst
+        return float(
+            sum(len(i.get("views", [])) >= 2 or i.get("n_views", 0) >= 2 for i in inst) / len(inst)
         )
     except (ValueError, AttributeError, TypeError):
         return float("nan")
@@ -147,9 +147,11 @@ def _pick(
         chosen = frozenset(i for i, r in enumerate(rows) if inside(r, c))
         if len(chosen) < MIN_SLICE:
             continue
-        rep = slice_report(
-            recs, {"cut": lambda m, ch=chosen: pos[id(m)] in ch}, min_scenes=MIN_SLICE, n_boot=1000
-        )
+
+        def in_cut(m: Any, ch: frozenset[int] = chosen) -> bool:
+            return pos[id(m)] in ch
+
+        rep = slice_report(recs, {"cut": in_cut}, min_scenes=MIN_SLICE, n_boot=1000)
         if rep and rep[0].worse_error and (best is None or rep[0].err_diff_ci[0] > best[1]):
             best = (c, rep[0].err_diff_ci[0], rep[0].n)
     return (best[0], best[2]) if best else (None, 0)

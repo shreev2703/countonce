@@ -34,6 +34,7 @@ dev = [
     "hypothesis>=6",
     "mypy>=1.10",
     "types-PyYAML",
+    "scipy-stubs",
 ]
 
 [project.scripts]
@@ -71,5 +72,5 @@ files = ["countonce"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*"]
+module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*"]
 ignore_missing_imports = true

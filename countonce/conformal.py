@@ -69,7 +69,9 @@ def conformal_quantile(scores: Sequence[float], level: float) -> float:
 def normalized_scores(
     y: Sequence[float], yhat: Sequence[float], sigma: Sequence[float]
 ) -> np.ndarray:
-    return np.abs(np.asarray(y, float) - np.asarray(yhat, float)) / np.asarray(sigma, float)
+    return np.asarray(
+        np.abs(np.asarray(y, float) - np.asarray(yhat, float)) / np.asarray(sigma, float)
+    )
 
 
 def split_conformal_interval(

@@ -257,7 +257,9 @@ def export_training_pairs(
         inst_of = {m: i for i in res.instances for m in i.members}
         ids = list(dict.fromkeys(c.detection_ids))
 
-        def add(kind: str, a: str, b: str | None, c: Correction = c, recs: dict = recs) -> None:
+        def add(
+            kind: str, a: str, b: str | None, c: Correction = c, recs: dict[str, Any] = recs
+        ) -> None:
             geo = {k: recs[k] for k in (a, b) if k is not None and k in recs}
             pairs.append(LabeledPair(kind, c.job_id, a, b, geo, c.user, c.timestamp))
 
@@ -276,7 +278,7 @@ def export_training_pairs(
                         seen.add((d, m))
                         add("hard_negative", d, m)
         else:
-            groups = []
+            groups: list[InstanceModel] = []
             for d in ids:
                 inst = inst_of.get(d)
                 if inst is not None and inst.id not in [g.id for g in groups]:

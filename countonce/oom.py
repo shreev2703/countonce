@@ -20,7 +20,7 @@ import os
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Generic, TypeVar
 
 from countonce.errors import GPU_OOM_TIP, ErrorCode, GpuOomError  # noqa: F401  (re-export)
 
@@ -66,8 +66,8 @@ class Attempt:
 
 
 @dataclass(frozen=True)
-class LadderResult:
-    value: object
+class LadderResult(Generic[T]):
+    value: T
     rung: int  # 0 = no fallback used; matches ``oom_fallback_rung``
     name: str
     attempts: tuple[str, ...]  # names tried, in order, including the one that succeeded
@@ -112,7 +112,7 @@ def run_with_oom_ladder(
     n_frames: int = 0,
     resolution_tiers: tuple[float, ...] = RESOLUTION_TIERS,
     free: Callable[[], None] = free_cache,
-) -> LadderResult:
+) -> LadderResult[T]:
     """Run ``stage(attempt)`` down the ladder until it stops raising OOM.
 
     The cache is freed before every retry (rung 1 is that retry with no other change). Non-OOM

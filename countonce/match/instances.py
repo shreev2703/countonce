@@ -23,7 +23,7 @@ def _min_cut_split(w: np.ndarray, s: int, t: int) -> np.ndarray:
     """Boolean mask of the source side of a min s-t cut on the symmetric weights ``w``."""
     n = w.shape[0]
     cap = np.rint(w * _CAP_SCALE).astype(np.int32)
-    flow = maximum_flow(csr_matrix(cap), s, t).flow.toarray()
+    flow = maximum_flow(csr_matrix(cap), s, t).flow.toarray()  # type: ignore[arg-type]
     resid = cap - flow
     side = np.zeros(n, dtype=bool)
     side[s] = True

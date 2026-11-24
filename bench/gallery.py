@@ -78,8 +78,8 @@ def contact_sheet(
     rows = math.ceil(len(images) / cols)
     sheet = Image.new("RGB", (cols * thumb, rows * thumb), (255, 255, 255))
     for i, p in enumerate(images):
-        with Image.open(p) as im:
-            im = im.convert("RGB")
+        with Image.open(p) as src:
+            im = src.convert("RGB")
             im.thumbnail((thumb, thumb))
             sheet.paste(im, ((i % cols) * thumb, (i // cols) * thumb))
     out = Path(out)

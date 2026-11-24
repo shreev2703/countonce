@@ -172,8 +172,8 @@ def load_rows(path: str | Path) -> list[dict[str, Any]]:
                 return [row_from_meta(r) for r in csv.DictReader(f)]
         return [row_from_result(json.loads(p.read_text()))]
     rows = []
-    for f in sorted(p.rglob("result.json")):
-        rows.append(row_from_result(json.loads(f.read_text())))
+    for fp in sorted(p.rglob("result.json")):
+        rows.append(row_from_result(json.loads(fp.read_text())))
     if not rows:
         csvs = sorted(p.glob("*.csv"))
         if csvs:

@@ -80,7 +80,7 @@ def mask_to_grid(mask: np.ndarray, grid_map: GridMap) -> np.ndarray:
     src_x = np.floor((np.arange(gw) + 0.5 - grid_map.ox) / grid_map.sx).astype(int)
     vy, vx = (src_y >= 0) & (src_y < h), (src_x >= 0) & (src_x < w)
     out = mask[np.ix_(np.clip(src_y, 0, h - 1), np.clip(src_x, 0, w - 1))]
-    return out & vy[:, None] & vx[None, :]
+    return np.asarray(out & vy[:, None] & vx[None, :])
 
 
 class OpenCVRegionDetector:

@@ -6,7 +6,7 @@ import csv
 import hashlib
 import json
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -97,7 +97,7 @@ def read_rows(path: str | Path = DEFAULT_CSV) -> list[dict[str, str]]:
         return [{c: (r.get(c) or "") for c in COLUMNS} for r in reader]
 
 
-def _is_known_header(names: list[str]) -> bool:
+def _is_known_header(names: Sequence[str]) -> bool:
     """Current schema or any older prefix of it (append-only evolution)."""
     return len(names) >= _V1_COLUMN_COUNT and names == COLUMNS[: len(names)]
 

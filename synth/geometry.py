@@ -63,7 +63,7 @@ class Episode:
     def match_matrix(self, a: int, b: int) -> np.ndarray:
         """Boolean GT matrix between detections of views a and b (rows a, cols b)."""
         ia, ib = self.identity[self.view_slice(a)], self.identity[self.view_slice(b)]
-        return (ia[:, None] == ib[None, :]) & (ia[:, None] >= 0)
+        return np.asarray((ia[:, None] == ib[None, :]) & (ia[:, None] >= 0))
 
     def pair_targets(self, a: int, b: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """GT targets: (match matrix, unmatched-in-a mask, unmatched-in-b mask)."""

@@ -296,3 +296,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - `countonce.plotting` no longer imports matplotlib at import time: `plt` is a small lazy proxy that imports matplotlib (and selects `Agg`) on first attribute access; `Figure` is a `TYPE_CHECKING` import. `bench/figures.py` and `bench/vlm/fig10.py` import that proxy, so modules that only compute numbers load without matplotlib. This keeps every call site unchanged, versus rewriting each to a local import.
 - `countonce/recon/profiling.py` imports torch inside each GPU helper, so the pure `frame_cap` works without torch.
 - Tests that really plot, use torch or need cv2 call `pytest.importorskip` inside the test; non-plotting tests in the same files still run. `types-PyYAML` added to the `dev` extra.
+
+## mypy to zero errors (real run)
+- `.venv/bin/mypy countonce` now exits 0 (65 source files). Stubs: `scipy-stubs` added to the `dev` extra (`types-PyYAML` was already there). `ignore_missing_imports` overrides extended to `cv2`, `mcp`, `anthropic`, `openai`, `google` (optional runtime deps, not installed in dev); the last three go beyond the task's list because `bench/vlm/client.py` imports them lazily.
+- `LadderResult` made `Generic[T]` so `run_with_oom_ladder` returns a typed value; this removed the `has-type` and `object` errors in `pipeline.py` and two `type: ignore`s. No behaviour change, so no new regression test (none of the errors was a real bug).
+- Remaining targeted ignores: `nn.Module` base classes in `match/model.py` (torch imported lazily), Pillow `ImageFile` vs `Image` in `ingest/sanitize.py`, scipy `maximum_flow` taking `csr_matrix` in `match/instances.py`.

@@ -49,8 +49,8 @@ def _thumbnail(path: Path) -> str | None:
     try:
         from PIL import Image
 
-        with Image.open(path) as im:
-            im = im.convert("RGB")
+        with Image.open(path) as src:
+            im = src.convert("RGB")
             im.thumbnail((THUMB_MAX_PX, THUMB_MAX_PX))
             buf = io.BytesIO()
             im.save(buf, format="JPEG", quality=80)

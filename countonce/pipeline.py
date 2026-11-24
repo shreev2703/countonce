@@ -176,7 +176,7 @@ def _make_associator(config: Config, k: float) -> Associator:
         min_views=config.motion_min_views,
         conf_factor=config.motion_conf_factor,
     )
-    return MotionAwareAssociator(inner, cfg)  # type: ignore[return-value]
+    return MotionAwareAssociator(inner, cfg)
 
 
 def _make_base_associator(config: Config, k: float) -> Associator:
@@ -346,7 +346,7 @@ def run(
         return r.reconstruct(stage_frames), None, False, stage_frames
 
     ladder = run_with_oom_ladder(recon_stage, stage_name="recon", n_frames=len(frames))
-    recon, cache_key, cache_hit, frames = ladder.value  # type: ignore[misc]
+    recon, cache_key, cache_hit, frames = ladder.value
     timings["recon"] = time.perf_counter() - t
 
     # Lift + associate

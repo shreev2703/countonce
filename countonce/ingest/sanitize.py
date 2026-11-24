@@ -104,9 +104,9 @@ def sanitize_image(
             had_meta = bool(exif) or bool(img.info.get("exif") or img.info.get("xmp"))
             has_gps = bool(exif.get_ifd(_GPS_IFD)) if exif else False
             img.load()  # raises on truncated data
-            img = ImageOps.exif_transpose(img)
+            img = ImageOps.exif_transpose(img)  # type: ignore[assignment]
             if img.mode not in ("RGB", "L", "RGBA"):
-                img = img.convert(
+                img = img.convert(  # type: ignore[assignment]
                     "RGBA" if "transparency" in img.info or img.mode == "PA" else "RGB"
                 )
             clean = Image.frombytes(img.mode, img.size, img.tobytes())  # fresh image: no .info

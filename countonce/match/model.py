@@ -162,7 +162,7 @@ def make_model(
         "sinkhorn_iters": sinkhorn_iters,
     }
 
-    class Block(nn.Module):  # type: ignore[misc]
+    class Block(nn.Module):  # type: ignore[misc,name-defined]
         def __init__(self, cross: bool) -> None:
             super().__init__()
             self.cross = cross
@@ -186,7 +186,7 @@ def make_model(
             x = self.norm1(x + h)
             return self.norm2(x + self.ffn(x))
 
-    class MatchNet(nn.Module):  # type: ignore[misc]
+    class MatchNet(nn.Module):  # type: ignore[misc,name-defined]
         def __init__(self) -> None:
             super().__init__()
             self.hparams = hparams

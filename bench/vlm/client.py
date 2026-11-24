@@ -12,7 +12,7 @@ import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @dataclass(frozen=True)
@@ -89,7 +89,7 @@ class AnthropicClient:
         self._c = anthropic.Anthropic(api_key=os.environ[PROVIDERS["anthropic"].env_var or ""])
 
     def complete(self, prompt: str, images: Sequence[Path], max_output_tokens: int) -> VLMResponse:
-        content: list[dict] = []
+        content: list[dict[str, Any]] = []
         for p in images:
             mime, data = _b64(p)
             content.append(
@@ -115,7 +115,7 @@ class OpenAIClient:
         self._c = openai.OpenAI(api_key=os.environ[PROVIDERS["openai"].env_var or ""])
 
     def complete(self, prompt: str, images: Sequence[Path], max_output_tokens: int) -> VLMResponse:
-        content: list[dict] = [{"type": "text", "text": prompt}]
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
         for p in images:
             mime, data = _b64(p)
             url = f"data:{mime};base64,{data}"

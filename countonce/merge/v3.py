@@ -165,7 +165,7 @@ class V3Associator:
             probs = self.model.match_probs(inputs).cpu().numpy()
         self.model.train(was_training)
         if self.synchronize:
-            labels = spectral_sync(probs, inputs.view, SyncConfig())
+            labels = spectral_sync(probs, inputs.view.tolist(), SyncConfig())
         else:
             labels = form_instances(probs, inputs.view, self.threshold)
 

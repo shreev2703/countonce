@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import Any
 
 from countonce.oom import configure_allocator
 
@@ -200,7 +201,7 @@ def _synth(args: argparse.Namespace) -> int:
 
     try:
         raw = yaml.safe_load(args.config.read_text()) or {}
-        geo = {
+        geo: dict[str, Any] = {
             k: tuple(v) if isinstance(v, list) else v
             for k, v in (raw.get("geometry") or {}).items()
         }

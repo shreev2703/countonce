@@ -20,7 +20,7 @@ def _arrays(pred: Sequence[float], gt: Sequence[float]) -> tuple[np.ndarray, np.
 
 def abs_errors(pred: Sequence[float], gt: Sequence[float]) -> np.ndarray:
     p, g = _arrays(pred, gt)
-    return np.abs(p - g)
+    return np.asarray(np.abs(p - g))
 
 
 def pct_errors(pred: Sequence[float], gt: Sequence[float]) -> np.ndarray:
@@ -47,7 +47,7 @@ def mape(pred: Sequence[float], gt: Sequence[float]) -> float:
 def within_tolerance(pred: Sequence[float], gt: Sequence[float], tol: float = 0.10) -> np.ndarray:
     """Per-scene indicator |pred - gt| <= tol * gt. With gt == 0 only an exact 0 passes."""
     p, g = _arrays(pred, gt)
-    return np.abs(p - g) <= tol * g + 1e-12
+    return np.asarray(np.abs(p - g) <= tol * g + 1e-12)
 
 
 def within_rate(pred: Sequence[float], gt: Sequence[float], tol: float = 0.10) -> float:

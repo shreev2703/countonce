@@ -175,7 +175,7 @@ def run_ablation(cfg: AblationConfig) -> tuple[Path, Path]:
             row[f"{m}_std"] = float(np.nanstd(seed_means, ddof=1)) if len(seed_means) > 1 else 0.0
             lo = hi = float("nan")
             if np.isfinite(ep_means).any():
-                ci = bootstrap_ci(ep_means, n_boot=cfg.n_boot, level=cfg.ci_level)
+                ci = bootstrap_ci(ep_means.tolist(), n_boot=cfg.n_boot, level=cfg.ci_level)
                 lo, hi = ci.low, ci.high
             row[f"{m}_ci_low"], row[f"{m}_ci_high"] = lo, hi
         summary.append(row)
