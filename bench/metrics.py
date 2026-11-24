@@ -145,3 +145,58 @@ def cluster_purity(clusters: Sequence[Hashable], gt_ids: Sequence[Hashable | Non
     for c, g in pairs:
         per.setdefault(c, Counter())[g] += 1
     return sum(max(cnt.values()) for cnt in per.values()) / len(pairs)
+
+
+# ---------------------------------------------------------------- zero-count metrics (§9.8b)
+
+
+def zero_count_metrics(
+    pred: Sequence[float],
+    gt: Sequence[float],
+    low: Sequence[float] | None = None,
+    high: Sequence[float] | None = None,
+) -> dict[str, float]:
+    """False-positive behaviour on scenes whose true count is 0.
+
+    Only scenes with ``gt == 0`` are used. Returns ``false_positive_rate`` (share with predicted
+    count > 0), ``mean_false_count`` (mean predicted count over those scenes) and, when
+    intervals are given, ``interval_includes_zero_rate`` (share with ``low <= 0``). Every value
+    is NaN when there are no zero-count scenes.
+    """
+    p, g = _arrays(pred, gt)
+    zero = g == 0
+    nan = float("nan")
+    out = {
+        "n_zero": float(zero.sum()),
+        "false_positive_rate": nan,
+        "mean_false_count": nan,
+    }
+    if (low is None) != (high is None):
+        raise ValueError("give both low and high, or neither")
+    if low is not None and high is not None:
+        out["interval_includes_zero_rate"] = nan
+        lo, _ = _arrays(low, gt)
+        hi, _ = _arrays(high, gt)
+        if np.any(lo > hi):
+            raise ValueError("interval low exceeds high")
+    if not zero.any():
+        return out
+    out["false_positive_rate"] = float((p[zero] > 0).mean())
+    out["mean_false_count"] = float(p[zero].mean())
+    if low is not None:
+        out["interval_includes_zero_rate"] = float(((lo[zero] <= 0) & (hi[zero] >= 0)).mean())
+    return out
+
+
+def false_positive_rate(pred: Sequence[float], gt: Sequence[float]) -> float:
+    return zero_count_metrics(pred, gt)["false_positive_rate"]
+
+
+def mean_false_count(pred: Sequence[float], gt: Sequence[float]) -> float:
+    return zero_count_metrics(pred, gt)["mean_false_count"]
+
+
+def interval_includes_zero_rate(
+    low: Sequence[float], high: Sequence[float], pred: Sequence[float], gt: Sequence[float]
+) -> float:
+    return zero_count_metrics(pred, gt, low, high)["interval_includes_zero_rate"]
