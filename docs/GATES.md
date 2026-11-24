@@ -103,3 +103,21 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 - `Config.masks: sam` needs the `sam2` package and a SAM 2 checkpoint, e.g. `sam2_hiera_small.pt` (config `sam2_hiera_s.yaml`), downloaded
   by you on a networked session and set as `mask_checkpoint`. Nothing was downloaded; `sam` mode raises `MaskModelUnavailable` when missing.
   The queued task built and tested only the `box_fill` producer and a fake. The bench ablation row uses `box_fill` for that reason.
+
+## 2026-11-24: Eighth tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state: all 61 earlier overnight tasks are checked. In the countonce `.venv` (Python 3.12, dev extra only), `pytest` gives 480 passed and
+  22 skipped, `ruff check .` is clean and `mypy countonce` reports no issues (70 files). The 22 skips are missing torch, matplotlib, cv2, mcp and
+  pycolmap. The 69 skipped-module tests pass in `~/vggtProject/.venv`. CI has the same blind spot, so a `full-cpu` CI job is queued.
+- **License choice (PLAN §16, §24):** the repo has no LICENSE. Pick the code license yourself (e.g. MIT or Apache-2.0 for the code).
+  Several dependencies and weights are non-commercial (VGGT, VGGT-Ω, possibly Fuji-SfM; see `docs/DATASETS.md`, `docs/MODEL_SURVEY.md`),
+  so the README needs a note on that whatever you choose. The queued hygiene task deliberately skips the LICENSE file.
+- **Local job queue vs. "API/DB deferred":** the queued queue/worker task uses stdlib sqlite only and has no web API, Postgres or frontend, so it
+  needs neither new deps nor mockup approval. FastAPI, Postgres, auth, SSE and the frontend stay unqueued until mockups are approved and
+  `fastapi`/`sqlalchemy`/a Postgres instance are added.
+- **Identity labelling itself:** the queued labeling tool only builds the tool. Labelling 3–5 real scenes needs your captures first.
+- **Still unqueued (unchanged from the seventh audit):** Track J Parquet/DuckDB/WebDataset/DVC and the OLTP→OLAP export (pyarrow/duckdb missing);
+  OpenTelemetry; Triton kernel and FP8/NVFP4 (interactive GPU); VGGT-Ω/VGG-T³/CountGD++ backends (gated weights); the real CountGD/GroundingDINO
+  forward passes (weights); dataset loaders and the C-DOG/CountVid/DG-Net baselines (downloads); HF releases; cloud GPU worker (account and billing).
+- **Remaining autonomous work after this batch is thin:** almost every remaining PLAN item needs data, weights, GPU time, new deps or your approval.
+  The best next unblockers are installing `pyarrow`+`duckdb` (unlocks Track J), approving mockups and adding `fastapi`/`sqlalchemy` (unlocks the
+  web API), and downloading Fuji-SfM plus the detector weights (unlocks real Core numbers).
