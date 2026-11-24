@@ -10,3 +10,20 @@ run:                         # any countonce.config.Config field
   backbone: vggt
   assoc: v1
   max_frames: 16
+
+# Named variants for `countonce profile`: each overrides the `run:` block above. The FIRST variant
+# is the baseline; speedup and count delta are measured against it. Writes variants_csv, then
+# render docs/PROFILE.md with `python scripts/make_profile_report.py`. Run on the GPU only.
+variants_csv: results/profile_variants.csv
+variants:
+  - name: baseline
+  - name: compile_default
+    run: {compile_reconstructor: default, compile_detector: default}
+  - name: compile_reduce_overhead
+    run: {compile_reconstructor: reduce-overhead, compile_detector: reduce-overhead}
+  - name: det_batch_8
+    run: {detector_batch_size: 8}
+  - name: preload_pinned
+    run: {preload_workers: 4, pin_memory: true}
+  - name: sdpa_check
+    run: {sdpa_check: true}

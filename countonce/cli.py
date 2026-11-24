@@ -192,10 +192,15 @@ def _bench(args: argparse.Namespace) -> int:
 
 
 def _profile(args: argparse.Namespace) -> int:
-    from countonce.profile import ProfileConfig, run_profile
+    from countonce.profile import ProfileConfig, run_profile, run_profile_variants
 
     try:
-        path, rows = run_profile(ProfileConfig.from_yaml(args.config))
+        pcfg = ProfileConfig.from_yaml(args.config)
+        if pcfg.variants:
+            path, vrows = run_profile_variants(pcfg)
+            print(f"profile: {len(vrows)} variant rows ({len(pcfg.variants)} variants) -> {path}")
+            return 0
+        path, rows = run_profile(pcfg)
     except (FileNotFoundError, ValueError) as exc:
         print(f"countonce: error: {exc}", file=sys.stderr)
         return 2

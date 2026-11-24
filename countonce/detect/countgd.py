@@ -48,6 +48,9 @@ class CountGDDetector:
         self.floor = floor
         self.device = device
         self._model: Any = None
+        self.compile_mode = (
+            "off"  # set by optim.configure_inference; apply with maybe_compile in _load
+        )
 
     def config(self) -> dict[str, object]:
         return {"floor": self.floor}

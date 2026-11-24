@@ -19,6 +19,7 @@ import numpy as np
 import torch
 
 from countonce.ingest.frames import VGGT_PATCH, VGGT_SIZE, scaled_target
+from countonce.optim import maybe_compile, preload
 from countonce.recon import profiling
 from countonce.recon.result import Recon
 
@@ -108,6 +109,10 @@ class VGGTMethod:
         self.input_size = input_size
         self.raise_on_oom = raise_on_oom
         self.autocast_dtype = pick_autocast_dtype()
+        # Inference switches, set by countonce.optim.configure_inference (defaults = eager, serial)
+        self.compile_mode = "off"
+        self.preload_workers = 0
+        self.pin_memory = False
         self.model: torch.nn.Module | None = None
         self.load_time_s: float | None = None
         self.weights_mb: float | None = None
@@ -152,6 +157,7 @@ class VGGTMethod:
         if self.weights_dtype == "bf16":
             model.aggregator.to(torch.bfloat16)
         model = model.to("cuda").eval()
+        model = maybe_compile(model, self.compile_mode)  # type: ignore[arg-type]
         torch.cuda.synchronize()
         self.load_time_s = time.perf_counter() - start
         self.weights_mb = profiling.allocated_mb()
@@ -162,6 +168,20 @@ class VGGTMethod:
             return load_images_at(image_paths, self.input_size)
         from vggt.utils.load_fn import load_and_preprocess_images
 
+        if self.preload_workers > 1 and len(image_paths) > 1:
+            # Decode/resize frames on threads with the official per-image preprocessing; fall back
+            # to the batch call when shapes differ (it pads mixed aspect ratios itself).
+            one = [
+                t
+                for t in preload(
+                    image_paths,
+                    lambda p: load_and_preprocess_images([str(p)], mode="crop"),
+                    self.preload_workers,
+                    pin=self.pin_memory,
+                )
+            ]
+            if len({tuple(t.shape) for t in one}) == 1:
+                return torch.cat(one)
         return load_and_preprocess_images([str(p) for p in image_paths], mode="crop")
 
     def forward(self, images: torch.Tensor) -> dict[str, torch.Tensor]:

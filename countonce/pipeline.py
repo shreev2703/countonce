@@ -31,6 +31,7 @@ from countonce.merge.cluster import V1Associator
 from countonce.merge.match import V2Associator, V2Config
 from countonce.merge.sync import SyncAssociator
 from countonce.oom import Attempt, RungUnavailable, free_cache, run_with_oom_ladder
+from countonce.optim import check_sdpa, configure_inference, wrap_detector
 from countonce.provenance import run_metadata
 from countonce.recon.base import Reconstructor
 from countonce.recon.cache import CachedReconstructor, ReconCache
@@ -252,12 +253,17 @@ def run(
     if config.privacy_blur:
         paths, privacy_masks = apply_privacy_blur(paths, config, out_dir, privacy_detector)
     rec = reconstructor if reconstructor is not None else build_reconstructor(config)
+    configure_inference(rec, config, "recon")
+    if config.sdpa_check:
+        check_sdpa("reconstructor")
     frames = make_frames(paths, getattr(rec, "preprocess_mode", None), privacy_masks)
     timings["ingest"] = time.perf_counter() - t0
 
     # Detect
     t = time.perf_counter()
     det = detector if detector is not None else build_detector(config)
+    configure_inference(det, config, "detector")
+    det = wrap_detector(det, config)
     if config.cache_dir is not None:
         det = CachedDetector(det, DetectionCache(Path(config.cache_dir) / "detect"))
 

@@ -16,6 +16,7 @@ BackboneName = Literal["vggt", "vggt_omega", "vggt_t3", "colmap"]
 AssocName = Literal["v1", "v2", "v3", "sync"]
 HallucinationMode = Literal["off", "downweight", "drop"]
 LiftRegion = Literal["mask", "box"]
+CompileModeName = Literal["off", "default", "reduce-overhead"]
 IntervalMethodName = Literal["sensitivity", "conformal", "jackknife_plus"]
 
 
@@ -77,6 +78,15 @@ class Config(BaseModel):
     # Backend options passed to the real detector / reconstructor (paths, device, ...)
     detector_options: dict[str, Any] = Field(default_factory=dict)
     backbone_options: dict[str, Any] = Field(default_factory=dict)
+
+    # Inference optimization (PLAN 13 items 2-5). Defaults reproduce the shipped eager behaviour;
+    # all switches are no-ops without CUDA.
+    compile_reconstructor: CompileModeName = "off"  # torch.compile mode for the backbone
+    compile_detector: CompileModeName = "off"
+    detector_batch_size: int = Field(0, ge=0)  # frames per detector call; 0 = all at once
+    preload_workers: int = Field(0, ge=0)  # frame-loader threads; 0 = load serially
+    pin_memory: bool = False  # pin preloaded frame tensors (CUDA only)
+    sdpa_check: bool = False  # log the attention kernel in use; warn on the math fallback
 
     # Output / caching
     out_dir: Path = Path("results")
