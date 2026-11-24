@@ -1,0 +1,144 @@
+# CountOnce
+
+Count objects in 3D from a few photos or a short video, without counting any object twice.
+
+> **Status: draft.** The pipeline and benchmark harness are implemented and tested on synthetic
+> and toy inputs. No real-data benchmark has been run yet, so every number, figure and table cell
+> below is `TODO: fill from results`. Nothing here is a measured result.
+
+![Headline figure: MAPE vs. number of views](TODO: fill from results)
+
+## Key findings
+
+- `TODO: fill from results` (headline accuracy vs. the sum/max/median baselines)
+- `TODO: fill from results` (effect of ordered vs. shuffled photos)
+- `TODO: fill from results` (v1 vs. v2 vs. sync association)
+- `TODO: fill from results` (at least one weakness, e.g. the worst error slice)
+
+## Demo
+
+Demo link: `TODO: fill from results`. Screenshot: `TODO: fill from results`.
+
+## Results
+
+Methods × views on the test split. Cells are filled by `countonce bench --figures` output,
+never by hand.
+
+| Method | Views | MAPE | Within 10% | Association F1 | Runtime |
+|---|---|---|---|---|---|
+| sum (baseline) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | n/a | TODO: fill from results |
+| max (baseline) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | n/a | TODO: fill from results |
+| median (baseline) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | n/a | TODO: fill from results |
+| CountOnce v1 (VGGT) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+| CountOnce v2 (VGGT) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+| CountOnce sync (VGGT) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+| CountOnce v1 (COLMAP) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+
+Confidence intervals are scene-level bootstrap CIs (`bench/stats.py`).
+Sensitivity-range coverage: `TODO: fill from results`.
+
+## How it works
+
+```
+photos / video
+   │  ingest      drop blurry and near-duplicate frames, cap frame count
+   ▼
+open-vocabulary detector (per frame)      "apple" → boxes + scores        countonce/detect/
+   │
+   ▼
+feed-forward reconstruction (VGGT)        cameras + depth + point maps    countonce/recon/
+   │
+   ▼
+lift each detection to a 3D point + size  countonce/lift.py
+   │
+   ▼
+associate detections across views         v1 3D clustering | v2 reprojection + Hungarian | sync
+   │  (two detections in one photo are never the same object)
+   ▼
+count = number of instances, plus a sensitivity range, quality warnings,
+overlays, counts.csv, scene.ply, result.json                              countonce/export/
+```
+
+A longer walk-through is in [docs/EXPLAINER.md](docs/EXPLAINER.md). The full plan is in
+[docs/PLAN.md](docs/PLAN.md); deviations from it are logged in
+[docs/DEVIATIONS.md](docs/DEVIATIONS.md).
+
+## Limitations
+
+- **Static scenes only.** Objects that move between photos break the geometry and are counted
+  twice or missed. Moving-object detection is not implemented (`possibly_moving` stays at its default).
+- **Chunk drift.** Captures larger than the backbone's frame budget are reconstructed in
+  overlapping chunks and chained with Sim(3) alignment. Errors accumulate with the chunk count;
+  there is no pose-graph optimization yet (see `docs/DEVIATIONS.md`).
+- **Relative scale.** VGGT output has no real-world units. All thresholds are relative: merge
+  distance is measured in object sizes, and scene scale is the median camera-to-scene distance.
+- **The sensitivity range is not coverage.** The reported interval is the 10th–90th percentile of
+  counts over a grid of merge strictness and detector thresholds. It shows how fragile the count
+  is. It is not a statistical guarantee that the true count lies inside it
+  (`confidence_method="sensitivity"`).
+- Quality warnings and confidence scores are heuristics and are not calibrated.
+- Detector adapters for CountGD / GroundingDINO have not been run against real weights in this repo
+  yet; the CountGD forward pass is a stub until weights are available.
+
+## Reproduce
+
+Setup (Python ≥ 3.11; the reconstruction backbone needs a GPU):
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev,recon]"
+countonce env --out results/env.json     # check Python / torch / CUDA / VRAM
+```
+
+Count objects in a folder of photos or a video:
+
+```bash
+countonce run --images path/to/photos --prompt "apple" --assoc v2 --out results/run1
+countonce run --video path/to/clip.mp4 --prompt "apple" --fps 2 --out results/run1
+```
+
+Flags: `--detector {countgd,gdino,countgdpp}`, `--backbone {vggt,vggt_omega,vggt_t3,colmap}`,
+`--assoc {v1,v2,v3,sync}`, `--config file.yaml` (flags override the file). Not every choice has an
+implementation yet; unimplemented ones exit with an error.
+
+Download the Fuji-SfM dataset (about 6.9 GB; read its license first, treat as research-only):
+
+```bash
+scripts/download_fuji_sfm.sh data/raw/fuji_sfm
+```
+
+Run the benchmark. Scenes go in `data/scenes/<id>/{images/,gt.json}`:
+
+```bash
+countonce bench --config configs/bench.yaml --dry-run     # print the job grid size
+countonce bench --config configs/bench.yaml               # run the sweep -> results/bench.csv
+countonce bench --config configs/bench.yaml --figures results/figures
+```
+
+Tests and lint:
+
+```bash
+ruff check .
+pytest -m "not slow and not gpu"
+```
+
+## Credits, citations and licenses
+
+This repo ships download scripts, not datasets or model weights. Verify each license before use.
+
+| Item | Role | License status |
+|---|---|---|
+| VGGT (Wang et al., CVPR 2025) | Reconstruction backbone | Original checkpoint is non-commercial; a commercial variant exists by application |
+| VGGT-Ω, VGG-T³ | Optional backbones (not wired) | Research only / `TODO: verify` |
+| CountGD (Amini-Naieni et al.) | Open-vocabulary counting detector | MIT |
+| CountGD++, CountVid, GroundingDINO, DINOv2 | Detector / video baselines / appearance features | `TODO: verify` each (see `docs/MODEL_SURVEY.md`) |
+| Fuji-SfM | Benchmark scenes | Conflicting statements; treated as non-commercial research only |
+| WGISD, MinneApple, AppleGrowthVision, FSC-147 | Other candidate datasets | See `docs/DATASETS.md` |
+| Kubric | Planned synthetic data | Open source; asset licenses to be checked |
+| Pachauri et al., NeurIPS 2013 | Spectral permutation synchronization (`countonce/merge/sync.py`) | Paper |
+
+Reconstruction wrapper, memory guard, frame extraction, COLMAP wrapper and plotting style are
+ported from the author's VGGT benchmark repo (`TODO: fill from results` — add its URL once
+public). The project's own license: `TODO: choose a license before release`.
+
+Related work and open novelty questions: [docs/RELATED_WORK.md](docs/RELATED_WORK.md).
