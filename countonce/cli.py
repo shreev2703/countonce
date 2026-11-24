@@ -116,6 +116,12 @@ def _parser() -> argparse.ArgumentParser:
     r.add_argument("out_dir", type=Path, help="directory holding result.json")
     r.add_argument("--pdf", action="store_true", help="also write report.pdf (needs weasyprint)")
 
+    lb = sub.add_parser("label", help="write a static label.html for identity labeling a run")
+    lb.add_argument("out_dir", type=Path, help="directory holding result.json")
+    lb.add_argument("--prelabel", action="store_true", help="seed ids from the run's instances")
+    lb.add_argument("--resume", type=Path, help="seed from an exported identity_labels.json")
+    lb.add_argument("--dest", type=Path, help="output path (default: <out_dir>/label.html)")
+
     c = sub.add_parser("correct", help="apply split/merge/reject corrections to a finished run")
     c.add_argument("out_dir", type=Path, help="directory holding result.json")
     c.add_argument("--file", type=Path, required=True, help="corrections.json")
@@ -261,6 +267,19 @@ def _correct(args: argparse.Namespace) -> int:
         pairs = export_training_pairs(corrections, jobs)
         write_training_pairs_jsonl(pairs, args.pairs)
         print(f"correct: wrote {len(pairs)} consented pairs to {args.pairs}")
+    return 0
+
+
+def _label(args: argparse.Namespace) -> int:
+    from bench.label.html import write_label_html
+    from bench.label.io import LabelError
+
+    try:
+        path = write_label_html(args.out_dir, args.dest, args.prelabel, args.resume)
+    except (FileNotFoundError, ValueError, LabelError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    print(f"label: wrote {path}; open it in a browser and export identity_labels.json")
     return 0
 
 
@@ -498,6 +517,8 @@ def main(argv: list[str] | None = None) -> int:
         return _models(args)
     if args.cmd == "review-queue":
         return _review_queue(args)
+    if args.cmd == "label":
+        return _label(args)
     if args.cmd == "report":
         return _report(args)
 
