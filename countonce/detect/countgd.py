@@ -80,6 +80,12 @@ class CountGDDetector:
         model = self._load()
         raise NotImplementedError(f"forward pass for {type(model).__name__} pending weights")
 
+    def detect_native_negatives(
+        self, frames: Sequence[Frame], prompt: str, negatives: Sequence[str]
+    ) -> list[Detection]:
+        """CountGD++ native negative prompts (weights gated, see docs/GATES.md)."""
+        raise NotImplementedError("CountGD++ native negative prompts need gated weights")
+
     def detect(
         self,
         frames: Sequence[Frame],

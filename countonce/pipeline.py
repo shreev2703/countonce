@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import replace
@@ -15,6 +16,12 @@ from countonce.config import Config
 from countonce.conformal import CalibrationArtifact, interval_from_artifact, resolve_method
 from countonce.detect.base import Detector, filter_by_score
 from countonce.detect.cache import CachedDetector, DetectionCache
+from countonce.detect.prompts import (
+    ParsedPrompt,
+    detect_with_negatives,
+    negatives_supported,
+    parse_prompt,
+)
 from countonce.errors import ErrorCode, MediaError
 from countonce.explain import build_camera_records, build_detection_records
 from countonce.export import export_all
@@ -39,7 +46,9 @@ from countonce.recon.cache import CachedReconstructor, ReconCache
 from countonce.recon.chunked import ChunkedReconstructor
 from countonce.types import CountResult, Detection, Frame, Interval, ModelVersions
 from countonce.types import Recon as DenseRecon
-from countonce.warnings import assess_quality, zero_count_warning
+from countonce.warnings import assess_quality, negatives_ignored_warning, zero_count_warning
+
+log = logging.getLogger(__name__)
 
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
@@ -264,18 +273,39 @@ def run(
     t = time.perf_counter()
     det = detector if detector is not None else build_detector(config)
     configure_inference(det, config, "detector")
+    base_det = det  # wrappers hide capability flags
     det = wrap_detector(det, config)
     if config.cache_dir is not None:
         det = CachedDetector(det, DetectionCache(Path(config.cache_dir) / "detect"))
+
+    parsed = parse_prompt(prompt) if config.negative_prompts else ParsedPrompt([prompt], [], prompt)
+    neg_warnings: list[dict[str, str]] = []
+    use_negatives = parsed.has_negatives
+    if use_negatives and not negatives_supported(base_det):
+        log.warning(
+            "detector %s has no phrase scores; ignoring negative prompts %s",
+            base_det.name,
+            parsed.negatives,
+        )
+        neg_warnings.append(negatives_ignored_warning(base_det.name, parsed.negatives))
+        use_negatives = False
+    detect_prompt = parsed.positive_prompt if parsed.has_negatives else prompt
+    if not use_negatives and parsed.has_negatives:
+        detect_prompt = prompt  # nothing is stripped when negatives cannot be applied
+
+    def run_detect(fr: list[Frame]) -> list[Detection]:
+        if use_negatives:
+            return detect_with_negatives(det, fr, parsed, config.negative_margin)
+        return det.detect(fr, detect_prompt)
 
     def detect_stage(att: Attempt) -> list[Detection]:
         if att.resolution_scale < 1.0:
             raise RungUnavailable("detectors have no resolution control")
         if att.chunk_size is None:
-            return det.detect(frames, prompt)
+            return run_detect(frames)
         out: list[Detection] = []  # smaller detector batch; free memory between batches
         for i in range(0, len(frames), att.chunk_size):
-            out.extend(det.detect(frames[i : i + att.chunk_size], prompt))
+            out.extend(run_detect(frames[i : i + att.chunk_size]))
             free_cache()
         return out
 
@@ -395,7 +425,7 @@ def run(
         count=count,
         interval=interval,
         confidence_method="sensitivity",
-        warnings=quality + interval_warnings + ([zero_warn] if zero_warn else []),
+        warnings=quality + neg_warnings + interval_warnings + ([zero_warn] if zero_warn else []),
         model_versions=ModelVersions(
             detector=f"{det.name}@{det.version}", backbone=recon.backbone, associator=config.assoc
         ),

@@ -29,6 +29,7 @@ from countonce.types import Detection, Frame
 
 class GroundingDinoDetector:
     name = "groundingdino"
+    supports_negatives = True  # phrase-conditioned scores: see countonce.detect.prompts
 
     def __init__(
         self,

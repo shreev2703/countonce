@@ -18,6 +18,7 @@ LOW_DEPTH_CONFIDENCE = "low_depth_confidence"
 MANY_FAILED_LIFTS = "many_failed_lifts"
 WIDE_RANGE = "wide_range"
 NO_OBJECTS_FOUND = "no_objects_found"
+NEGATIVES_IGNORED = "negative_prompts_ignored"
 
 
 @dataclass
@@ -46,6 +47,17 @@ class WarningThresholds:
 
 def _w(code: str, message: str, fix: str) -> dict[str, str]:
     return {"code": code, "message": message, "fix": fix}
+
+
+def negatives_ignored_warning(detector: str, negatives: Sequence[str]) -> dict[str, str]:
+    """Negative phrases were parsed but the detector reports no phrase scores."""
+    return _w(
+        NEGATIVES_IGNORED,
+        f"Detector {detector!r} has no per-phrase scores, so the negative phrases "
+        f"{list(negatives)} were not applied.",
+        "Use detector 'gdino' for negative-prompt suppression, or review false positives "
+        "with the correction tools.",
+    )
 
 
 def assess_quality(

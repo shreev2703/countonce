@@ -272,3 +272,6 @@ One entry per decision: date, what the plan said, what was done, why.
 - Split with several source instances puts all moved detections in one new instance; splitting an instance's entire membership is refused (`ERR_INVALID_CORRECTION`). Merge of detections already in one instance is a no-op. Cannot-link violations raise `CorrectionError` with `ERR_CANNOT_LINK`.
 - Merge hard positives are all cross pairs between the two instances' members; Split hard negatives are moved-vs-remaining members. Pass the ORIGINAL results to `export_training_pairs`. Corrections whose job id has no result are skipped. CLI maps every job id in the file to the one `out_dir` result.
 - Tests ran with `~/vggtProject/.venv` (project `.venv` lacks torch/matplotlib).
+
+## Negative prompts (natural-language prompts)
+- Suppression runs the negative phrases as a second detector call and matches boxes by IoU >= 0.5 (same frame) rather than adding tokens to one caption, because `Detection` carries only the max-token score. Works for any detector whose scores depend on the caption; opt-in via `supports_negatives` (GroundingDINO only). `Config.negative_margin` default 0.0, untuned. Detectors without the flag keep the original prompt and get a `negative_prompts_ignored` warning. `Config.negative_prompts=False` sends the raw prompt untouched (ablation row).
