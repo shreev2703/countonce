@@ -43,6 +43,8 @@ test = [
     "pyyaml",
     "opencv-python-headless",
     "pillow",
+    "safetensors",
+    "httpx2",  # starlette TestClient backend (httpx is deprecated there)
 ]
 dev = [
     "ruff>=0.5",
@@ -66,7 +68,14 @@ countonce = ["py.typed", "configs/*.yaml"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["logs"]
+# Orchestrator-owned, untracked files: not part of the project lint gate.
+extend-exclude = [
+    "logs",
+    "scripts/hud.py",
+    "scripts/dashboard.sh",
+    "scripts/morning_review.sh",
+    "scripts/overnight_orchestrator.sh",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "W"]

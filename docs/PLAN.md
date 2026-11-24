@@ -253,32 +253,35 @@ class Frame:
     path: Path
     width: int
     height: int
-    sha256: str                    # content hash (stage caching)
+    sha256: str  # content hash (stage caching)
     privacy_mask: np.ndarray | None  # HxW bool, blurred faces/plates (§14.8)
     blur_score: float
 
+
 @dataclass
 class Detection:
-    id: str                        # f"{frame_id}:{k}"
+    id: str  # f"{frame_id}:{k}"
     frame_id: int
-    box_xyxy: np.ndarray | None    # (4,) pixels
-    point_xy: np.ndarray | None    # (2,) pixels
-    mask: np.ndarray | None        # HxW bool
+    box_xyxy: np.ndarray | None  # (4,) pixels
+    point_xy: np.ndarray | None  # (2,) pixels
+    mask: np.ndarray | None  # HxW bool
     score: float
-    feature: np.ndarray | None     # appearance embedding (DINOv2), filled on demand
+    feature: np.ndarray | None  # appearance embedding (DINOv2), filled on demand
+
 
 @dataclass
 class Recon:
-    backbone: str                  # "vggt" | "vggt_omega" | "vggt_t3" | "colmap"
-    intrinsics: np.ndarray         # (N,3,3)
-    extrinsics: np.ndarray         # (N,3,4) world->camera
-    depth: np.ndarray              # (N,H,W)
-    depth_conf: np.ndarray         # (N,H,W)
-    world_points: np.ndarray       # (N,H,W,3)
+    backbone: str  # "vggt" | "vggt_omega" | "vggt_t3" | "colmap"
+    intrinsics: np.ndarray  # (N,3,3)
+    extrinsics: np.ndarray  # (N,3,4) world->camera
+    depth: np.ndarray  # (N,H,W)
+    depth_conf: np.ndarray  # (N,H,W)
+    world_points: np.ndarray  # (N,H,W,3)
     world_points_conf: np.ndarray  # (N,H,W)
     scene_scale: float
     runtime_s: float
     peak_vram_mb: float
+
 
 @dataclass
 class LiftedDetection:
@@ -287,18 +290,20 @@ class LiftedDetection:
     size: float | None
     lift_conf: float
     motion_residual: float | None  # cross-view reprojection residual (§8.3b)
-    fail_reason: str | None        # "low_conf" | "privacy_mask" | "too_few_pixels" | None
+    fail_reason: str | None  # "low_conf" | "privacy_mask" | "too_few_pixels" | None
+
 
 @dataclass
-class MatchEvidence:               # powers "Explain this match" (§14.8)
+class MatchEvidence:  # powers "Explain this match" (§14.8)
     det_a: str
     det_b: str
-    dist_3d_norm: float            # 3D distance / mean size
+    dist_3d_norm: float  # 3D distance / mean size
     reproj_error_px: float
     appearance_sim: float
-    match_prob: float              # calibrated (temperature-scaled) probability
+    match_prob: float  # calibrated (temperature-scaled) probability
     merged: bool
-    reason: str                    # e.g. "same_frame_cannot_link", "below_threshold"
+    reason: str  # e.g. "same_frame_cannot_link", "below_threshold"
+
 
 @dataclass
 class Instance:
@@ -307,42 +312,47 @@ class Instance:
     size: float
     members: list[str]
     n_views: int
-    conf: float                    # calibrated (§10.5)
-    possibly_moved: bool           # dynamic-scene flag (§8.3b)
+    conf: float  # calibrated (§10.5)
+    possibly_moved: bool  # dynamic-scene flag (§8.3b)
+
 
 @dataclass
 class Interval:
     low: int
     high: int
-    level: float                   # e.g. 0.90
-    method: str                    # "sensitivity" | "split_conformal" | "jackknife_plus"
+    level: float  # e.g. 0.90
+    method: str  # "sensitivity" | "split_conformal" | "jackknife_plus"
     n_calibration: int | None
+
 
 @dataclass
 class ModelVersions:
-    detector: str                  # name + checkpoint hash
+    detector: str  # name + checkpoint hash
     backbone: str
-    associator: str                # "v1" | "v2" | "v3@<checkpoint>"
-    calibration: str | None        # temperature/conformal calibration version
+    associator: str  # "v1" | "v2" | "v3@<checkpoint>"
+    calibration: str | None  # temperature/conformal calibration version
+
 
 @dataclass
 class CountResult:
-    schema_version: str            # "1.0", bumped on any change (§8.10)
+    schema_version: str  # "1.0", bumped on any change (§8.10)
     prompt: str
     negative_prompts: list[str]
     count: int
     interval: Interval
-    zero_count: bool               # true when no target objects were found
+    zero_count: bool  # true when no target objects were found
     instances: list[Instance]
     per_frame_counts: dict[int, int]
-    detection_status: dict[str, str]   # "new" | "duplicate" | "rejected"
-    reject_reasons: dict[str, str]     # detection id -> reason
-    match_evidence: list[MatchEvidence] # stored for the inspector (may be pruned to top-k per instance)
-    warnings: list[dict]               # {code, message, fix}
+    detection_status: dict[str, str]  # "new" | "duplicate" | "rejected"
+    reject_reasons: dict[str, str]  # detection id -> reason
+    match_evidence: list[
+        MatchEvidence
+    ]  # stored for the inspector (may be pruned to top-k per instance)
+    warnings: list[dict]  # {code, message, fix}
     model_versions: ModelVersions
-    input_hash: str                    # content-addressable cache key
+    input_hash: str  # content-addressable cache key
     recon_cache_hit: bool
-    oom_fallback_rung: int             # 0 = no fallback used (§13 item 6c)
+    oom_fallback_rung: int  # 0 = no fallback used (§13 item 6c)
     timings: dict[str, float]
     peak_vram_mb: float
     config: dict

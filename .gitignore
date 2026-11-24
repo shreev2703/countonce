@@ -45,3 +45,6 @@ paper/*.fls
 paper/*.fdb_latexmk
 paper/main.pdf
 site/
+
+# Orchestrator logs
+logs/
