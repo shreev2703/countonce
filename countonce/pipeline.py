@@ -333,11 +333,11 @@ def run(
         if att.chunk_size is not None:
             # a ladder chunk can be smaller than the configured overlap; keep overlap < chunk
             overlap = max(2, min(config.chunk_overlap, att.chunk_size - 1))
-            r = ChunkedReconstructor(r, att.chunk_size, overlap)
+            r = ChunkedReconstructor(r, att.chunk_size, overlap, config.chunk_stitch)
         elif config.chunked_recon:
             cap = _chunk_cap(config)
             if cap is not None:
-                r = ChunkedReconstructor(r, cap, config.chunk_overlap)
+                r = ChunkedReconstructor(r, cap, config.chunk_overlap, config.chunk_stitch)
         if cache_dir is not None:
             got = CachedReconstructor(r, ReconCache(cache_dir / "recon"), "0").reconstruct_cached(
                 stage_frames

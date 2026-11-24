@@ -4,8 +4,10 @@ When a capture has more frames than the backbone can hold (config ``chunk_size``
 memory-guard calibration), reconstruct overlapping chunks, align each chunk to the previously
 merged result with a Sim(3) fitted to the shared frames' camera centres (Umeyama,
 ``recon.align``) and merge into one dense ``types.Recon``. Shared frames keep the earlier
-chunk's copy. Chaining is sequential, so scale/rotation drift accumulates with chunk count
-(see docs/DEVIATIONS.md; pose-graph stitching is a separate task).
+chunk's copy. Chaining is sequential, so scale/rotation drift accumulates with chunk count;
+``stitch="pose_graph"`` instead solves a global Sim(3) synchronization over every pair of chunks
+that share frames (``recon.posegraph``) and falls back to chaining when the graph is a tree
+(see docs/DEVIATIONS.md).
 """
 
 from __future__ import annotations
@@ -80,7 +82,12 @@ def _scaled(inner: Any, scale: float) -> Any:
 class ChunkedReconstructor:
     """``Reconstructor`` wrapper; passes through unchanged when frames fit in one chunk."""
 
-    def __init__(self, inner: Reconstructor, chunk_size: int, overlap: int = 4) -> None:
+    def __init__(
+        self, inner: Reconstructor, chunk_size: int, overlap: int = 4, stitch: str = "chain"
+    ) -> None:
+        if stitch not in ("chain", "pose_graph"):
+            raise ValueError(f"stitch must be 'chain' or 'pose_graph', got {stitch!r}")
+        self.stitch = stitch
         chunk_ranges(chunk_size + 1, chunk_size, overlap)  # validate arguments early
         self.inner = inner
         self.chunk_size = chunk_size
@@ -92,12 +99,13 @@ class ChunkedReconstructor:
             "chunked": True,
             "chunk_size": self.chunk_size,
             "overlap": self.overlap,
+            **({"stitch": self.stitch} if self.stitch != "chain" else {}),
             "inner": self.inner.config(),
         }
 
     def with_resolution_scale(self, scale: float) -> ChunkedReconstructor:
         inner = _scaled(self.inner, scale)
-        return ChunkedReconstructor(inner, self.chunk_size, self.overlap)
+        return ChunkedReconstructor(inner, self.chunk_size, self.overlap, self.stitch)
 
     def reconstruct(self, frames: list[Frame]) -> Recon:
         if len(frames) <= self.chunk_size:
@@ -107,8 +115,23 @@ class ChunkedReconstructor:
         parts: list[dict[str, np.ndarray]] = []
         runtime, vram, backbone, scale = 0.0, 0.0, "", 1.0
         merged_ext = np.zeros((0, 3, 4))
+        recs: list[Recon] | None = None
+        graph_sims: list[Sim3] | None = None
+        if self.stitch == "pose_graph":
+            from countonce.recon.posegraph import solve_pose_graph
+
+            recs = [self.inner.reconstruct(frames[a:b]) for a, b in ranges]
+            for i, ((a, b), r) in enumerate(zip(ranges, recs, strict=True)):
+                if r.n_views != b - a:
+                    raise ChunkAlignmentError(
+                        f"chunk {i} returned {r.n_views} views for {b - a} frames"
+                    )
+            res = solve_pose_graph(
+                [r.extrinsics for r in recs], [np.arange(a, b) for a, b in ranges]
+            )
+            graph_sims = None if res.is_tree else res.sims  # a tree is exactly the chain
         for i, (a, b) in enumerate(ranges):
-            rec = self.inner.reconstruct(frames[a:b])
+            rec = recs[i] if recs is not None else self.inner.reconstruct(frames[a:b])
             if rec.n_views != b - a:
                 raise ChunkAlignmentError(
                     f"chunk {i} returned {rec.n_views} views for {b - a} frames"
@@ -121,10 +144,13 @@ class ChunkedReconstructor:
                 backbone, scale = rec.backbone, rec.scene_scale
             else:
                 skip = self.overlap
-                try:
-                    sim = align_chunk(merged_ext[a : a + skip], rec.extrinsics[:skip])
-                except ChunkAlignmentError as e:
-                    raise ChunkAlignmentError(f"chunk {i} (frames {a}-{b - 1}): {e}") from e
+                if graph_sims is not None:
+                    sim = graph_sims[i]
+                else:
+                    try:
+                        sim = align_chunk(merged_ext[a : a + skip], rec.extrinsics[:skip])
+                    except ChunkAlignmentError as e:
+                        raise ChunkAlignmentError(f"chunk {i} (frames {a}-{b - 1}): {e}") from e
                 ext = transform_extrinsics(rec.extrinsics, sim)
                 depth = rec.depth * sim.s
                 wp = sim.apply(rec.world_points)

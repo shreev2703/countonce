@@ -55,6 +55,7 @@ class Config(BaseModel):
     chunked_recon: bool = False
     chunk_size: int = Field(0, ge=0)  # 0 = use the memory-guard calibration (no chunking if none)
     chunk_overlap: int = Field(4, ge=2)  # shared frames between adjacent chunks
+    chunk_stitch: Literal["chain", "pose_graph"] = "chain"  # pose_graph: global Sim(3) sync
 
     # Detect / lift / associate
     score_threshold: float = Field(0.3, ge=0, le=1)
