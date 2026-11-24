@@ -39,3 +39,9 @@ ablations:
   # "off" is quoted: a bare off is a YAML boolean
   hallucination: {field: hallucination, values: ["off", drop]}
   lift_region: {field: lift_region, values: [box]}
+
+# Frontier-VLM baselines (PLAN 9.3 item 8). Recorded as status=skipped_paid_disabled unless the
+# run passes --allow-paid AND --spend-cap-usd N AND the provider's API key variable is set.
+# Uncomment and set real model ids to use; prompt is `count` or `enumerate`.
+#  - {name: vlm_claude_count, kind: vlm, config: {provider: anthropic, model: MODEL_ID, prompt: count}}
+#  - {name: vlm_claude_enum, kind: vlm, config: {provider: anthropic, model: MODEL_ID, prompt: enumerate}}

@@ -208,3 +208,11 @@ One entry per decision: date, what the plan said, what was done, why.
 - Limits in `MediaLimits` (50 MB image, 100 MP, 4 GB video, 8K, 120 fps, 600 s, 36k frames, codec allow-list) are my defaults; tune later.
 - Images are re-saved to `<out_dir>/sanitized/<n>/` (JPEG q95, re-encoded) and the original is never modified. `collect_paths` now raises typed `MediaError` for unsupported files (was `FileNotFoundError`); missing paths still raise `FileNotFoundError`. Video frames are extracted with `-map_metadata -1`. Provenance: `config["exif_stripped"]` and `config["sanitize"]`.
 - Face/plate blurring and resumable uploads (rest of PLAN 14.8) are not part of this task.
+
+## Frontier VLM baseline harness (no paid calls)
+- `kind: vlm` methods (`config: {provider, model, prompt: count|enumerate, version}`) live in `bench/vlm/`. They run only with `--allow-paid` AND `--spend-cap-usd N` (>0) AND the provider key env var (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`); otherwise `status=skipped_paid_disabled` and no client is built. The cap is per bench process on *estimated* cost: a call is skipped (`skipped_cost_cap`, latched) if spent + projected worst case would exceed it.
+- Prices and per-request image caps in `bench/vlm/client.py:PROVIDERS` are my conservative planning numbers, not quotes (verify before a paid run; override per method with `price_in`/`price_out` USD per Mtok). Image caps: anthropic 100, openai 500, google 3000.
+- The Anthropic/OpenAI/Google adapters are untested against live APIs (no keys, by design). Model ids are not hard-coded; the bench config has commented examples with `MODEL_ID`. The open-weight (Qwen-VL) baseline is not part of this task.
+- Refusals (no integer plus refusal wording) are logged in `results/vlm_calls.csv` and recorded as `status=refused`; non-`ok` rows are retried on resume, so a rerun would pay again for refused jobs. Unparseable replies are `status=error`.
+- Per-call log is a separate CSV (`results/vlm_calls.csv`) since its columns (tokens, cost, prompt version) do not fit `bench.csv`. `order: [ordered, shuffled]` doubles VLM calls; set `order: [ordered]` to halve cost.
+- Figure 10 (`python -m bench.vlm.fig10`) groups by the scene's `overlap` key in `gt.json` (copied into the job config only when present, so existing job keys are unchanged) and falls back to number of views.

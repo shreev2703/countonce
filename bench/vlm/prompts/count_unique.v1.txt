@@ -1,0 +1,2 @@
+These photos show the same scene from different viewpoints. Count the number of unique {object} in the scene. The same physical object may appear in several photos; count it once. Do not add up per-photo counts.
+Finish your reply with a final line in exactly this form: ANSWER: <integer>

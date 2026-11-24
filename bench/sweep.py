@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from bench.baselines import BASELINES
 from bench.runner import DEFAULT_CSV, Job, RunOutput, SkipRun, run_jobs
@@ -32,9 +32,15 @@ class MethodSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    kind: Literal["baseline", "countonce"]
+    kind: Literal["baseline", "countonce", "vlm"]
     baseline: Literal["sum", "max", "median"] | None = None
     config: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _vlm_needs_provider(self) -> MethodSpec:
+        if self.kind == "vlm" and not {"provider", "model"} <= set(self.config):
+            raise ValueError(f"vlm method {self.name!r} needs config.provider and config.model")
+        return self
 
 
 class Ablation(BaseModel):
@@ -58,6 +64,9 @@ class BenchConfig(BaseModel):
     random_samples: int = Field(3, ge=0)
     even_sample: bool = True
     seed: int = 0
+    # Paid VLM baselines (kind: vlm) run only with allow_paid AND a positive cap AND an API key.
+    allow_paid: bool = False
+    spend_cap_usd: float | None = None
     order: list[Literal["ordered", "shuffled"]] = ["ordered", "shuffled"]
     methods: list[MethodSpec]
     ablation_base: str | None = None
@@ -139,6 +148,8 @@ def build_jobs(cfg: BenchConfig, scenes: list[dict[str, Any]]) -> list[Job]:
                                     "options": method.config,
                                     "tier": scene.get("tier", ""),
                                     "seed": cfg.seed,
+                                    # Only when the scene declares it, so older job keys hold.
+                                    **({"overlap": scene["overlap"]} if "overlap" in scene else {}),
                                 },
                             )
                         )
@@ -155,7 +166,10 @@ def discover_scenes(scenes_dir: Path) -> list[dict[str, Any]]:
         if not (d / "images").is_dir() or not gt_path.exists():
             continue
         gt = json.loads(gt_path.read_text())
-        scenes.append({"id": d.name, "dir": d, "tier": gt.get("tier", ""), "gt": gt})
+        scene = {"id": d.name, "dir": d, "tier": gt.get("tier", ""), "gt": gt}
+        if "overlap" in gt:
+            scene["overlap"] = gt["overlap"]  # view-overlap label or fraction, for figure 10
+        scenes.append(scene)
     return scenes
 
 
@@ -189,8 +203,16 @@ def make_executor(
     by_id = {s["id"]: s for s in scenes}
     seeds = dict(view_samples(cfg))
     make_det = detector_factory or build_detector
+    vlm_fn: Callable[[Job], RunOutput] | None = None
 
     def fn(job: Job) -> RunOutput:
+        nonlocal vlm_fn
+        if job.config["kind"] == "vlm":
+            if vlm_fn is None:
+                from bench.vlm.harness import make_vlm_executor
+
+                vlm_fn = make_vlm_executor(cfg, scenes)
+            return vlm_fn(job)
         opts = job.config["options"]
         if job.config["kind"] == "countonce" and opts.get("assoc") == "v3":
             ckpt = opts.get("v3_checkpoint")

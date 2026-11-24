@@ -37,6 +37,12 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument("--config", type=Path, default=Path("configs/bench.yaml"))
     b.add_argument("--dry-run", action="store_true", help="print the job grid size and exit")
     b.add_argument(
+        "--allow-paid", action="store_true", help="permit paid VLM API calls (kind: vlm methods)"
+    )
+    b.add_argument(
+        "--spend-cap-usd", type=float, help="per-run estimated spend cap; required for paid calls"
+    )
+    b.add_argument(
         "--figures", type=Path, metavar="DIR", help="render figures/gallery from the CSV"
     )
 
@@ -130,6 +136,10 @@ def _bench(args: argparse.Namespace) -> int:
     from bench.sweep import BenchConfig, build_jobs, discover_scenes, run_bench
 
     cfg = BenchConfig.from_yaml(args.config)
+    if args.allow_paid:
+        cfg = cfg.model_copy(update={"allow_paid": True})
+    if args.spend_cap_usd is not None:
+        cfg = cfg.model_copy(update={"spend_cap_usd": args.spend_cap_usd})
     if args.figures is not None:
         from bench.figures import make_all
         from bench.gallery import write_gallery

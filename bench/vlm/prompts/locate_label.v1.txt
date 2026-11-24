@@ -1,0 +1,2 @@
+These photos show the same scene from different viewpoints. First locate each {object} you can see and give it a label (for example "obj1: left edge of the table, red lid"), and note which photos show it. Recognise when two photos show the same physical object, and give it one label only. Then count the labels.
+Finish your reply with a final line in exactly this form: ANSWER: <integer>
