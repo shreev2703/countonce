@@ -543,6 +543,9 @@ class SqliteJobStore:
         for r in rows:
             if self.delete_job(r["id"]):
                 purged.append(r["id"])
+        from countonce.jobs.uploads import purge_upload_sessions  # lazy: uploads imports store
+
+        purge_upload_sessions(self, now)
         return purged
 
     # -- share tokens ---------------------------------------------------------------------

@@ -1,0 +1,6 @@
+# Resumable upload limits (PLAN 14.8). Per-kind media caps (image/video bytes) still apply on top.
+max_bytes: 4294967296      # whole-file cap, bytes
+min_chunk_bytes: 1
+max_chunk_bytes: 67108864  # 64 MiB
+max_chunks: 10000          # bounds the per-session chunk rows
+session_ttl_s: 86400       # idle time before a session is abandoned and purged

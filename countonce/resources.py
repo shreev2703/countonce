@@ -10,7 +10,7 @@ from __future__ import annotations
 from importlib import resources
 from pathlib import Path
 
-PACKAGED = ("alerts.yaml", "colmap.yaml", "cost.yaml")
+PACKAGED = ("alerts.yaml", "colmap.yaml", "cost.yaml", "uploads.yaml")
 
 
 def packaged_config(name: str) -> Path | None:

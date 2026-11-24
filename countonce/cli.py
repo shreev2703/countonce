@@ -176,6 +176,16 @@ def _parser() -> argparse.ArgumentParser:
     sj.add_argument("--idempotency-key")
     sj.add_argument("--config", type=Path, help="YAML Config stored as the job options")
 
+    up = sub.add_parser("upload", help="resumable chunked upload into a job database")
+    up.add_argument("file", type=Path)
+    up.add_argument("--db", type=Path, required=True)
+    up.add_argument("--user", default="local")
+    up.add_argument("--resume", metavar="SESSION", help="continue an interrupted session")
+    up.add_argument("--chunk-mb", type=float, default=4.0, help="chunk size in MiB (default 4)")
+    up.add_argument("--job-id", help="attach to this queued job instead of creating one")
+    up.add_argument("--prompt", help="prompt for the new job (needed without --job-id)")
+    up.add_argument("--limits", type=Path, default=Path("configs/uploads.yaml"))
+
     tr = sub.add_parser("trace", help="inspect stage traces written by a traced worker or run")
     tsub = tr.add_subparsers(dest="trace_cmd", required=True)
     ts = tsub.add_parser("show", help="print an indented waterfall for a job's trace")
@@ -484,6 +494,39 @@ def _submit(args: argparse.Namespace) -> int:
         idempotency_key=args.idempotency_key,
     )
     print(f"{job_id} {'queued' if created else 'duplicate (existing job)'}")
+    return 0
+
+
+def _upload(args: argparse.Namespace) -> int:
+    from countonce.errors import CountOnceError
+    from countonce.jobs.uploads import LocalTransport, open_service, upload_file
+
+    if not args.file.is_file():
+        print(f"upload: no such file: {args.file}", file=sys.stderr)
+        return 1
+    if args.job_id is None and not args.prompt:
+        print("upload: pass --prompt (new job) or --job-id", file=sys.stderr)
+        return 2
+    try:
+        service = open_service(args.db, limits_path=args.limits)
+        out = upload_file(
+            LocalTransport(service),
+            args.user,
+            args.file,
+            chunk_size=max(1, int(args.chunk_mb * 1024 * 1024)),
+            resume=args.resume,
+            job_id=args.job_id,
+            prompt=args.prompt,
+            on_session=lambda sid: print(f"upload session {sid}", flush=True),
+            on_chunk=lambda i, n: print(f"chunk {i + 1}/{n}", flush=True),
+        )
+    except CountOnceError as exc:
+        print(f"upload: {exc}\n  tip: {exc.tip}", file=sys.stderr)
+        return 1
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"upload: {exc}", file=sys.stderr)
+        return 1
+    print(f"upload: job {out['job_id']}")
     return 0
 
 
@@ -858,6 +901,8 @@ def main(argv: list[str] | None = None) -> int:
         return _admin_stats(args)
     if args.cmd == "submit":
         return _submit(args)
+    if args.cmd == "upload":
+        return _upload(args)
     if args.cmd == "jobs":
         return _jobs(args)
     if args.cmd == "trace":

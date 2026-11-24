@@ -25,6 +25,8 @@ class ErrorCode(StrEnum):
     ERR_CANNOT_LINK = "ERR_CANNOT_LINK"
     ERR_INVALID_CORRECTION = "ERR_INVALID_CORRECTION"
     ERR_INVALID_INPUT = "ERR_INVALID_INPUT"
+    ERR_CHUNK_CORRUPT = "ERR_CHUNK_CORRUPT"
+    ERR_UPLOAD_INCOMPLETE = "ERR_UPLOAD_INCOMPLETE"
 
 
 @dataclass(frozen=True)
@@ -80,6 +82,12 @@ ERROR_INFO: dict[ErrorCode, ErrorInfo] = {
     ),
     ErrorCode.ERR_INVALID_INPUT: ErrorInfo(
         False, "Check the image paths, the prompt and the config keys, then call the tool again."
+    ),
+    ErrorCode.ERR_CHUNK_CORRUPT: ErrorInfo(
+        True, "A chunk arrived damaged. Send that chunk again; finished chunks are kept."
+    ),
+    ErrorCode.ERR_UPLOAD_INCOMPLETE: ErrorInfo(
+        False, "Some chunks are still missing. Resume the upload to send them, then finalize."
     ),
 }
 
