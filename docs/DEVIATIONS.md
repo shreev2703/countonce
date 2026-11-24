@@ -514,3 +514,10 @@ One entry per decision: date, what the plan said, what was done, why.
 - **`ReconCache`/`DetectionCache` TTL is an explicit `expire()` sweep** (`ttl_s=`), not a read-time check; nothing schedules it yet. `MaskCache` (`detect/masks.py`) is still disk-only.
 - **Upload assembly still buffers the whole file in memory/temp disk** (chunks are fetched one by one into a temp file; the sanitized result is `put` in one call). S3 multipart/presigned-PUT upload straight from the browser (§14.8) is the later step; `presign_put` is ready for it.
 - Verified only against `moto`. Real R2 behaviour (endpoint, `region=auto`, SigV4 presign) is untested: needs credentials and a bucket (human gate, see `docs/GATES.md`).
+
+## DVC scaffold
+- Added `--only STAGE` to `countonce dag run` / `Dag.run` so each DVC stage maps to one DAG stage.
+- DVC stages run with `--config params.yaml` (generated from configs/dag.yaml + defaults) instead of configs/dag.yaml, so DVC param tracking matches what actually runs.
+- `evaluate` tracks the whole `train` param section (DVC fails on missing dotted keys such as `train.match_threshold`).
+- Stamp JSONs are DVC outs with `cache: false`; `episodes` is included in `dvc.yaml` as it is a real DAG stage.
+- Version string is `dvc:<sha256[:12] of dvc.lock>`, looked up in the CWD; fallback is the episode content hash.

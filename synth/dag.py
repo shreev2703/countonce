@@ -33,6 +33,29 @@ from synth.validate import QuarantineReport, RenderedScene, validate_scene
 STAGES = ("recipe", "validate", "shard", "episodes", "features", "catalog", "train", "evaluate")
 _RECIPE_KEYS = {"n_objects", "n_views", "arrangement", "rig_kind"}
 
+# Declarative stage graph: the single source for `scripts/make_dvc_yaml.py` (dvc.yaml/params.yaml).
+# `deps` are upstream stage names (their output dirs) or repo paths; `params` are DagConfig keys
+# (top-level keys of params.yaml). Stage output dirs are `<work_dir>/<stage>`.
+STAGE_GRAPH: dict[str, dict[str, tuple[str, ...]]] = {
+    "recipe": {"deps": ("synth/recipe.py",), "params": ("seed", "splits", "recipe")},
+    "validate": {"deps": ("recipe", "synth/validate.py"), "params": ()},
+    "shard": {"deps": ("recipe", "validate", "synth/shards.py"), "params": ("shards",)},
+    "episodes": {
+        "deps": ("recipe", "validate", "synth/geometry.py"),
+        "params": ("geometry",),
+    },
+    "features": {"deps": ("episodes", "synth/features.py"), "params": ()},
+    "catalog": {"deps": ("recipe", "validate", "episodes", "synth/catalog.py"), "params": ()},
+    "train": {
+        "deps": ("episodes", "features", "countonce/match/train.py"),
+        "params": ("train",),
+    },
+    "evaluate": {
+        "deps": ("episodes", "train", "countonce/match/train.py"),
+        "params": ("ablate", "train"),
+    },
+}
+
 SceneLoader = Callable[[SceneRecipe], RenderedScene]
 Executor = Callable[["Dag"], None]
 
@@ -118,6 +141,12 @@ def dataset_version(episode_dirs: list[Path]) -> str:
             h.update(p.name.encode())
             h.update(p.read_bytes())
     return h.hexdigest()[:12]
+
+
+def dvc_lock_hash(lock: Path | str = "dvc.lock") -> str | None:
+    """``dvc:<sha256 prefix>`` of `dvc.lock` when it exists, else None (callers fall back)."""
+    p = Path(lock)
+    return f"dvc:{_sha(p.read_bytes())[:12]}" if p.is_file() else None
 
 
 def _git_sha() -> str | None:
@@ -259,7 +288,8 @@ def _episode_triples(dag: Dag) -> list[tuple[str, str, Path]]:
 
 
 def _episodes_version(dag: Dag) -> str:
-    return dataset_version([dag.work / "episodes" / s for s in ("train", "val", "test")])
+    dirs = [dag.work / "episodes" / s for s in ("train", "val", "test")]
+    return dvc_lock_hash() or dataset_version(dirs)
 
 
 def _exec_features(dag: Dag) -> None:
@@ -322,7 +352,8 @@ def _train_config(dag: Dag) -> Any:
         "seed": dag.cfg.seed,
         "resume": False,
         "device": "cpu",
-        "data_version": dataset_version([work / "episodes" / "train", work / "episodes" / "val"]),
+        "data_version": dvc_lock_hash()
+        or dataset_version([work / "episodes" / "train", work / "episodes" / "val"]),
         "feature_store": str(_feature_store_path(dag)),
     }
     return TrainConfig(**{**base, **dag.cfg.train})
@@ -505,10 +536,16 @@ class Dag:
         return out
 
     # run
-    def run(self, from_stage: str | None = None, force: bool = False) -> dict[str, str]:
-        """Run stale stages in order. Returns {stage: 'ran' | 'skipped'}."""
-        if from_stage is not None and from_stage not in STAGES:
-            raise DagError(f"unknown stage {from_stage!r}; stages are {', '.join(STAGES)}")
+    def run(
+        self, from_stage: str | None = None, force: bool = False, only: str | None = None
+    ) -> dict[str, str]:
+        """Run stale stages in order. Returns {stage: 'ran' | 'skipped'}.
+
+        `only` forces that one stage and leaves every other stage untouched (DVC runs one stage
+        per command)."""
+        for name in (from_stage, only):
+            if name is not None and name not in STAGES:
+                raise DagError(f"unknown stage {name!r}; stages are {', '.join(STAGES)}")
         forced = force
         result: dict[str, str] = {}
         hashes: dict[str, str | None] = {}
@@ -517,6 +554,11 @@ class Dag:
                 forced = True
             stamp = self.read_stamp(st)
             key = self._key(st, self._upstream_hash(st, hashes))
+            if only is not None and st != only:
+                result[st] = "skipped"
+                hashes[st] = stamp.get("output_hash") if stamp else None
+                continue
+            forced = forced or st == only
             fresh = (
                 not forced
                 and stamp is not None

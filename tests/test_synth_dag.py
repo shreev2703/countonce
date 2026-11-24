@@ -153,3 +153,27 @@ def test_checkpoint_records_dataset_version(tmp_path: Path) -> None:
     ev = json.loads((dag.work / "evaluate" / "eval.json").read_text())
     assert ev["train_data_version"] == version
     assert set(Dag(cfg).run().values()) == {"skipped"}
+
+
+def test_only_runs_a_single_stage(tmp_path):
+    calls: list[str] = []
+    dag = Dag(_cfg(tmp_path), executors=_counting(calls))
+    dag.run()
+    calls.clear()
+    assert dag.run(only="train")["train"] == "ran"
+    assert calls == ["train"]
+    with pytest.raises(DagError):
+        dag.run(only="nope")
+
+
+def test_versions_record_dvc_lock_hash_when_present(tmp_path, monkeypatch):
+    from synth.dag import _episodes_version, _train_config, dvc_lock_hash
+
+    monkeypatch.chdir(tmp_path)
+    dag = Dag(_cfg(tmp_path))
+    dag.run()
+    fallback = _episodes_version(dag)
+    assert not fallback.startswith("dvc:")
+    (tmp_path / "dvc.lock").write_text("schema: '2.0'\n")
+    assert _episodes_version(dag) == dvc_lock_hash() != fallback
+    assert _train_config(dag).data_version == dvc_lock_hash()

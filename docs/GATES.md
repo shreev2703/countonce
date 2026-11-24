@@ -190,3 +190,8 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 
 ## Object storage against real R2 (human gate)
 - `S3BlobStore` and the cache/upload/worker routing pass the contract suite on `moto` only. To verify on Cloudflare R2: create a bucket and an API token, set `COUNTONCE_STORAGE=s3`, `COUNTONCE_S3_BUCKET`, `COUNTONCE_S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com`, `COUNTONCE_S3_ACCESS_KEY_ID`, `COUNTONCE_S3_SECRET_ACCESS_KEY` (`COUNTONCE_S3_REGION=auto`), install `.[storage]`, then run a worker with `--storage s3` and fetch a presigned URL by hand. Also set a bucket CORS rule before browser uploads use `presign_put`.
+
+## DVC remote (R2): human gate
+`dvc.yaml`/`params.yaml` are committed but no DVC remote is configured. Needs a human: create the
+R2 bucket, then `dvc remote add -d r2 s3://<bucket>/dvc`, set the endpoint URL and credentials
+(local, not committed), `dvc push`. Until then `dvc.lock`/data stay local.

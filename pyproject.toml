@@ -36,6 +36,9 @@ api = [
 storage = [
     "boto3>=1.34",
 ]
+dvc = [
+    "dvc>=3.0",
+]
 data = [
     "pyarrow>=15",
     "duckdb>=1.0",

@@ -32,6 +32,28 @@ A scene is a `RenderedScene` (images, depth, instance masks, camera centres, met
 | `fewer_than_2_views_see_target` | no target instance visible in >= 2 views |
 | `degenerate_camera_rig` | camera centres (and viewing directions) nearly identical, non-finite, or < 2 cameras |
 
+## Dataset versioning with DVC (PLAN §16B.1)
+`dvc.yaml` and `params.yaml` are generated from `synth.dag.STAGE_GRAPH` (each stage's deps, outs and
+params), so they cannot drift from the DAG. Never edit them by hand:
+
+```
+make dvc-yaml     # regenerate (params.yaml = configs/dag.yaml over DagConfig defaults)
+make dvc-check    # fail if the committed files are stale (also covered by tests/test_dvc_yaml.py)
+```
+
+Each DVC stage runs `countonce dag run --config params.yaml --only <stage>`. The optional extra
+(`uv pip install -e .[dvc]`) is needed only to run `dvc`; tests do not need it (`dvc dag` is
+checked under `importorskip`).
+
+Workflow once `dvc` is installed: `dvc init` (once), `dvc repro`, then commit `dvc.lock` with the
+code. When `dvc.lock` exists in the working directory, the feature-store/catalog data version and
+the checkpoint `data_version` become `dvc:<12-char sha256 of dvc.lock>` (`synth.dag.dvc_lock_hash`);
+without it they keep the episode-content hash. Checkout of an old git commit plus `dvc checkout`
+restores the matching data.
+
+**No remote is configured.** Adding the Cloudflare R2 remote (`dvc remote add`, bucket and
+credentials) is a human gate; see `docs/GATES.md`.
+
 ## Cost
 - Storage per scene / per 1,000 scenes: TODO: fill from results
 - Render time per scene (renderer, GPU/CPU): TODO: fill from results

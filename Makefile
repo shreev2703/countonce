@@ -3,7 +3,7 @@ PYTHON ?= $(shell command -v python3 || command -v python)
 DAG_CONFIG ?= configs/dag.yaml
 CLI = countonce dag
 
-.PHONY: paper site dag dag-status dag-force recipe validate episodes train evaluate lint test
+.PHONY: dvc-yaml dvc-check paper site dag dag-status dag-force recipe validate episodes train evaluate lint test
 
 dag:
 	$(CLI) run --config $(DAG_CONFIG)
@@ -32,3 +32,10 @@ paper:
 # Static project page (self-contained, placeholders where results are missing).
 site:
 	$(PYTHON) scripts/make_site.py --out site/index.html
+
+# Regenerate dvc.yaml/params.yaml from synth/dag.py STAGE_GRAPH; dvc-check fails if they drifted.
+dvc-yaml:
+	$(PYTHON) scripts/make_dvc_yaml.py
+
+dvc-check:
+	$(PYTHON) scripts/make_dvc_yaml.py --check

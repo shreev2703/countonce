@@ -145,6 +145,7 @@ def _parser() -> argparse.ArgumentParser:
     g.add_argument("--config", type=Path, default=Path("configs/dag.yaml"))
     g.add_argument("--from", dest="from_stage", help="rerun this stage and everything after it")
     g.add_argument("--force", action="store_true", help="rerun every stage")
+    g.add_argument("--only", help="rerun just this stage (used by dvc.yaml)")
 
     d = sub.add_parser("drift", help="population-stability drift of current jobs vs a reference")
     d.add_argument("--reference", type=Path, required=True, help="bench CSV or dir of result.json")
@@ -1011,7 +1012,8 @@ def _dag(args: argparse.Namespace) -> int:
         if args.dag_cmd == "status":
             print(format_status(dag.status()))
             return 0
-        for stage, state in dag.run(from_stage=args.from_stage, force=args.force).items():
+        ran = dag.run(from_stage=args.from_stage, force=args.force, only=args.only)
+        for stage, state in ran.items():
             print(f"dag: {stage}: {state}")
     except (FileNotFoundError, DagError, ValueError) as exc:
         print(f"countonce: error: {exc}", file=sys.stderr)
