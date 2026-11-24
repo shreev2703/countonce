@@ -1,0 +1,60 @@
+name: Benchmark submission
+description: Submit predictions for CountOnce-Bench
+labels: [benchmark]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Predictions must validate against `bench/schemas/predictions.schema.json` and be scored
+        on a frozen split. Check locally first:
+        `python -m bench.evaluate --predictions preds.json --gt <split>`.
+  - type: input
+    id: method
+    attributes:
+      label: Method name (the `method` field)
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind (the `kind` field)
+      options: [countonce, baseline, vlm, other]
+    validations:
+      required: true
+  - type: input
+    id: split
+    attributes:
+      label: Split (the `split` field)
+      description: Must be a frozen split listed in `bench/splits.json`, for example `test`.
+    validations:
+      required: true
+  - type: textarea
+    id: format
+    attributes:
+      label: Format check
+      description: |
+        Each scene needs `scene_id` and `count` (>= 0). `interval` ([low, high]) and
+        `assignments` (detection id -> instance label) are optional. No extra fields.
+      value: |
+        ```json
+        {"method": "...", "kind": "other", "split": "test",
+         "scenes": [{"scene_id": "...", "count": 0, "interval": [0, 0]}]}
+        ```
+  - type: input
+    id: file
+    attributes:
+      label: Link to the predictions file
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Model, prompt, settings and code link
+      description: Enough to reproduce. For VLMs give the exact model id and prompt.
+  - type: checkboxes
+    id: honest
+    attributes:
+      label: Confirmation
+      options:
+        - label: The predictions came from running the method on the split, with no test-set tuning.
+          required: true

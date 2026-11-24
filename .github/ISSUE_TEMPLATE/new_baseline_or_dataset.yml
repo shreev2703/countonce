@@ -1,0 +1,40 @@
+name: New baseline or dataset
+description: Propose a counting baseline, detector, backbone or dataset to add
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options: [Baseline, Detector, Reconstruction backbone, Dataset]
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Name and link (paper, code, or dataset page)
+    validations:
+      required: true
+  - type: input
+    id: license
+    attributes:
+      label: License of the code, weights or data
+      description: Say if it is non-commercial or gated.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it belongs here
+      description: What it measures that the current baselines do not.
+  - type: textarea
+    id: access
+    attributes:
+      label: How to obtain it
+      description: Download steps, size, and any account or approval needed.
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contribution
+      options:
+        - label: I can open a PR for this (see CONTRIBUTING.md)

@@ -27,6 +27,7 @@ weights/
 # Secrets
 .env
 .env.*
+!.env.example
 
 # Editors / OS
 .vscode/

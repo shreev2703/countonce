@@ -1,0 +1,35 @@
+name: Bug report
+description: Something crashed, or a count looks wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Command or code to reproduce
+      description: The exact `countonce ...` command or a minimal Python snippet.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Output
+      description: Traceback, or the relevant part of `result.json` (count, interval, warnings).
+      render: text
+  - type: input
+    id: config
+    attributes:
+      label: Detector / backbone / association
+      placeholder: "e.g. countgd / vggt / v2"
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Output of `countonce env`, plus OS and Python version.
+      render: text

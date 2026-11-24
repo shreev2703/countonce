@@ -1,5 +1,7 @@
 # CountOnce
 
+[![CI](https://github.com/shreev2703/countonce/actions/workflows/ci.yml/badge.svg)](https://github.com/shreev2703/countonce/actions/workflows/ci.yml)
+
 Count objects in 3D from a few photos or a short video, without counting any object twice.
 
 > **Status: draft.** The pipeline and benchmark harness are implemented and tested on synthetic
@@ -134,6 +136,8 @@ pytest -m "not slow and not gpu"
 ```
 
 ## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, test markers and how to add a detector or baseline.
 
 Install the git hooks once per clone (they are local to this repository, not global):
 
