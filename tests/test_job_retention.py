@@ -176,3 +176,37 @@ def test_cli(tmp_path, capsys):
     assert main([*base, "purge", "--retention-days", "0"]) == 0
     assert not inp.exists()
     assert main([*base, "delete", jid]) == 1  # already purged
+
+
+def test_cli_dash_leading_token(tmp_path, capsys, monkeypatch):
+    """A token_urlsafe value starting with '-' must not break the CLI round trip."""
+    import secrets
+
+    monkeypatch.setattr(secrets, "token_urlsafe", lambda n=32: "-" + "a" * 42)
+    db = tmp_path / "j.db"
+    store = SqliteJobStore(db, output_root=tmp_path / "outputs")
+    jid, _, _ = _finished(store, tmp_path, "a", Clock())
+    base = ["jobs", "--db", str(db)]
+    assert main([*base, "share", jid]) == 0
+    token = capsys.readouterr().out.strip()
+    assert not token.startswith("-")
+    assert store.resolve_share_token(token)
+    assert main([*base, "revoke-share", token]) == 0
+    assert store.resolve_share_token(token) is None
+
+
+def test_cli_positionals_after_double_dash(tmp_path, capsys):
+    db = tmp_path / "j.db"
+    store = SqliteJobStore(db, output_root=tmp_path / "outputs")
+    jid, _, _ = _finished(store, tmp_path, "a", Clock())
+    legacy = "-legacytoken"
+    with store._tx() as conn:
+        conn.execute(
+            "INSERT INTO share_tokens (token, job_id, created_at) VALUES (?, ?, ?)",
+            (legacy, jid, 0.0),
+        )
+    assert store.resolve_share_token(legacy)  # old unprefixed tokens still resolve
+    base = ["jobs", "--db", str(db)]
+    assert main([*base, "revoke-share", "--", legacy]) == 0
+    assert store.resolve_share_token(legacy) is None
+    assert main([*base, "apikey", "revoke", "--", "-nokey"]) == 1  # parsed, just unknown

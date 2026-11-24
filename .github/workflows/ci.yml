@@ -17,6 +17,8 @@ jobs:
         run: pip install -e .[dev]
       - name: Lint
         run: ruff check .
+      - name: Format check
+        run: ruff format --check .
       - name: Type check
         run: mypy countonce
       - name: Test

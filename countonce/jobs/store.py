@@ -548,7 +548,9 @@ class SqliteJobStore:
     # -- share tokens ---------------------------------------------------------------------
     def create_share_token(self, job_id: str) -> str:
         """A random, revocable, read-only token for one job's result."""
-        token = secrets.token_urlsafe(32)
+        # Fixed prefix: a bare token_urlsafe value can start with "-" and be parsed as a CLI flag.
+        # Unprefixed tokens issued earlier still resolve (lookup is by exact stored value).
+        token = f"st_{secrets.token_urlsafe(32)}"
         with self._tx() as conn:
             row = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,)).fetchone()
             if row is None or row["status"] == "deleted":
