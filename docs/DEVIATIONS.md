@@ -429,3 +429,11 @@ One entry per decision: date, what the plan said, what was done, why.
 - The job store has no corrections table (corrections live in `corrections.json` files), so corrections metrics take an optional `--corrections` file; without it those cells stay `TODO: fill from results`.
 - "Instances" for corrections-per-instance is `results.count` summed over finished jobs. A "visit" is a distinct `captured_at` (fallback `created_at`) per `jobs.site_id`; `sites.json` is not read.
 - Bootstrap CIs (95% percentile, seeded, 1000 resamples) appear only for n >= 5; otherwise `n/a (n<5)`.
+
+## Track J data stack (shards, Parquet features, DuckDB catalog)
+- DAG stage order is now `recipe, validate, shard, episodes, features, catalog, train, evaluate`. `shard` sits after `validate` (packs clean scenes via the scene loader); `features` and `catalog` need the episodes, so they follow `episodes`. The DAG stages need the `data` extra and raise `DagError` without it; `tests/test_synth_dag.py` uses `pytest.importorskip` and CI's `full-cpu` installs `.[data]` (the skip checker does not allow pyarrow/duckdb skips).
+- Shards are plain tar via `tarfile` (deterministic headers and npz zip timestamps). `max_bytes` caps the payload; tar pads the file up to a 10 KiB record.
+- The generator has no per-object size or box, so feature rows use the nominal object size and a nominal pixel box; `embedding` is null until an embedder is supplied. `occlusion` in the catalog is a recipe proxy (occluders per object).
+- The catalog is a Parquet file queried through in-memory DuckDB views (`scenes`, `detections`), not a `.duckdb` file, so DAG output hashing stays byte-stable.
+- "Feature-store data version" = the episode-set content hash stored in the Parquet schema metadata. `TrainConfig.feature_store` makes `train` put it in checkpoint meta and the run log; DAG lineage and eval records carry it.
+- `pyarrow.*`/`duckdb.*` added to the mypy ignore list (no stubs).

@@ -1,6 +1,7 @@
 """Rerunnable synthetic-data DAG with lineage (PLAN §16B.1, pipeline orchestration and versioning).
 
-Stages: ``recipe`` -> ``validate`` (quarantine) -> ``episodes`` -> ``train`` -> ``evaluate``.
+Stages: ``recipe`` -> ``validate`` (quarantine) -> ``shard`` (WebDataset tars) -> ``episodes`` ->
+``features`` (Parquet) -> ``catalog`` (DuckDB-queryable) -> ``train`` -> ``evaluate``.
 
 Each stage writes its outputs under ``<work_dir>/<stage>/`` plus ``<work_dir>/stamps/<stage>.json``
 recording the input hashes, the config-slice hash, the recipe version, the seed, the git sha and
@@ -17,7 +18,7 @@ import hashlib
 import json
 import shutil
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
@@ -29,7 +30,7 @@ from synth.geometry import GeometryConfig, generate_episode, save_episode
 from synth.recipe import RECIPE_VERSION, SceneRecipe, make_recipe
 from synth.validate import QuarantineReport, RenderedScene, validate_scene
 
-STAGES = ("recipe", "validate", "episodes", "train", "evaluate")
+STAGES = ("recipe", "validate", "shard", "episodes", "features", "catalog", "train", "evaluate")
 _RECIPE_KEYS = {"n_objects", "n_views", "arrangement", "rig_kind"}
 
 SceneLoader = Callable[[SceneRecipe], RenderedScene]
@@ -49,6 +50,7 @@ class DagConfig:
     geometry: dict[str, Any] = field(default_factory=dict)  # GeometryConfig fields (not counts)
     train: dict[str, Any] = field(default_factory=dict)  # TrainConfig overrides
     ablate: dict[str, Any] = field(default_factory=dict)  # AblationConfig overrides; {} = skip
+    shards: dict[str, Any] = field(default_factory=dict)  # max_bytes (default 1 GiB per shard)
 
     @classmethod
     def from_yaml(cls, path: Path | str) -> DagConfig:
@@ -66,12 +68,19 @@ class DagConfig:
         bad = sorted(set(self.recipe) - _RECIPE_KEYS)
         if bad:
             raise DagError(f"unknown recipe pins: {bad}")
+        bad = sorted(set(self.shards) - {"max_bytes"})
+        if bad:
+            raise DagError(f"unknown shards keys: {bad}")
 
     def slice(self, stage: str) -> dict[str, Any]:
         """The config values a stage depends on (changing anything else leaves it fresh)."""
         if stage == "recipe":
             return {"splits": self.splits, "recipe": self.recipe}
         if stage == "validate":
+            return {}
+        if stage == "shard":
+            return {"shards": self.shards}
+        if stage in ("features", "catalog"):
             return {}
         if stage == "episodes":
             return {"geometry": self.geometry}
@@ -170,9 +179,12 @@ def _exec_validate(dag: Dag) -> None:
     rdir, out = dag.stage_dir("recipe", create=False), dag.stage_dir("validate")
     report = QuarantineReport()
     clean: list[str] = []
+    renderers: dict[str, str] = {}
     for p in sorted(rdir.glob("*/recipe_*.json")):
         key = f"{p.parent.name}/{p.stem}"
-        reasons = validate_scene(dag.scene_loader(SceneRecipe.from_json(p.read_text())))
+        scene = dag.scene_loader(SceneRecipe.from_json(p.read_text()))
+        renderers[key] = str(scene.metadata.get("renderer", "unknown"))
+        reasons = validate_scene(scene)
         report.n_scenes += 1
         if reasons:
             report.quarantined[key] = reasons
@@ -180,6 +192,41 @@ def _exec_validate(dag: Dag) -> None:
             clean.append(key)
     report.write(out)
     (out / "clean.json").write_text(json.dumps({"clean": clean}, indent=2))
+    (out / "renderers.json").write_text(json.dumps(renderers, indent=2, sort_keys=True))
+
+
+def scene_id_for(recipe: SceneRecipe) -> str:
+    """Stable id shared by shards, features and the catalog (renderer metadata may differ)."""
+    return f"scene_{recipe.seed:06d}"
+
+
+def _need_data_stack() -> None:
+    try:
+        import duckdb  # noqa: F401
+        import pyarrow  # noqa: F401
+    except ImportError as exc:
+        raise DagError("the shard/features/catalog stages need: uv pip install -e .[data]") from exc
+
+
+def _exec_shard(dag: Dag) -> None:
+    from synth.shards import pack_shards, scene_sample
+
+    out = dag.stage_dir("shard")
+    verdict = json.loads((dag.stage_dir("validate", create=False) / "clean.json").read_text())
+
+    def samples() -> Iterator[Any]:
+        for key in verdict["clean"]:
+            recipe = SceneRecipe.from_json(
+                (dag.stage_dir("recipe", create=False) / f"{key}.json").read_text()
+            )
+            sid = scene_id_for(recipe)
+            yield scene_sample(
+                sid,
+                dag.scene_loader(recipe),
+                {"split": key.split("/")[0], "scene_id": sid, "recipe_version": RECIPE_VERSION},
+            )
+
+    pack_shards(samples(), out, max_bytes=int(dag.cfg.shards.get("max_bytes", 1 << 30)))
 
 
 def _exec_episodes(dag: Dag) -> None:
@@ -203,6 +250,62 @@ def _exec_episodes(dag: Dag) -> None:
         save_episode(generate_episode(recipe.seed, gcfg), path)
 
 
+def _episode_triples(dag: Dag) -> list[tuple[str, str, Path]]:
+    out: list[tuple[str, str, Path]] = []
+    for split in ("train", "val", "test"):
+        for path in sorted((dag.work / "episodes" / split).glob("ep_*.npz")):
+            out.append((f"scene_{int(path.stem[3:]):06d}", split, path))
+    return out
+
+
+def _episodes_version(dag: Dag) -> str:
+    return dataset_version([dag.work / "episodes" / s for s in ("train", "val", "test")])
+
+
+def _exec_features(dag: Dag) -> None:
+    from synth.features import write_features
+
+    _need_data_stack()
+    out = dag.stage_dir("features")
+    n = write_features(
+        _episode_triples(dag),
+        out / "features.parquet",
+        recipe_version=RECIPE_VERSION,
+        data_version=_episodes_version(dag),
+    )
+    (out / "summary.json").write_text(json.dumps({"n_rows": n}, indent=2))
+
+
+def _exec_catalog(dag: Dag) -> None:
+    from synth.catalog import scene_row, write_scenes
+
+    _need_data_stack()
+    out = dag.stage_dir("catalog")
+    vdir = dag.stage_dir("validate", create=False)
+    quarantined = json.loads((vdir / "quarantine.json").read_text())["quarantined"]
+    renderers = json.loads((vdir / "renderers.json").read_text())
+    version = _episodes_version(dag)
+    rows = []
+    for p in sorted(dag.stage_dir("recipe", create=False).glob("*/recipe_*.json")):
+        key = f"{p.parent.name}/{p.stem}"
+        recipe = SceneRecipe.from_json(p.read_text())
+        rows.append(
+            scene_row(
+                recipe,
+                scene_id=scene_id_for(recipe),
+                split=p.parent.name,
+                renderer=renderers.get(key, "unknown"),
+                data_version=version,
+                quarantine_reasons=quarantined.get(key, []),
+            )
+        )
+    write_scenes(rows, out / "scenes.parquet")
+
+
+def _feature_store_path(dag: Dag) -> Path:
+    return dag.work / "features" / "features.parquet"
+
+
 def _train_config(dag: Dag) -> Any:
     from countonce.match.train import TrainConfig
 
@@ -220,8 +323,18 @@ def _train_config(dag: Dag) -> Any:
         "resume": False,
         "device": "cpu",
         "data_version": dataset_version([work / "episodes" / "train", work / "episodes" / "val"]),
+        "feature_store": str(_feature_store_path(dag)),
     }
     return TrainConfig(**{**base, **dag.cfg.train})
+
+
+def _feature_store_version(dag: Dag) -> str | None:
+    path = _feature_store_path(dag)
+    if not path.exists():
+        return None
+    from synth.features import feature_store_version
+
+    return feature_store_version(path)
 
 
 def _exec_train(dag: Dag) -> None:
@@ -234,6 +347,7 @@ def _exec_train(dag: Dag) -> None:
     best = out / "best.pt"
     lineage = {
         "data_version": tcfg.data_version,
+        "feature_store_version": _feature_store_version(dag),
         "checkpoint": "run/best.pt",
         "checkpoint_sha256": _sha(best.read_bytes()) if best.exists() else None,
         "recipe_version": RECIPE_VERSION,
@@ -258,6 +372,7 @@ def _exec_evaluate(dag: Dag) -> None:
         "metrics": metrics,
         "n_test_episodes": len(test),
         "train_data_version": lineage["data_version"],
+        "feature_store_version": lineage.get("feature_store_version"),
         "test_data_version": dataset_version([dag.work / "episodes" / "test"]),
         "checkpoint_sha256": lineage["checkpoint_sha256"],
     }
@@ -283,6 +398,9 @@ def _exec_evaluate(dag: Dag) -> None:
 EXECUTORS: dict[str, Executor] = {
     "recipe": _exec_recipe,
     "validate": _exec_validate,
+    "shard": _exec_shard,
+    "features": _exec_features,
+    "catalog": _exec_catalog,
     "episodes": _exec_episodes,
     "train": _exec_train,
     "evaluate": _exec_evaluate,
@@ -421,7 +539,7 @@ class Dag:
                 "output_hash": _combine(outputs),
                 "seconds": round(time.time() - t0, 3),
             }
-            if st in ("episodes", "train", "evaluate"):
+            if st in ("episodes", "features", "catalog", "train", "evaluate"):
                 new["dataset_version"] = dataset_version(
                     [self.work / "episodes" / s for s in ("train", "val", "test")]
                 )

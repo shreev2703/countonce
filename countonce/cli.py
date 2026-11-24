@@ -99,6 +99,11 @@ def _parser() -> argparse.ArgumentParser:
     y = sub.add_parser("synth", help="write synthetic geometry episodes for the matcher")
     y.add_argument("--config", type=Path, default=Path("configs/synth.yaml"))
 
+    ct = sub.add_parser("catalog", help="DuckDB catalog over synthetic scenes and features")
+    ct.add_argument("catalog_cmd", choices=["query"])
+    ct.add_argument("sql", help="SQL over the `scenes` (and `detections`) views")
+    ct.add_argument("--dir", type=Path, default=Path("data/dag"), help="DAG work dir")
+
     g = sub.add_parser("dag", help="rerunnable synthetic-data DAG with lineage")
     g.add_argument("dag_cmd", choices=["run", "status"])
     g.add_argument("--config", type=Path, default=Path("configs/dag.yaml"))
@@ -752,6 +757,21 @@ def _train(args: argparse.Namespace) -> int:
     return 0
 
 
+def _catalog(args: argparse.Namespace) -> int:
+    from synth.catalog import CatalogError, connect, format_table, run_query
+
+    try:
+        con = connect(
+            args.dir / "catalog" / "scenes.parquet", args.dir / "features" / "features.parquet"
+        )
+        cols, rows = run_query(con, args.sql)
+    except (CatalogError, OSError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    print(format_table(cols, rows))
+    return 0
+
+
 def _dag(args: argparse.Namespace) -> int:
     from synth.dag import Dag, DagConfig, DagError, format_status
 
@@ -914,6 +934,8 @@ def main(argv: list[str] | None = None) -> int:
         return _train(args)
     if args.cmd == "dag":
         return _dag(args)
+    if args.cmd == "catalog":
+        return _catalog(args)
     if args.cmd == "synth":
         return _synth(args)
     if args.cmd == "profile":

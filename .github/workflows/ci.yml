@@ -46,7 +46,7 @@ jobs:
       - name: Install CPU torch
         run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Install
-        run: pip install -e .[dev,test]
+        run: pip install -e .[dev,test,data]
       - name: Type check
         run: mypy countonce
       - name: Test (report skips)

@@ -43,6 +43,7 @@ class TrainConfig:
     results_csv: str = ""  # default: results/<run_name>.csv
     run_name: str = "match"
     data_version: str = ""  # default: hash of the episode file names and sizes
+    feature_store: str = ""  # Parquet feature store; its data version rides in the checkpoint meta
     epochs: int = 30
     batch_size: int = 8  # episodes per optimiser step
     lr: float = 3e-4
@@ -300,6 +301,11 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
     device = _device(cfg.device)
     use_amp = device == "cuda"
     version = cfg.data_version or data_version(cfg.train_dir, cfg.val_dir)
+    store_version = ""
+    if cfg.feature_store:
+        from synth.features import feature_store_version
+
+        store_version = feature_store_version(cfg.feature_store)
     groups: list[Any] = []
     if cfg.corrections:
         from countonce.match.correction_data import build_groups, load_pairs
@@ -343,6 +349,7 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
                 "git_commit": git_commit(),
                 "git_dirty": git_is_dirty(),
                 "data_version": version,
+                "feature_store_version": store_version,
                 "activation_checkpointing": cfg.activation_checkpointing,
                 "device": device,
             },
@@ -399,6 +406,7 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
                 best,
                 meta={
                     "data_version": version,
+                    "feature_store_version": store_version,
                     "seed": cfg.seed,
                     "activation_checkpointing": cfg.activation_checkpointing,
                 },

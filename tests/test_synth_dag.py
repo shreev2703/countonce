@@ -5,6 +5,9 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("pyarrow")
+pytest.importorskip("duckdb")
+
 from synth.dag import STAGES, Dag, DagConfig, DagError, dataset_version, proxy_scene
 from synth.recipe import SceneRecipe
 
@@ -51,12 +54,15 @@ def test_config_change_reruns_only_downstream(tmp_path: Path) -> None:
     calls.clear()
     changed = _cfg(tmp_path, train={"epochs": 2})
     dag = Dag(changed, executors=_counting(calls))
-    assert [r.state for r in dag.status()] == ["fresh"] * 3 + ["stale"] * 2
+    assert [r.state for r in dag.status()] == ["fresh"] * 6 + ["stale"] * 2
     res = dag.run()
     assert res == {
         "recipe": "skipped",
         "validate": "skipped",
+        "shard": "skipped",
         "episodes": "skipped",
+        "features": "skipped",
+        "catalog": "skipped",
         "train": "ran",
         "evaluate": "ran",
     }
@@ -66,7 +72,13 @@ def test_config_change_reruns_only_downstream(tmp_path: Path) -> None:
 def test_geometry_change_reruns_episodes_onward(tmp_path: Path) -> None:
     Dag(_cfg(tmp_path), executors=_counting([])).run()
     res = Dag(_cfg(tmp_path, geometry={"pixel_noise": 3.0}), executors=_counting([])).run()
-    assert [s for s in STAGES if res[s] == "ran"] == ["episodes", "train", "evaluate"]
+    assert [s for s in STAGES if res[s] == "ran"] == [
+        "episodes",
+        "features",
+        "catalog",
+        "train",
+        "evaluate",
+    ]
 
 
 def test_from_and_force(tmp_path: Path) -> None:
@@ -84,7 +96,7 @@ def test_tampered_output_is_detected(tmp_path: Path) -> None:
     dag.run()
     victim = next((dag.work / "episodes" / "train").glob("*.npz"))
     victim.write_bytes(b"x")
-    assert dag.status()[2].state == "stale"
+    assert dag.status()[3].state == "stale"
     assert dag.run()["episodes"] == "ran"
 
 
