@@ -452,11 +452,24 @@ def open_app(
     rate_limit: int | None = None,
     request_rate_limit: int | None = None,
     limits_path: Path | None = None,
+    store_kind: str = "sqlite",
+    pg_url: str | None = None,
 ) -> FastAPI:
-    """App for a job database; upload limits from ``configs/uploads.yaml``."""
+    """App for a job database; upload limits from ``configs/uploads.yaml``.
+
+    ``store_kind="postgres"`` uses ``pg_url`` / ``COUNTONCE_PG_URL``; ``db`` then only anchors the
+    local ``outputs`` and ``uploads`` folders.
+    """
+    from countonce.jobs.store import open_store
     from countonce.resources import resolve_config
 
-    store = SqliteJobStore(db, rate_limit=rate_limit, output_root=Path(db).parent / "outputs")
+    store = open_store(
+        store_kind,
+        db,
+        pg_url=pg_url,
+        rate_limit=rate_limit,
+        output_root=Path(db).parent / "outputs",
+    )
     limits = UploadLimits.from_yaml(resolve_config(limits_path or Path("configs/uploads.yaml")))
     return create_app(
         store, UploadService(store, upload_root, limits), request_rate_limit=request_rate_limit

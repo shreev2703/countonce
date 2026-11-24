@@ -63,7 +63,7 @@ countonce-mcp = "countonce.integrations.mcp_server:main"
 include = ["countonce*", "synth*"]
 
 [tool.setuptools.package-data]
-countonce = ["py.typed", "configs/*.yaml"]
+countonce = ["py.typed", "configs/*.yaml", "db/migrations/*.mako", "db/migrations/versions/*.py"]
 
 [tool.ruff]
 line-length = 100
@@ -82,12 +82,14 @@ select = ["E", "F", "I", "UP", "B", "W"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+python_files = ["test_*.py", "jobs_contract.py"]
 addopts = "-ra"
 markers = [
     "slow: long-running tests (excluded from hosted CI)",
     "gpu: tests that need a CUDA GPU (self-hosted runner or local)",
     "loadtest: multi-process queue load tests (several seconds; deselect with -m 'not loadtest')",
     "golden: CPU golden synthetic-geometry regression tests",
+    "postgres: needs COUNTONCE_PG_URL (skips without it)",
 ]
 pythonpath = ["."]
 
@@ -98,5 +100,5 @@ files = ["countonce", "bench", "synth"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*", "sam2.*", "opentelemetry.*", "uvicorn.*", "pyarrow.*", "duckdb.*"]
+module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*", "sam2.*", "opentelemetry.*", "uvicorn.*", "pyarrow.*", "alembic.*", "psycopg.*", "duckdb.*"]
 ignore_missing_imports = true

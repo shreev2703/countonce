@@ -47,9 +47,9 @@ UPLOAD_SCHEMA = [
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         filename TEXT NOT NULL,
-        total_bytes INTEGER NOT NULL,
+        total_bytes BIGINT NOT NULL,
         sha256 TEXT NOT NULL,
-        chunk_size INTEGER NOT NULL,
+        chunk_size BIGINT NOT NULL,
         n_chunks INTEGER NOT NULL,
         status TEXT NOT NULL DEFAULT 'open',
         dir TEXT NOT NULL,
@@ -60,7 +60,7 @@ UPLOAD_SCHEMA = [
     """CREATE TABLE IF NOT EXISTS upload_chunks (
         session_id TEXT NOT NULL REFERENCES upload_sessions (id),
         idx INTEGER NOT NULL,
-        size INTEGER NOT NULL,
+        size BIGINT NOT NULL,
         sha256 TEXT NOT NULL,
         PRIMARY KEY (session_id, idx)
     )""",

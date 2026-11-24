@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import sys
 
-ALLOWED = ("pycolmap", "mcp", "cuda", "gpu")
+ALLOWED = ("pycolmap", "mcp", "cuda", "gpu", "countonce_pg_url")
 _LINE = re.compile(r"^SKIPPED \[(\d+)\] (\S+): (.*)$")
 
 

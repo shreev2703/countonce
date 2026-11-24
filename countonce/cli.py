@@ -208,7 +208,13 @@ def _parser() -> argparse.ArgumentParser:
     pr.add_argument("--out", type=Path, default=Path("docs/PILOT.md"))
 
     wk = sub.add_parser("worker", help="run a queue worker against a job database")
-    wk.add_argument("--db", type=Path, required=True)
+    wk.add_argument(
+        "--db",
+        type=Path,
+        default=Path("jobs.db"),
+        help="sqlite file; for postgres only its folder is used (outputs/uploads)",
+    )
+    _add_store_args(wk)
     wk.add_argument("--once", action="store_true", help="drain claimable jobs, then exit")
     wk.add_argument("--out", type=Path, help="job output root (default: <db dir>/outputs)")
     wk.add_argument("--poll", type=float, default=1.0, help="idle poll interval, seconds")
@@ -289,8 +295,16 @@ def _parser() -> argparse.ArgumentParser:
     )
     rt.add_argument("--config", type=Path, default=Path("configs/retrain.yaml"))
 
-    sa = sub.add_parser("serve-api", help="serve the HTTP API over a sqlite job store (api extra)")
-    sa.add_argument("--db", type=Path, default=Path("jobs.db"))
+    sa = sub.add_parser(
+        "serve-api", help="serve the HTTP API over a sqlite or postgres job store (api extra)"
+    )
+    sa.add_argument(
+        "--db",
+        type=Path,
+        default=Path("jobs.db"),
+        help="sqlite file; for postgres only its folder is used (outputs/uploads)",
+    )
+    _add_store_args(sa)
     sa.add_argument("--upload-root", type=Path, help="default: <db dir>/uploads")
     sa.add_argument("--host", default="127.0.0.1")
     sa.add_argument("--port", type=int, default=8000)
@@ -489,6 +503,11 @@ def _correct(args: argparse.Namespace) -> int:
     return 0
 
 
+def _add_store_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--store", choices=["sqlite", "postgres"], default="sqlite")
+    p.add_argument("--pg-url", help="postgres URL (default: $COUNTONCE_PG_URL; db extra)")
+
+
 def _serve_api(args: argparse.Namespace) -> int:
     try:
         from countonce.api.app import open_app
@@ -498,12 +517,18 @@ def _serve_api(args: argparse.Namespace) -> int:
             "countonce: error: serve-api needs the api extra: pip install .[api]", file=sys.stderr
         )
         return 2
-    app = open_app(
-        args.db,
-        args.upload_root,
-        rate_limit=args.rate_limit,
-        request_rate_limit=args.request_rate_limit,
-    )
+    try:
+        app = open_app(
+            args.db,
+            args.upload_root,
+            rate_limit=args.rate_limit,
+            request_rate_limit=args.request_rate_limit,
+            store_kind=args.store,
+            pg_url=args.pg_url,
+        )
+    except (ValueError, ImportError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
     if args.write_docs:
         args.write_docs.parent.mkdir(parents=True, exist_ok=True)
         args.write_docs.write_text(render_api_md(app))
@@ -587,10 +612,14 @@ def _pilot_report(args: argparse.Namespace) -> int:
 
 
 def _worker(args: argparse.Namespace) -> int:
-    from countonce.jobs.store import SqliteJobStore
+    from countonce.jobs.store import open_store
     from countonce.jobs.worker import Worker, pipeline_runner
 
-    store = SqliteJobStore(args.db)
+    try:
+        store = open_store(args.store, args.db, pg_url=args.pg_url)
+    except (ValueError, ImportError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
     out = args.out or args.db.resolve().parent / "outputs"
     from countonce.monitor.tracing import TracingConfig
 

@@ -3,8 +3,8 @@
 ``JobStore`` is the protocol the worker and (later) the admin metrics depend on.
 ``SqliteJobStore`` is the local implementation. The SQL is plain standard SQL (``ON CONFLICT DO
 NOTHING``, ``UPDATE ... RETURNING``, scalar sub-selects, ``COALESCE``) with ``?`` placeholders, so a
-Postgres store can reuse every statement: translate ``?`` to ``%s`` and set ``CLAIM_LOCK`` to
-``"FOR UPDATE SKIP LOCKED"``.
+Postgres store can reuse every statement: ``PostgresJobStore`` (``jobs/pg_store.py``) subclasses
+this class, translates ``?`` to ``%s`` and claims with ``FOR UPDATE SKIP LOCKED``.
 
 Atomic claim: a single ``UPDATE jobs ... WHERE id = (SELECT id ... LIMIT 1) RETURNING *``. SQLite
 serialises writers, so two workers can never claim the same row. On Postgres the same statement
@@ -148,12 +148,18 @@ SCHEMA = [
     )""",
 ]
 
-CLAIM_SQL = f"""UPDATE jobs SET status = 'running', worker_id = ?, attempts = attempts + 1,
+
+def build_claim_sql(lock: str = "") -> str:
+    """The atomic claim statement; ``lock`` is ``"FOR UPDATE SKIP LOCKED"`` on Postgres."""
+    return f"""UPDATE jobs SET status = 'running', worker_id = ?, attempts = attempts + 1,
     started_at = COALESCE(started_at, ?), heartbeat_at = ?, stage = 'starting', progress = 0
 WHERE id = (SELECT id FROM jobs WHERE status = 'queued' AND next_attempt_at <= ?
-            ORDER BY created_at, id LIMIT 1 {CLAIM_LOCK})
+            ORDER BY created_at, id LIMIT 1 {lock})
   AND status = 'queued'
 RETURNING *"""
+
+
+CLAIM_SQL = build_claim_sql(CLAIM_LOCK)
 
 _INSERT_JOB = """INSERT INTO jobs (id, user_id, prompt, negative_prompts, options_json,
     idempotency_key, input_hash, model_routing_id, site_id, captured_at, created_at)
@@ -176,6 +182,27 @@ class RateLimitError(RuntimeError):
         super().__init__(f"rate limit exceeded for {user_id!r}; retry in {retry_after_s:.1f}s")
         self.user_id = user_id
         self.retry_after_s = retry_after_s
+
+
+def open_store(
+    kind: str = "sqlite", db: str | Path = "jobs.db", *, pg_url: str | None = None, **kw: Any
+) -> SqliteJobStore:
+    """``--store sqlite|postgres`` factory. ``db`` anchors outputs/uploads for either kind.
+
+    Postgres reads ``pg_url`` or ``COUNTONCE_PG_URL`` and needs the ``db`` extra.
+    """
+    if kind == "sqlite":
+        return SqliteJobStore(db, **kw)
+    if kind != "postgres":
+        raise ValueError(f"unknown store {kind!r}; expected sqlite or postgres")
+    import os
+
+    url = pg_url or os.environ.get("COUNTONCE_PG_URL")
+    if not url:
+        raise ValueError("--store postgres needs --pg-url or COUNTONCE_PG_URL")
+    from countonce.jobs.pg_store import PostgresJobStore
+
+    return PostgresJobStore(url, data_dir=Path(db).parent, **kw)
 
 
 def _hash_key(salt: str, key: str) -> str:
@@ -256,9 +283,19 @@ class SqliteJobStore:
             for stmt in SCHEMA:
                 conn.execute(stmt)
 
+    # -- dialect hooks (PostgresJobStore overrides) ----------------------------------------
+    _TRUE_SQL = "1"
+    _CLAIM_SQL = CLAIM_SQL
+    _FLAG_RESULT_COLS = ("recon_cache_hit", "zero_count")
+
+    @staticmethod
+    def _flag(value: bool | int) -> Any:
+        """A boolean column value: SQLite stores 0/1, Postgres a real boolean."""
+        return int(value)
+
     # -- plumbing -------------------------------------------------------------------------
     @contextmanager
-    def _tx(self) -> Iterator[sqlite3.Connection]:
+    def _tx(self) -> Iterator[Any]:
         conn = sqlite3.connect(self.path, timeout=30, isolation_level=None)
         conn.row_factory = sqlite3.Row
         try:
@@ -399,7 +436,7 @@ class SqliteJobStore:
             conn.execute(
                 "INSERT INTO feedback (id, job_id, user_id, correct, user_count, comment, "
                 "created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (fid, job_id, user_id, int(correct), user_count, comment, self.clock()),
+                (fid, job_id, user_id, self._flag(correct), user_count, comment, self.clock()),
             )
         return fid
 
@@ -446,7 +483,7 @@ class SqliteJobStore:
     def claim(self, worker_id: str) -> dict[str, Any] | None:
         now = self.clock()
         with self._tx() as conn:
-            row = conn.execute(CLAIM_SQL, (worker_id, now, now, now)).fetchone()
+            row = conn.execute(self._CLAIM_SQL, (worker_id, now, now, now)).fetchone()
         return dict(row) if row else None
 
     def heartbeat(self, job_id: str, worker_id: str) -> bool:
@@ -458,7 +495,7 @@ class SqliteJobStore:
                 "AND status = 'running'",
                 (now, job_id, worker_id),
             )
-            return cur.rowcount == 1
+            return bool(cur.rowcount == 1)
 
     def set_progress(self, job_id: str, worker_id: str, stage: str, progress: float) -> bool:
         with self._tx() as conn:
@@ -467,7 +504,7 @@ class SqliteJobStore:
                 "AND worker_id = ? AND status = 'running'",
                 (stage, min(max(progress, 0.0), 1.0), self.clock(), job_id, worker_id),
             )
-            return cur.rowcount == 1
+            return bool(cur.rowcount == 1)
 
     def complete(self, job_id: str, worker_id: str, result: dict[str, Any]) -> bool:
         """Mark done and write the result row; no-op (False) if the job is no longer ours."""
@@ -480,6 +517,9 @@ class SqliteJobStore:
             )
             if cur.rowcount == 0:
                 return False
+            result = {
+                k: self._flag(v) if k in self._FLAG_RESULT_COLS else v for k, v in result.items()
+            }
             cols = list(result)
             conn.execute(
                 f"INSERT INTO results (job_id, {', '.join(cols)}) "
@@ -525,7 +565,7 @@ class SqliteJobStore:
         return requeued, failed
 
     # -- rate limit -----------------------------------------------------------------------
-    def _consume_token(self, conn: sqlite3.Connection, user_id: str) -> None:
+    def _consume_token(self, conn: Any, user_id: str) -> None:
         """Token bucket: capacity ``rate_limit``, refilled evenly over ``rate_window_s``."""
         if self.rate_limit is None:
             return
@@ -548,7 +588,7 @@ class SqliteJobStore:
         )
 
     # -- deletion and retention -----------------------------------------------------------
-    def _remove_files(self, conn: sqlite3.Connection, job_id: str, kinds: Sequence[str]) -> int:
+    def _remove_files(self, conn: Any, job_id: str, kinds: Sequence[str]) -> int:
         """Delete a job's files on disk and their rows; returns the number of files removed."""
         n = 0
         marks = ", ".join("?" for _ in kinds)
@@ -657,7 +697,7 @@ class SqliteJobStore:
                 "UPDATE share_tokens SET revoked_at = ? WHERE token = ? AND revoked_at IS NULL",
                 (self.clock(), token),
             )
-            return cur.rowcount == 1
+            return bool(cur.rowcount == 1)
 
     # -- API keys -------------------------------------------------------------------------
     def create_api_key(self, user_id: str) -> tuple[str, str]:
@@ -702,7 +742,7 @@ class SqliteJobStore:
                 "UPDATE api_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
                 (self.clock(), key_id),
             )
-            return cur.rowcount == 1
+            return bool(cur.rowcount == 1)
 
     def api_keys(self, user_id: str | None = None) -> list[dict[str, Any]]:
         """Key metadata (never the hash or plaintext)."""
@@ -717,9 +757,9 @@ class SqliteJobStore:
             conn.execute(
                 "INSERT INTO users (id, training_opt_in, created_at) VALUES (?, ?, ?) "
                 "ON CONFLICT (id) DO UPDATE SET training_opt_in = excluded.training_opt_in",
-                (user_id, int(opt_in), self.clock()),
+                (user_id, self._flag(opt_in), self.clock()),
             )
 
     def opted_in_users(self) -> set[str]:
-        rows = self._query("SELECT id FROM users WHERE training_opt_in = 1")
+        rows = self._query(f"SELECT id FROM users WHERE training_opt_in = {self._TRUE_SQL}")
         return {r["id"] for r in rows}

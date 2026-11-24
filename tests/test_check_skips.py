@@ -13,3 +13,8 @@ def test_allow_list_and_offenders():
 
 def test_clean_log():
     assert check(LOG.splitlines()[0])[1] == []
+
+
+def test_postgres_contract_skip_is_allowed():
+    log = "SKIPPED [18] tests/jobs_contract.py:121: COUNTONCE_PG_URL not set: Postgres contract"
+    assert check(log) == (18, [])
