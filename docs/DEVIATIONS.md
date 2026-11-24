@@ -82,3 +82,13 @@ One entry per decision: date, what the plan said, what was done, why.
 - **`confidence_method`:** `"sensitivity"` added to `CONFIDENCE_METHODS` so `run()` can set it as the task specifies (it also names the interval method).
 - **Warning thresholds** (`WarningThresholds`, all untuned, `TODO: tune on calibration data`): <3 frames; <30% of instances in >=2 views; median depth confidence <1.5; >30% failed lifts (>=3 detections); width >= 2 and > 25% of count. Test fixture `PlaneRecon` has depth_conf 1.0, so e2e runs show `low_depth_confidence`.
 - **Noise test:** range width grows with noise only until detections over-split (count saturates), so the test compares noise 0.02 < 0.1 <= 0.2 (object size 1, spacing 4).
+
+## 2026-11-24: Benchmark core (`bench/`)
+- **Package location:** `bench/` sits at the repo root, outside the `countonce` wheel (`pythonpath = ["."]` makes it importable in tests). It imports `countonce.provenance` only.
+- **MAPE:** scenes with gt = 0 are excluded (undefined); they belong to the §9.8b false-positive metrics. Within-10% treats gt = 0 as a pass only for an exact 0.
+- **Duplicate/miss rate definitions:** each predicted cluster gets its majority GT id (unlabelled detections ignored). Duplicate rate = redundant clusters / clusters; miss rate = GT objects with no cluster / `gt_universe` (defaults to GT ids seen, so pass the full list to include never-detected objects).
+- **Pairwise F1:** precision/recall are vacuously 1.0 when there are no predicted/true positive pairs.
+- **Median baseline** is returned unrounded.
+- **Bootstrap:** percentile, 10,000 resamples of scenes, NaNs dropped. Paired p-value is twice the smaller tail of the bootstrap distribution of the mean difference; Wilcoxon is two-sided and returns 1.0 for all-zero differences.
+- **Splits:** assignment ranks scenes by `sha256(seed:id)`, so it is order-independent; `write_splits` refuses to overwrite a frozen file. Only `val` and `test` splits are written; `verify_splits` also flags scenes on disk missing from the file.
+- **Runner:** error rows are written with `status=error` and retried on resume; only `status=ok` keys are skipped. Provenance (git commit/dirty, UTC time, torch/GPU if present) is captured once per `run_jobs` call. Plain `csv` module, no pandas dependency.
