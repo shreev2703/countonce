@@ -36,7 +36,8 @@ sources are listed as conflicts; resolve against the primary record before any r
 - **What:** RGB-D video counting from "Depth-Guided Video Object Counting in Crowded Scenes" (arXiv 2608.06236); Intel RealSense D455;
   2,032 annotated frames, 77,638 instance boxes, multiple categories per video, depth, exemplar boxes, video-level ROIs.
 - **Where:** `huggingface.co/datasets/aerospace123/RGBD-VideoCount`; code at `github.com/streamer-AP/DG-Net`.
-- **Format:** per the card: RGB + depth + box annotations. HF viewer currently fails, so expect raw-file download; layout `TODO: verify`.
+- **Format:** HF repo is a single ~2.7 GB `RGBD-VideoCount.zip` (file tree listed, nothing downloaded). README gives only the top level: `images/`, `Depth_Data/`, `object_annotations/`, `count_annotations/`, `dataset_split.json`, `video_class.txt`, `exemplars_*.json`; 195 clips, 6 categories. Sub-folder and JSON schemas `TODO: verify`.
+- **Loader:** `bench/datasets/rgbd_videocount.py` (scaffold, synthetic-fixture tests only; layout below the top level is assumed). `scripts/download_rgbd_videocount.sh` (not run).
 - **License:** CC BY 4.0 (HF card).
 - **Size:** `TODO: verify`.
 
@@ -45,12 +46,14 @@ sources are listed as conflicts; resolve against the primary record before any r
 - **Where:** `github.com/niki-amini-naieni/CountVid`.
 - **License:** `TODO: verify`; derived videos inherit TAO/MOT20 terms. MOT20 is research-use only, `TODO: verify`.
 - **Format / size:** `TODO: verify`.
+- **Loader:** `bench/datasets/videocount.py` (scaffold; whole layout assumed: `annotations.json` + `frames/<video>/` or `videos/<video>.mp4`). `scripts/download_videocount.sh` needs its `DATA_URLS` filled first (not run).
 - **Fit caveat:** crowds, penguins, crystals; not orchard-like. Used only as the Strong-tier external video benchmark.
 
 ### OneScene-Bench
 - **What:** arXiv 2610.38926, "Do Vision-Language Models Integrate Evidence Across Views?". **Not a counting-only dataset**; its counting part draws on
   DL3DV-10K scenes (object category chosen by Qwen3-VL-32B-Instruct). It is the right probe for the frontier-VLM baseline.
 - **Availability, license, format, size:** `TODO: verify` (not found in search results; check the paper's project/code link).
+- **Loader:** `bench/datasets/onescene.py` (scaffold; whole layout assumed: `counting.json` + `scenes/<id>/images/`). `scripts/download_onescene.sh` needs its `DATA_URLS` filled first (not run).
 - **Note:** DL3DV-10K has its own terms (`TODO: verify`) that bind any derived images.
 
 ### WGISD (Embrapa Wine Grape Instance Segmentation Dataset)
@@ -102,3 +105,16 @@ sources are listed as conflicts; resolve against the primary record before any r
 - MinneApple: https://conservancy.umn.edu/handle/11299/206575 , https://arxiv.org/pdf/1909.06441
 - AppleGrowthVision: https://arxiv.org/abs/2505.14029 , https://huggingface.co/datasets/Voxel51/AppleGrowthVision
 - FSC-147: https://huggingface.co/datasets/isentropic/FSC147 , https://service.tib.eu/ldmservice/dataset/fsc147
+
+## Loader status (video / multi-view)
+
+| Dataset | Loader | Layout | Download script | Status |
+|---|---|---|---|---|
+| RGBD-VideoCount | `bench/datasets/rgbd_videocount.py` | top level from README, rest assumed | `scripts/download_rgbd_videocount.sh` | scaffold, unverified against real data |
+| VideoCount | `bench/datasets/videocount.py` | fully assumed | `scripts/download_videocount.sh` (URLs TODO) | scaffold, unverified |
+| OneScene-Bench | `bench/datasets/onescene.py` | fully assumed | `scripts/download_onescene.sh` (URLs TODO) | scaffold, unverified |
+
+Each loader yields `BenchScene`s (frames, GT count, prompt, split). `configs/bench.yaml` `datasets:` entries are
+opt-in (`enabled: false`); enabled ones are symlinked into `<csv dir>/datasets/<name>/` as scene dirs
+(`images/` + `gt.json`) and swept like any scene, with `max_frames`/`stride` subsampling. `to_gt_doc` writes a GT
+file for `bench.evaluate`. All format assumptions are marked `TODO: verify` in each `_read_layout`.

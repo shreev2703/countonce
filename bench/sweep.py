@@ -53,10 +53,23 @@ class Ablation(BaseModel):
     values: list[Any]
 
 
+class DatasetSpec(BaseModel):
+    """Opt-in external dataset (``bench.datasets``): materialised as scene dirs, then swept."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: Literal["rgbd_videocount", "videocount", "onescene"]
+    root: Path
+    enabled: bool = False  # opt-in: nothing is loaded unless set true
+    max_frames: int | None = None  # None = loader default (20 for videos, all for onescene)
+    stride: int | None = None
+
+
 class BenchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scenes_dir: Path = Path("data/scenes")
+    datasets: list[DatasetSpec] = Field(default_factory=list)
     csv: Path = DEFAULT_CSV
     runs_dir: Path = Path("results/runs")
     cache_dir: Path | None = Path("results/cache")  # shared detection/recon cache; None = off
@@ -271,6 +284,26 @@ def discover_scenes(scenes_dir: Path) -> list[dict[str, Any]]:
             scene["overlap"] = gt["overlap"]  # view-overlap label or fraction, for figure 10
         scenes.append(scene)
     return scenes
+
+
+def dataset_scenes(cfg: BenchConfig) -> list[dict[str, Any]]:
+    """Scenes from the enabled ``datasets`` entries, in ``discover_scenes`` format. Frames are
+    symlinked under ``<csv dir>/datasets/<name>/`` and only the config's ``split`` is kept."""
+    from bench.datasets import load_dataset
+    from bench.datasets.common import to_sweep_scenes
+
+    out: list[dict[str, Any]] = []
+    for d in cfg.datasets:
+        if not d.enabled:
+            continue
+        kw: dict[str, Any] = {"stride": d.stride}
+        if d.max_frames is not None:
+            kw["max_frames"] = d.max_frames
+        if d.name == "videocount":
+            kw["frames_dir"] = cfg.csv.parent / "datasets" / d.name / "_frames"
+        loaded = load_dataset(d.name, d.root, **kw)
+        out += to_sweep_scenes(loaded, cfg.csv.parent / "datasets" / d.name, split=cfg.split)
+    return out
 
 
 def baseline_counts(paths: list[Path], prompt: str, conf: Any, detector: Detector) -> list[int]:

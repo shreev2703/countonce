@@ -911,7 +911,13 @@ def _ablate(args: argparse.Namespace) -> int:
 def _bench(args: argparse.Namespace) -> int:
     if args.synth_assoc is not None:
         return _synth_assoc(args)
-    from bench.sweep import BenchConfig, build_jobs, discover_scenes, run_bench
+    from bench.sweep import (
+        BenchConfig,
+        build_jobs,
+        dataset_scenes,
+        discover_scenes,
+        run_bench,
+    )
 
     cfg = BenchConfig.from_yaml(args.config)
     if args.tune_warnings is not None:
@@ -945,8 +951,8 @@ def _bench(args: argparse.Namespace) -> int:
             return 2
         return 0
     try:
-        scenes = discover_scenes(cfg.scenes_dir)
-    except FileNotFoundError as exc:
+        scenes = discover_scenes(cfg.scenes_dir) + dataset_scenes(cfg)
+    except (FileNotFoundError, ValueError, KeyError) as exc:
         print(f"countonce: error: {exc}", file=sys.stderr)
         return 2
     if args.dry_run:
