@@ -1,0 +1,8 @@
+- [ ] Bootstrap `countonce` repo: create `pyproject.toml` (Python 3.11, ruff, pytest, mypy, pydantic, numpy), `.gitignore`, package `__init__.py` files, and `docs/DEVIATIONS.md` + `docs/GATES.md`.
+- [ ] Port `00_env_check.py`, VGGT wrapper, memory guard, frame extraction, COLMAP wrapper, and plotting utilities from `~/vggtProject` into `countonce/` with source attribution comments.
+- [ ] Implement `countonce/types.py` (Frame, Detection, Recon, LiftedDetection, Instance, CountResult including `schema_version`, `confidence_method`, `recon_cache_key`, `possibly_moving`) and `tests/test_types.py`.
+- [ ] Implement `countonce/lift.py` and `countonce/merge/cluster.py` (v1 constrained 3D clustering with cannot-link) plus the synthetic geometry unit test and cannot-link unit test from §18.
+- [ ] Implement `countonce/export/` (`result.json` with `schema_version: "1.0"`, `markers.json`, `counts.csv`, overlay renderer) and `tests/test_export.py`.
+- [ ] Research and write `docs/MODEL_SURVEY.md` covering CountGD, CountGD++, GroundingDINO, CountVid, DG-Net, C-DOG, VGGT, VGGT-Ω, and VGG-T³ (repo URL, weights, license, output format, VRAM).
+- [ ] Research and write `docs/DATASETS.md` covering Fuji-SfM, RGBD-VideoCount, VideoCount, OneScene-Bench, WGISD, MinneApple, AppleGrowthVision, and FSC-147 (availability, license, format, size).
+- [ ] Research and write `docs/RELATED_WORK.md` comparing CountVid, DG-Net, VGGT-Det, ROM, C-DOG, and OneScene-Bench against the §2.4 novelty claim.
