@@ -13,8 +13,10 @@ from countonce.config import Config
 from countonce.conformal import CalibrationArtifact, interval_from_artifact, resolve_method
 from countonce.detect.base import Detector, filter_by_score
 from countonce.detect.cache import CachedDetector, DetectionCache
+from countonce.errors import ErrorCode, MediaError
 from countonce.export import export_all
 from countonce.ingest.frames import IMAGE_EXTS, drop_blurry, extract_frames
+from countonce.ingest.sanitize import SanitizeReport, sanitize_image, validate_video
 from countonce.ingest.select import cap_frames, drop_near_duplicates
 from countonce.lift import LiftKwargs, apply_lift_region, compute_scene_scale, lift_detections
 from countonce.merge.base import Associator
@@ -33,21 +35,33 @@ from countonce.warnings import assess_quality
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
 
-def collect_paths(inputs: list[Path] | Path, out_dir: Path, fps: float) -> list[Path]:
-    """Expand a directory, video file or list of images into an ordered image list."""
+def collect_paths(
+    inputs: list[Path] | Path,
+    out_dir: Path,
+    fps: float,
+    report: SanitizeReport | None = None,
+) -> list[Path]:
+    """Expand a directory, video file or list of images into an ordered image list.
+
+    Images are re-written without EXIF/GPS into ``out_dir/sanitized`` before anything else sees
+    them (PLAN 14.8); videos are probed first. Typed ``MediaError`` on bad media.
+    """
     items = [Path(inputs)] if isinstance(inputs, (str, Path)) else [Path(p) for p in inputs]
+    clean_root = out_dir / "sanitized"
     paths: list[Path] = []
-    for item in items:
+    for i, item in enumerate(items):
         if item.is_dir():
-            paths += sorted(p for p in item.iterdir() if p.suffix.lower() in IMAGE_EXTS)
+            for p in sorted(p for p in item.iterdir() if p.suffix.lower() in IMAGE_EXTS):
+                paths.append(sanitize_image(p, clean_root / str(i), report=report))
+        elif not item.exists():
+            raise FileNotFoundError(f"missing input: {item}")
         elif item.suffix.lower() in VIDEO_EXTS:
+            validate_video(item, report=report)
             paths += extract_frames(item, out_dir / "frames", fps)
-        elif item.suffix.lower() in IMAGE_EXTS and item.exists():
-            paths.append(item)
-        else:
-            raise FileNotFoundError(f"unsupported or missing input: {item}")
+        else:  # images, and anything unsupported -> ERR_UNSUPPORTED_MEDIA
+            paths.append(sanitize_image(item, clean_root / str(i), report=report))
     if not paths:
-        raise ValueError("no input images found")
+        raise MediaError("no input images found", code=ErrorCode.ERR_TOO_FEW_FRAMES)
     return paths
 
 
@@ -179,7 +193,8 @@ def run(
 
     # Ingest
     out_dir = Path(config.out_dir)
-    paths = collect_paths(inputs, out_dir, config.fps)
+    sanitize_report = SanitizeReport()
+    paths = collect_paths(inputs, out_dir, config.fps, sanitize_report)
     if config.blur_threshold > 0:
         paths, _ = drop_blurry(paths, config.blur_threshold)
     if config.dedup_threshold > 0:
@@ -332,7 +347,12 @@ def run(
         timings=timings,
         oom_fallback_rung=ladder.rung,
         peak_vram_mb=recon.peak_vram_mb,
-        config={**run_metadata(config.to_dict()), "lift_fallbacks": lift_fallbacks},
+        config={
+            **run_metadata(config.to_dict()),
+            "lift_fallbacks": lift_fallbacks,
+            "exif_stripped": sanitize_report.to_dict()["exif_stripped"],
+            "sanitize": sanitize_report.to_dict(),
+        },
     )
     timings["total"] = time.perf_counter() - t0
 

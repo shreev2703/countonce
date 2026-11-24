@@ -201,3 +201,10 @@ One entry per decision: date, what the plan said, what was done, why.
 - Feature groups: `3d` zeroes box, score, lift confidence, rays and camera centre (log-depth then degrades to distance from the scene centre); `3d_rays` keeps rays and camera centre; `full` keeps everything. The appearance slot is zero-masked when the model has one and the episodes carry none. Appearance-only and VGGT-token groups are not run (synthetic episodes have neither).
 - Ablation: each distinct (cycle loss, group, seed) is trained once and reused (`arm:pairwise` and `group:full` share a model, `arm:sync` reuses it with synchronization). Summary: mean ± std over seeds; CI is a percentile bootstrap over test episodes of the per-episode seed mean. At least 3 distinct seeds are required. `countonce ablate --config configs/synth_ablation.yaml`.
 - Smoke-tested on tiny episodes in tmp with 1 epoch; no real run, no numbers committed.
+
+## Media sanitization + typed errors
+- `GpuOomError` now lives in `countonce/errors.py` (subclass of `CountOnceError`); `countonce.oom` re-exports it plus `ERR_GPU_OOM`/`USER_TIP`, so old imports work.
+- Added `ERR_UNSUPPORTED_CODEC`, `ERR_WORKER_TIMEOUT`, `ERR_STORAGE_TRANSIENT`, `ERR_NO_OVERLAP` (PLAN 14.4) beyond the task's list. Retry policy defaults: 4 total attempts, 2 s base doubling, 60 s cap (not specified in PLAN).
+- Limits in `MediaLimits` (50 MB image, 100 MP, 4 GB video, 8K, 120 fps, 600 s, 36k frames, codec allow-list) are my defaults; tune later.
+- Images are re-saved to `<out_dir>/sanitized/<n>/` (JPEG q95, re-encoded) and the original is never modified. `collect_paths` now raises typed `MediaError` for unsupported files (was `FileNotFoundError`); missing paths still raise `FileNotFoundError`. Video frames are extracted with `-map_metadata -1`. Provenance: `config["exif_stripped"]` and `config["sanitize"]`.
+- Face/plate blurring and resumable uploads (rest of PLAN 14.8) are not part of this task.

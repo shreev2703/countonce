@@ -22,16 +22,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeVar
 
+from countonce.errors import GPU_OOM_TIP, ErrorCode, GpuOomError  # noqa: F401  (re-export)
+
 log = logging.getLogger(__name__)
 
 ALLOC_ENV = "PYTORCH_CUDA_ALLOC_CONF"
 ALLOC_SETTING = "expandable_segments:True"
-ERR_GPU_OOM = "ERR_GPU_OOM"
-USER_TIP = (
-    "The GPU ran out of memory even after freeing the cache, using smaller chunks and lowering "
-    "the resolution. Use fewer or shorter frames (lower max_frames or fps), close other "
-    "GPU programs, or retry later."
-)
+ERR_GPU_OOM = ErrorCode.ERR_GPU_OOM.value
+USER_TIP = GPU_OOM_TIP
 RESOLUTION_TIERS: tuple[float, ...] = (0.75, 0.5)
 MIN_CHUNK = 3  # must exceed the default chunk overlap floor (2)
 
@@ -51,18 +49,6 @@ def configure_allocator() -> bool:
     if "expandable_segments" not in current:
         os.environ[ALLOC_ENV] = f"{current},{ALLOC_SETTING}" if current else ALLOC_SETTING
     return True
-
-
-class GpuOomError(RuntimeError):
-    """Typed, retryable infrastructure error raised once the whole ladder is exhausted."""
-
-    code = ERR_GPU_OOM
-    retryable = True
-
-    def __init__(self, message: str, tip: str = USER_TIP, attempts: list[str] | None = None):
-        super().__init__(f"{ERR_GPU_OOM}: {message}")
-        self.tip = tip
-        self.attempts = attempts or []
 
 
 class RungUnavailable(Exception):

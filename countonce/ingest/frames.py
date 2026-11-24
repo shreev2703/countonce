@@ -92,7 +92,7 @@ def extract_frames(video: Path, out_dir: Path, fps: float = 2.0) -> list[Path]:
     for stale in out_dir.glob("frame_*.jpg"):  # a re-run must not mix in older frames
         stale.unlink()
     cmd = [
-        "ffmpeg", "-v", "error", "-y", "-i", str(video),
+        "ffmpeg", "-v", "error", "-y", "-i", str(video), "-map_metadata", "-1",
         "-vf", f"fps={fps}", "-q:v", "2", str(out_dir / "frame_%06d.jpg"),
     ]  # fmt: skip
     proc = subprocess.run(cmd, capture_output=True, text=True)
