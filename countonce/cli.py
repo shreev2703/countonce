@@ -127,6 +127,20 @@ def _parser() -> argparse.ArgumentParser:
     c.add_argument("--file", type=Path, required=True, help="corrections.json")
     c.add_argument("--pairs", type=Path, help="also write consented training pairs (JSONL)")
 
+    wk = sub.add_parser("worker", help="run a queue worker against a job database")
+    wk.add_argument("--db", type=Path, required=True)
+    wk.add_argument("--once", action="store_true", help="drain claimable jobs, then exit")
+    wk.add_argument("--out", type=Path, help="job output root (default: <db dir>/outputs)")
+    wk.add_argument("--poll", type=float, default=1.0, help="idle poll interval, seconds")
+
+    sj = sub.add_parser("submit", help="queue a counting job in a job database")
+    sj.add_argument("--db", type=Path, required=True)
+    sj.add_argument("--prompt", required=True)
+    sj.add_argument("--images", type=Path, nargs="+", required=True)
+    sj.add_argument("--user", default="local")
+    sj.add_argument("--idempotency-key")
+    sj.add_argument("--config", type=Path, help="YAML Config stored as the job options")
+
     q = sub.add_parser("review-queue", help="rank finished jobs by matcher uncertainty")
     q.add_argument("jobs", type=Path, help="a job dir, or a dir of job dirs with result.json")
     q.add_argument("--out", type=Path, default=Path("results/review_queue.jsonl"))
@@ -267,6 +281,37 @@ def _correct(args: argparse.Namespace) -> int:
         pairs = export_training_pairs(corrections, jobs)
         write_training_pairs_jsonl(pairs, args.pairs)
         print(f"correct: wrote {len(pairs)} consented pairs to {args.pairs}")
+    return 0
+
+
+def _worker(args: argparse.Namespace) -> int:
+    from countonce.jobs.store import SqliteJobStore
+    from countonce.jobs.worker import Worker, pipeline_runner
+
+    store = SqliteJobStore(args.db)
+    out = args.out or args.db.resolve().parent / "outputs"
+    worker = Worker(store, pipeline_runner(out))
+    try:
+        n = worker.run_loop(until_idle=args.once, poll_s=args.poll)
+    except KeyboardInterrupt:
+        return 0
+    print(f"worker {worker.worker_id}: processed {n} job(s); {store.counts()}")
+    return 0
+
+
+def _submit(args: argparse.Namespace) -> int:
+    from countonce.jobs.store import SqliteJobStore
+
+    options = Config.from_yaml(args.config).to_dict() if args.config else {}
+    store = SqliteJobStore(args.db)
+    job_id, created = store.submit(
+        args.user,
+        args.prompt,
+        [p.resolve() for p in args.images],
+        options=options,
+        idempotency_key=args.idempotency_key,
+    )
+    print(f"{job_id} {'queued' if created else 'duplicate (existing job)'}")
     return 0
 
 
@@ -519,6 +564,10 @@ def main(argv: list[str] | None = None) -> int:
         return _review_queue(args)
     if args.cmd == "label":
         return _label(args)
+    if args.cmd == "worker":
+        return _worker(args)
+    if args.cmd == "submit":
+        return _submit(args)
     if args.cmd == "report":
         return _report(args)
 
