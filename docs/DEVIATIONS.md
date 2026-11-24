@@ -437,3 +437,9 @@ One entry per decision: date, what the plan said, what was done, why.
 - The catalog is a Parquet file queried through in-memory DuckDB views (`scenes`, `detections`), not a `.duckdb` file, so DAG output hashing stays byte-stable.
 - "Feature-store data version" = the episode-set content hash stored in the Parquet schema metadata. `TrainConfig.feature_store` makes `train` put it in checkpoint meta and the run log; DAG lineage and eval records carry it.
 - `pyarrow.*`/`duckdb.*` added to the mypy ignore list (no stubs).
+
+## OLTP -> OLAP export (`countonce etl export`)
+- Export is sqlite -> local Parquet directory (`<out>/<table>/dt=YYYY-MM-DD/part-NNNNN.parquet`); R2 upload is left to the Postgres/web stage. `dt` is the UTC day of the event time (job finish; feedback/correction creation).
+- Corrections are not in the store, so they come from `--corrections corrections.json` (as in `pilot-report`). Cost rows store GPU-seconds, frames and the rate; `cost` is null while the rate is unset (never 0).
+- Watermark (`_watermark.json`) is per table: newest exported timestamp plus the ids at that instant. Rows finishing with a timestamp older than the watermark after an export are not picked up (job `finished_at` is set at completion, so this is not expected).
+- The Parquet path is opt-in: `admin-stats --export DIR` and `drift` given an export dir (via `ParquetStore` / `load_drift_rows`); sqlite stays the default. Queued/running jobs are not exported, so queue depth and oldest-queued age read 0 / n/a there. `jobs.result_json` keeps only timings and frame count; drift features are precomputed into `drift_json`.

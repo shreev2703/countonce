@@ -166,6 +166,11 @@ def load_rows(path: str | Path) -> list[dict[str, Any]]:
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"drift input not found: {p}")
+    if p.is_dir():
+        from countonce.monitor.etl import is_export, load_drift_rows
+
+        if is_export(p):  # DuckDB over the OLAP Parquet export instead of the live store
+            return load_drift_rows(p)
     if p.is_file():
         if p.suffix.lower() == ".csv":
             with p.open(newline="") as f:

@@ -221,13 +221,26 @@ def _parser() -> argparse.ArgumentParser:
     jk.add_parser("revoke", help="revoke a key by id").add_argument("key_id")
 
     ad = sub.add_parser("admin-stats", help="job-store metrics and alerts (JSON / static HTML)")
-    ad.add_argument("--db", type=Path, required=True)
+    ad.add_argument("--db", type=Path, help="live sqlite job store (default source)")
+    ad.add_argument(
+        "--export", type=Path, help="read this Parquet export (DuckDB), not the live db"
+    )
     ad.add_argument("--alerts", type=Path, default=Path("configs/alerts.yaml"))
     ad.add_argument("--cost", type=Path, default=Path("configs/cost.yaml"), help="cost_per_hour")
     ad.add_argument("--json", action="store_true", help="print metrics and alerts as JSON")
     ad.add_argument("--html", nargs="?", const=Path("admin.html"), type=Path, help="write HTML")
     ad.add_argument("--reference", type=Path, help="drift reference (bench CSV or result.json dir)")
     ad.add_argument("--current", type=Path, help="current result.json dir for drift")
+
+    et = sub.add_parser(
+        "etl", help="OLTP -> OLAP: export job telemetry to date-partitioned Parquet"
+    )
+    et.add_argument("etl_cmd", choices=["export"])
+    et.add_argument("--db", type=Path, default=Path("jobs.db"))
+    et.add_argument("--out", type=Path, required=True, help="export directory")
+    et.add_argument("--since", help="ISO date/time or epoch; skip rows older than this")
+    et.add_argument("--corrections", type=Path, help="corrections.json (not stored in the db)")
+    et.add_argument("--cost", type=Path, default=Path("configs/cost.yaml"), help="cost_per_hour")
 
     q = sub.add_parser("review-queue", help="rank finished jobs by matcher uncertainty")
     q.add_argument("jobs", type=Path, help="a job dir, or a dir of job dirs with result.json")
@@ -487,6 +500,24 @@ def _trace(args: argparse.Namespace) -> int:
     return 0
 
 
+def _etl(args: argparse.Namespace) -> int:
+    from countonce.monitor import admin, etl
+
+    if not args.db.exists():
+        print(f"countonce: error: no such database: {args.db}", file=sys.stderr)
+        return 2
+    try:
+        cost_p = _find_config(args.cost)
+        rates = admin.load_cost_rates(cost_p) if cost_p else None
+        summary = etl.export(args.db, args.out, args.since, args.corrections, rates)
+    except (FileNotFoundError, ValueError, TypeError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    detail = ", ".join(f"{t}={n}" for t, n in summary.rows.items())
+    print(f"etl: exported {summary.total} new rows in {summary.files} files ({detail})")
+    return 0
+
+
 def _admin_stats(args: argparse.Namespace) -> int:
     import json
     import time
@@ -494,12 +525,17 @@ def _admin_stats(args: argparse.Namespace) -> int:
     from countonce.jobs.store import SqliteJobStore
     from countonce.monitor import admin
 
-    if not args.db.exists():
-        print(f"countonce: error: no such database: {args.db}", file=sys.stderr)
-        return 2
-    store = SqliteJobStore(args.db)
     now = time.time()
     try:
+        if args.export:
+            from countonce.monitor.etl import ParquetStore
+
+            store: Any = ParquetStore(args.export)
+        elif args.db is None or not args.db.exists():
+            print(f"countonce: error: no such database: {args.db}", file=sys.stderr)
+            return 2
+        else:
+            store = SqliteJobStore(args.db)
         alerts_p, cost_p = _find_config(args.alerts), _find_config(args.cost)
         rules = admin.load_rules(alerts_p) if alerts_p else []
         rates = admin.load_cost_rates(cost_p) if cost_p else None
@@ -966,6 +1002,8 @@ def main(argv: list[str] | None = None) -> int:
         return _worker(args)
     if args.cmd == "loadtest":
         return _loadtest(args)
+    if args.cmd == "etl":
+        return _etl(args)
     if args.cmd == "admin-stats":
         return _admin_stats(args)
     if args.cmd == "submit":

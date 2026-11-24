@@ -72,6 +72,8 @@ def _duration(job: Mapping[str, Any]) -> float | None:
 
 def _feedback_accuracy(store: JobStore) -> dict[str, Any] | None:
     """``{n, accuracy}`` from the ``feedback`` table, or None when there is no such data."""
+    if hasattr(store, "feedback_accuracy"):  # Parquet export (monitor.etl.ParquetStore)
+        return store.feedback_accuracy()  # type: ignore[no-any-return]
     path = getattr(store, "path", None)
     if path is None:
         return None
@@ -102,6 +104,8 @@ def load_cost_rates(path: str | Path) -> dict[str, float | None]:
 
 
 def _worker_kinds(store: JobStore) -> dict[str, str]:
+    if hasattr(store, "worker_kinds"):  # Parquet export
+        return store.worker_kinds()  # type: ignore[no-any-return]
     path = getattr(store, "path", None)
     if path is None:
         return {}
