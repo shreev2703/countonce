@@ -117,3 +117,72 @@ def test_run_bench_resumes_and_cli(tmp_path, capsys):
     assert main(["bench", "--config", str(cfg_path), "--figures", str(tmp_path / "f")]) == 0
     assert (tmp_path / "f" / "failure_gallery.md").exists()
     assert (tmp_path / "f" / "mape_vs_views.png").exists()
+
+
+def test_sweep_end_to_end_baselines_and_colmap_lifting_ok(tmp_path):
+    """Baselines run FakeDetector through the detection cache; co_v1_colmap runs through the
+    same executor with a fake reconstructor. Every row must be status=ok."""
+    import shutil
+
+    from test_pipeline import OBJECTS, PlaneRecon, make_scene
+
+    from countonce.detect.base import FakeDetector
+
+    src = tmp_path / "src"
+    src.mkdir()
+    img_dir, script = make_scene(src)
+    script[2], script[3] = script[2][:4], script[3][:3]  # uneven per-view counts (5, 5, 4, 3)
+    script[0] = [*script[0], (1.0, 1.0, 5.0, 5.0, 0.1)]  # below score_threshold: must be dropped
+    scene = tmp_path / "scenes" / "s1"
+    scene.mkdir(parents=True)
+    shutil.move(str(img_dir), scene / "images")
+    (scene / "gt.json").write_text(json.dumps({"count": len(OBJECTS), "tier": "easy"}))
+
+    counts = [sum(1 for b in script[i] if b[4] >= 0.3) for i in range(len(script))]
+    assert len(set(counts)) > 1  # sum, max and median are distinguishable
+
+    cfg = BenchConfig(
+        scenes_dir=tmp_path / "scenes",
+        csv=tmp_path / "bench.csv",
+        runs_dir=tmp_path / "runs",
+        cache_dir=tmp_path / "cache",
+        views=[4],
+        order=["ordered"],  # FakeDetector is positional; a content-keyed cache needs one order
+        random_samples=1,
+        even_sample=True,
+        methods=[
+            {"name": "sum", "kind": "baseline", "baseline": "sum"},
+            {"name": "max", "kind": "baseline", "baseline": "max"},
+            {"name": "median", "kind": "baseline", "baseline": "median"},
+            {
+                "name": "co_v1_colmap",
+                "kind": "countonce",
+                "config": {"assoc": "v1", "backbone": "colmap", "max_frames": 0},
+            },
+        ],
+    )
+    detectors: list[FakeDetector] = []
+
+    def make_det(conf):
+        d = FakeDetector(script)
+        detectors.append(d)
+        return d
+
+    ran, skipped, errored = run_bench(
+        cfg,
+        discover_scenes(cfg.scenes_dir),
+        detector_factory=make_det,
+        reconstructor_factory=lambda conf: PlaneRecon(),
+    )
+    assert (ran, skipped, errored) == (8, 0, 0)  # 4 methods x (random0 + even)
+    rows = read_rows(cfg.csv)
+    assert {r["status"] for r in rows} == {"ok"}
+    expected = {
+        "sum": float(sum(counts)),
+        "max": float(max(counts)),
+        "median": float(np.median(counts)),
+        "co_v1_colmap": float(len(OBJECTS)),
+    }
+    for r in rows:
+        assert float(r["pred"]) == expected[r["method"]], r["method"]
+    assert any((cfg.cache_dir / "detect").iterdir())  # detections went through the cache

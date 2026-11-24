@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import random
 import time
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
@@ -16,8 +17,13 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from bench.baselines import BASELINES
 from bench.runner import DEFAULT_CSV, Job, RunOutput, run_jobs
+from countonce.detect.base import Detector, filter_by_score
+from countonce.detect.cache import CachedDetector, DetectionCache
 from countonce.ingest.frames import list_images, sample_frames
+from countonce.pipeline import make_frames
+from countonce.recon.base import Reconstructor
 
 TIERS = ("easy", "medium", "hard")
 
@@ -43,6 +49,8 @@ class BenchConfig(BaseModel):
 
     scenes_dir: Path = Path("data/scenes")
     csv: Path = DEFAULT_CSV
+    runs_dir: Path = Path("results/runs")
+    cache_dir: Path | None = Path("results/cache")  # shared detection/recon cache; None = off
     prompt_key: str = "prompt"
     prompt: str = "object"
     split: str = "test"
@@ -151,14 +159,36 @@ def discover_scenes(scenes_dir: Path) -> list[dict[str, Any]]:
     return scenes
 
 
-def make_executor(cfg: BenchConfig, scenes: list[dict[str, Any]]) -> Callable[[Job], RunOutput]:
-    """Default executor: runs the real pipeline / baselines. Needs real backends; not used
-    by tests (they pass their own ``fn`` to :func:`run_bench`)."""
+def baseline_counts(paths: list[Path], prompt: str, conf: Any, detector: Detector) -> list[int]:
+    """Per-image detection counts: the detector runs once over the selected views (through the
+    detection cache when ``conf.cache_dir`` is set), then ``conf.score_threshold`` is applied.
+    Views with no detections count as 0, so the list has one entry per selected view."""
+    frames = make_frames(paths)
+    det: Detector = detector
+    if conf.cache_dir is not None:
+        det = CachedDetector(detector, DetectionCache(Path(conf.cache_dir) / "detect"))
+    kept = filter_by_score(det.detect(frames, prompt), conf.score_threshold)
+    per_frame = Counter(d.frame_id for d in kept)
+    return [per_frame.get(f.id, 0) for f in frames]
+
+
+def make_executor(
+    cfg: BenchConfig,
+    scenes: list[dict[str, Any]],
+    detector_factory: Callable[[Any], Detector] | None = None,
+    reconstructor_factory: Callable[[Any], Reconstructor] | None = None,
+) -> Callable[[Job], RunOutput]:
+    """Default executor. Baselines (sum/max/median) run the config-selected detector on the
+    selected views and reduce the per-image counts; CountOnce methods, including
+    ``co_v1_colmap`` (COLMAP lifting, baseline 4), go through ``run()``. Both paths build their
+    backends from the same ``countonce.Config`` (method options + the bench cache dir).
+    The factories (default: ``build_detector``) let tests inject fakes."""
     from countonce.config import Config
-    from countonce.pipeline import run
+    from countonce.pipeline import build_detector, run
 
     by_id = {s["id"]: s for s in scenes}
     seeds = dict(view_samples(cfg))
+    make_det = detector_factory or build_detector
 
     def fn(job: Job) -> RunOutput:
         scene = by_id[job.scene_id]
@@ -168,15 +198,23 @@ def make_executor(cfg: BenchConfig, scenes: list[dict[str, Any]]) -> Callable[[J
             list_images(scene["dir"]), job.n_views or 0, seeds[job.sample], cfg.seed, job.ordered
         )
         t0 = time.perf_counter()
+        options = {"cache_dir": cfg.cache_dir, **job.config["options"]}
+        conf = Config(**options).with_overrides(out_dir=cfg.runs_dir / job.key())
         if job.config["kind"] == "baseline":
-            raise NotImplementedError(
-                "baselines need per-image counts from a detector; wire a Detector here "
-                "(sum/max/median helpers live in bench.baselines)"
+            reduce = BASELINES[job.config["baseline"]]
+            counts = baseline_counts(paths, prompt, conf, make_det(conf))
+            return RunOutput(
+                pred=reduce(counts),
+                gt=float(gt["count"]),
+                runtime_s=time.perf_counter() - t0,
             )
-        conf = Config(**job.config["options"]).with_overrides(
-            out_dir=Path("results") / "runs" / job.key()
+        res = run(
+            paths,
+            prompt,
+            conf,
+            detector=make_det(conf) if detector_factory else None,
+            reconstructor=reconstructor_factory(conf) if reconstructor_factory else None,
         )
-        res = run(paths, prompt, conf)
         return RunOutput(
             pred=float(res.count),
             gt=float(gt["count"]),
@@ -192,6 +230,10 @@ def run_bench(
     cfg: BenchConfig,
     scenes: list[dict[str, Any]],
     fn: Callable[[Job], RunOutput] | None = None,
+    *,
+    detector_factory: Callable[[Any], Detector] | None = None,
+    reconstructor_factory: Callable[[Any], Reconstructor] | None = None,
 ) -> tuple[int, int, int]:
     jobs = build_jobs(cfg, scenes)
-    return run_jobs(jobs, fn or make_executor(cfg, scenes), cfg.csv, cfg.model_dump(mode="json"))
+    fn = fn or make_executor(cfg, scenes, detector_factory, reconstructor_factory)
+    return run_jobs(jobs, fn, cfg.csv, cfg.model_dump(mode="json"))
