@@ -55,6 +55,18 @@ def _parser() -> argparse.ArgumentParser:
         help="run v1/v2/sync/v3 on held-out synthetic episodes (association metrics)",
     )
 
+    b.add_argument(
+        "--tune-warnings",
+        nargs="?",
+        const=Path("configs/warnings.yaml"),
+        type=Path,
+        metavar="OUT",
+        help="tune quality-warning thresholds on the val split of the bench CSV",
+    )
+    b.add_argument(
+        "--tune-method", default="co_v2_vggt", help="bench method used by --tune-warnings"
+    )
+
     a = sub.add_parser("ablate", help="v3 arm and feature-group ablation on synthetic episodes")
     a.add_argument("--config", type=Path, default=Path("configs/synth_ablation.yaml"))
 
@@ -136,6 +148,20 @@ def _bench(args: argparse.Namespace) -> int:
     from bench.sweep import BenchConfig, build_jobs, discover_scenes, run_bench
 
     cfg = BenchConfig.from_yaml(args.config)
+    if args.tune_warnings is not None:
+        from bench.tune_warnings import tune_from_csv
+
+        try:
+            doc = tune_from_csv(cfg.csv, args.tune_warnings, method=args.tune_method)
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"countonce: error: {exc}", file=sys.stderr)
+            return 2
+        n_tuned = len(doc["warnings"])
+        print(
+            f"tune-warnings: {n_tuned} tuned from {doc['n_scenes']} val scenes "
+            f"-> {args.tune_warnings}"
+        )
+        return 0
     if args.allow_paid:
         cfg = cfg.model_copy(update={"allow_paid": True})
     if args.spend_cap_usd is not None:

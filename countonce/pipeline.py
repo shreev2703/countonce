@@ -341,6 +341,7 @@ def run(
         recon=recon,
         interval_low=sens.low,
         interval_high=sens.high,
+        thresholds=config.warning_thresholds(),
     )
     zero_warn, below = zero_count_warning(
         prompt=prompt,
@@ -348,6 +349,7 @@ def run(
         interval_low=interval.low,
         raw_detections=raw_detections,
         threshold=config.score_threshold,
+        thresholds=config.warning_thresholds(),
     )
     result = CountResult(
         prompt=prompt,

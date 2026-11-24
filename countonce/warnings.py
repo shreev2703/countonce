@@ -5,7 +5,7 @@ Named ``warnings`` inside the package; the stdlib module is unaffected (absolute
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -31,6 +31,17 @@ class WarningThresholds:
     min_range_width: int = 2  # ignore ranges narrower than this many objects
     small_count: int = 2  # counts up to this with an interval reaching 0 count as 'near zero'
     top_below_threshold: int = 3  # labels listed in the no-objects summary
+
+    @classmethod
+    def from_overrides(cls, overrides: Mapping[str, float] | None) -> WarningThresholds:
+        """Defaults with ``overrides`` applied; values are cast to each field's type."""
+        base = cls()
+        out: dict[str, float] = {}
+        for k, v in (overrides or {}).items():
+            if k not in cls.__dataclass_fields__:
+                raise ValueError(f"unknown warning threshold {k!r}")
+            out[k] = type(getattr(base, k))(v)
+        return cls(**out)  # type: ignore[arg-type]
 
 
 def _w(code: str, message: str, fix: str) -> dict[str, str]:

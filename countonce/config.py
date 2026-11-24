@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+if TYPE_CHECKING:
+    from countonce.warnings import WarningThresholds
 
 DetectorName = Literal["countgd", "gdino", "countgdpp"]
 BackboneName = Literal["vggt", "vggt_omega", "vggt_t3", "colmap"]
@@ -59,6 +62,9 @@ class Config(BaseModel):
     # (bench.calibration + countonce.conformal.CalibrationArtifact JSON).
     interval_method: IntervalMethodName = "sensitivity"
     calibration_path: Path | None = None
+    # Quality-warning threshold overrides (PLAN 8.9), keyed by WarningThresholds field name, e.g.
+    # ``warnings: {min_frames: 4}``. configs/warnings.yaml (bench.tune_warnings) has the same shape.
+    warnings: dict[str, float] = Field(default_factory=dict)
     # Trained CountOnce-Match checkpoint (match.model.save_checkpoint); required for assoc: v3.
     v3_checkpoint: Path | None = None
 
@@ -69,6 +75,22 @@ class Config(BaseModel):
     # Output / caching
     out_dir: Path = Path("results")
     cache_dir: Path | None = None  # None = no stage caching
+
+    @field_validator("warnings")
+    @classmethod
+    def _check_warning_keys(cls, v: dict[str, float]) -> dict[str, float]:
+        from countonce.warnings import WarningThresholds
+
+        bad = set(v) - set(WarningThresholds.__dataclass_fields__)
+        if bad:
+            raise ValueError(f"unknown warning threshold(s): {sorted(bad)}")
+        return v
+
+    def warning_thresholds(self) -> WarningThresholds:
+        """Default thresholds with this config's ``warnings:`` overrides applied."""
+        from countonce.warnings import WarningThresholds
+
+        return WarningThresholds.from_overrides(self.warnings)
 
     @classmethod
     def from_yaml(cls, path: Path | str) -> Config:
