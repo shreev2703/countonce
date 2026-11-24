@@ -1,0 +1,12 @@
+# Profiling harness. Run: countonce profile --config configs/profile.yaml
+# Writes one row per (repeat, stage) to out_csv. Nothing here is a result.
+inputs: data/profile/scene   # image directory, files, or a video
+prompt: mug
+warmup: 1                    # untimed runs (model load, kernel autotune)
+repeats: 3
+out_csv: results/profile.csv
+run:                         # any countonce.config.Config field
+  detector: countgd
+  backbone: vggt
+  assoc: v1
+  max_frames: 16

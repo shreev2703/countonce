@@ -20,6 +20,7 @@ from countonce.merge.base import Associator
 from countonce.merge.cluster import V1Associator
 from countonce.merge.match import V2Associator, V2Config
 from countonce.merge.sync import SyncAssociator
+from countonce.oom import Attempt, RungUnavailable, run_with_oom_ladder
 from countonce.provenance import run_metadata
 from countonce.recon.base import Reconstructor
 from countonce.recon.cache import CachedReconstructor, ReconCache
@@ -181,21 +182,33 @@ def run(
     detections = filter_by_score(raw_detections, config.score_threshold)
     timings["detect"] = time.perf_counter() - t
 
-    # Reconstruct
+    # Reconstruct, under the OOM degradation ladder (rung 0 = the configured run, unchanged)
     t = time.perf_counter()
-    if config.chunked_recon:
-        cap = _chunk_cap(config)
-        if cap is not None:
-            rec = ChunkedReconstructor(rec, cap, config.chunk_overlap)
-    cache_key: str | None = None
-    cache_hit = False
-    recon: DenseRecon
-    if config.cache_dir is not None:
-        cached = CachedReconstructor(rec, ReconCache(Path(config.cache_dir) / "recon"), "0")
-        got = cached.reconstruct_cached(frames)
-        recon, cache_key, cache_hit = got.recon, got.key, got.hit
-    else:
-        recon = rec.reconstruct(frames)
+    base_rec = rec
+    cache_dir = Path(config.cache_dir) if config.cache_dir is not None else None
+
+    def recon_stage(att: Attempt) -> tuple[DenseRecon, str | None, bool]:
+        r = base_rec
+        if att.resolution_scale < 1.0:
+            with_res = getattr(r, "with_resolution_scale", None)
+            if with_res is None:
+                raise RungUnavailable("backbone has no resolution control")
+            r = with_res(att.resolution_scale)
+        if att.chunk_size is not None:
+            r = ChunkedReconstructor(r, att.chunk_size, config.chunk_overlap)
+        elif config.chunked_recon:
+            cap = _chunk_cap(config)
+            if cap is not None:
+                r = ChunkedReconstructor(r, cap, config.chunk_overlap)
+        if cache_dir is not None:
+            got = CachedReconstructor(r, ReconCache(cache_dir / "recon"), "0").reconstruct_cached(
+                frames
+            )
+            return got.recon, got.key, got.hit
+        return r.reconstruct(frames), None, False
+
+    ladder = run_with_oom_ladder(recon_stage, stage_name="recon", n_frames=len(frames))
+    recon, cache_key, cache_hit = ladder.value  # type: ignore[misc]
     timings["recon"] = time.perf_counter() - t
 
     # Lift + associate
@@ -278,6 +291,7 @@ def run(
         reject_reasons=clustered.reject_reasons,
         match_evidence=clustered.evidence,
         timings=timings,
+        oom_fallback_rung=ladder.rung,
         peak_vram_mb=recon.peak_vram_mb,
         config=run_metadata(config.to_dict()),
     )

@@ -6,7 +6,11 @@ import argparse
 import sys
 from pathlib import Path
 
-from countonce.config import Config
+from countonce.oom import configure_allocator
+
+configure_allocator()  # before anything can import torch
+
+from countonce.config import Config  # noqa: E402
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -38,6 +42,9 @@ def _parser() -> argparse.ArgumentParser:
 
     t = sub.add_parser("train", help="train the CountOnce-Match v3 matcher")
     t.add_argument("--config", type=Path, default=Path("configs/match.yaml"))
+
+    f = sub.add_parser("profile", help="time each pipeline stage and record peak VRAM")
+    f.add_argument("--config", type=Path, default=Path("configs/profile.yaml"))
 
     y = sub.add_parser("synth", help="write synthetic geometry episodes for the matcher")
     y.add_argument("--config", type=Path, default=Path("configs/synth.yaml"))
@@ -109,7 +116,20 @@ def _bench(args: argparse.Namespace) -> int:
     return 0
 
 
+def _profile(args: argparse.Namespace) -> int:
+    from countonce.profile import ProfileConfig, run_profile
+
+    try:
+        path, rows = run_profile(ProfileConfig.from_yaml(args.config))
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    print(f"profile: {len(rows)} stage rows -> {path}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    configure_allocator()
     args = _parser().parse_args(argv)
     if args.cmd == "env":
         from countonce import env_check
@@ -121,6 +141,8 @@ def main(argv: list[str] | None = None) -> int:
         return _train(args)
     if args.cmd == "synth":
         return _synth(args)
+    if args.cmd == "profile":
+        return _profile(args)
 
     from countonce.pipeline import run
 

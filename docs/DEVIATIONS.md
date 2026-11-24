@@ -173,3 +173,13 @@ One entry per decision: date, what the plan said, what was done, why.
 - Calibration is fitted on the val split only after the final epoch and written to `<out_dir>/calibration.json`; test-split ECE reporting is left to the evaluation step.
 - Temperature scaling recalibrates the symmetric match probability `match_probs`, not Sinkhorn log-scores.
 - `countonce synth` writes train/val/test geometry episodes with disjoint seed ranges. No training was run.
+
+## Profiling harness and OOM ladder (overnight)
+- Rungs are numbered so `oom_fallback_rung` 0 means no fallback: 0 initial, 1 free cache and retry, 2 chunked reconstruction at half the frame count (min 3), 3 lower resolution (tiers 0.75 then 0.5, each its own attempt, both rung 3). Then `GpuOomError` (`ERR_GPU_OOM`, retryable, with a user tip).
+- Only the `recon` stage is wrapped in the pipeline; other GPU stages (detector) are not yet. `run_with_oom_ladder` is generic for them.
+- The resolution rung needs a reconstructor with `with_resolution_scale(scale)`. None has it yet, so the rung is skipped (`RungUnavailable`) and the ladder ends in `ERR_GPU_OOM`. Implementing it for VGGT is open.
+- A stage must raise on OOM. `VGGTReconstructor` currently converts `OutOfMemoryError` into `Recon.failure("cuda_oom")`, so it bypasses the ladder until that return path is changed.
+- OOM is detected by class name `OutOfMemoryError` or a "out of memory" RuntimeError, so no torch import is needed.
+- `configure_allocator()` runs at `countonce.cli` import and in `main()`. It keeps other `PYTORCH_CUDA_ALLOC_CONF` options and respects an explicit `expandable_segments` setting. Python entry points that skip the CLI must call it themselves.
+- Profile CSV: one row per (repeat, stage) from the pipeline's `timings`. VRAM is filled only for `recon` (run peak) and `total`, and empty without CUDA. `docs/PROFILE.md` is a skeleton; `torch.profiler`/Nsight traces are not wired.
+- Tests ran with `~/vggtProject/.venv` (countonce still has no venv, see GATES.md).
