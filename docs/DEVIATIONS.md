@@ -306,3 +306,10 @@ One entry per decision: date, what the plan said, what was done, why.
 - Pooled human MAE/within-10% average per-participant errors per scene (not the error of the mean count), then bootstrap over scenes. Per-participant CIs bootstrap that participant's scenes.
 - Time ratio = mean human seconds / median (p50) CountOnce runtime over the shared scenes; the CI resamples scenes jointly for both. CountOnce runtime is per-scene mean of `runtime_s` in `bench.csv`.
 - Scene manifest JSON (images + GT count) is the harness input; GT is never written into sheets. No real study data exists; tests use synthetic CSVs only.
+
+## Model registry, promotion gate, active learning (overnight)
+- **Evaluators injected.** `Registry.promote` takes `frozen_eval`/`golden_eval` callables (checkpoint path -> `bench.evaluate` / `bench.golden` result). The CLI builds the frozen one from `--frozen-gt` plus a dir of `<version>.json` Predictions (produced by running each checkpoint on the frozen split); the golden one runs the CPU synthetic set with the checkpoint as `assoc=v3` (`run_synthetic(cfg, checkpoint=...)`). The default golden path was not exercised with a real checkpoint; tests use fake evaluators.
+- **No evaluator is a refusal, not a skip** (`GateConfig.require_frozen=True`), except the very first model, which has no incumbent. `--allow-no-frozen` overrides.
+- **Tolerances** (untuned): frozen MAE +5% relative, frozen assoc F1 -0.01 absolute, golden MAPE +0.02 / F1 -0.02; golden VRAM/latency never gate (hardware noise).
+- **Active score** = 0.5 x mean(1 - 2|p-0.5|) + 0.5 x min(interval width / count, 1); weights are arbitrary, jobs with `corrected/` are skipped.
+- **Corrections in training.** Persisted results hold no rays/camera centres, so correction groups use xyz/size/frame only (other inputs neutral) and a BCE loss on match probability; one group per optimiser step, round-robin, weight `corrections_weight`. `false_positive` pairs are ignored by the matcher. The data version gets a `+corr-<hash>` suffix. Not run on real corrections.

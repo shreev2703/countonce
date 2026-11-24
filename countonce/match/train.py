@@ -52,6 +52,8 @@ class TrainConfig:
     cycle_weight: float = 0.0  # 0 disables the cycle loss (the "pairwise only" ablation)
     max_triplets: int = 8  # view triplets sampled per episode per step
     match_threshold: float = 0.5  # for validation association F1
+    corrections: str = ""  # JSONL of consented correction pairs mixed in as hard pos/neg
+    corrections_weight: float = 1.0
     feature_group: str = "full"  # 3d | 3d_rays | full (§10.5 attribution ablation)
     seed: int = 0
     device: str = "auto"  # auto | cpu | cuda
@@ -283,6 +285,13 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
     device = _device(cfg.device)
     use_amp = device == "cuda"
     version = cfg.data_version or data_version(cfg.train_dir, cfg.val_dir)
+    groups: list[Any] = []
+    if cfg.corrections:
+        from countonce.match.correction_data import build_groups, load_pairs
+        from countonce.match.registry import file_sha256
+
+        groups = build_groups(load_pairs(cfg.corrections), cfg.feature_group, adim)
+        version = f"{version}+corr-{file_sha256(cfg.corrections)[:8]}"
 
     torch.manual_seed(cfg.seed)
     model = make_model(**cfg.model).to(device)
@@ -319,8 +328,10 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
         model.train()
         rng = np.random.default_rng([cfg.seed, epoch])
         order = rng.permutation(len(train_set))
-        sums = {"loss": 0.0, "nll": 0.0, "count": 0.0, "cycle": 0.0}
+        sums = {"loss": 0.0, "nll": 0.0, "count": 0.0, "cycle": 0.0, "corr": 0.0}
         n_eps = 0
+        n_corr = 0
+        step_no = 0
         for s in range(0, len(order), cfg.batch_size):
             opt.zero_grad(set_to_none=True)
             batch_loss = []
@@ -337,6 +348,14 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
                 for k in ("nll", "count", "cycle"):
                     if k in terms:
                         sums[k] += float(terms[k].detach())
+            if groups:
+                from countonce.match.correction_data import correction_loss
+
+                closs = correction_loss(model, groups[(epoch * 7919 + step_no) % len(groups)])
+                batch_loss.append(cfg.corrections_weight * closs)
+                sums["corr"] += float(closs.detach())
+                n_corr += 1
+                step_no += 1
             if batch_loss:
                 _stack_mean(batch_loss).backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
@@ -344,7 +363,9 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
             sched.step()
         val = evaluate(model, val_set, cfg)
         rec: dict[str, Any] = {"epoch": epoch + 1, "lr": sched.get_last_lr()[0], **val}
-        rec.update({f"train_{k}": v / max(n_eps, 1) for k, v in sums.items()})
+        rec.update({f"train_{k}": v / max(n_eps, 1) for k, v in sums.items() if k != "corr"})
+        if groups:
+            rec["train_corr"] = sums["corr"] / max(n_corr, 1)
         history.append(rec)
         if rec["val_f1"] > best_f1:
             best_f1 = rec["val_f1"]

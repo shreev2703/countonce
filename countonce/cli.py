@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import sys
 from pathlib import Path
 from typing import Any
@@ -73,6 +74,11 @@ def _parser() -> argparse.ArgumentParser:
 
     t = sub.add_parser("train", help="train the CountOnce-Match v3 matcher")
     t.add_argument("--config", type=Path, default=Path("configs/match.yaml"))
+    t.add_argument(
+        "--corrections",
+        type=Path,
+        help="JSONL of consented correction pairs (countonce correct --pairs) to mix in",
+    )
 
     f = sub.add_parser("profile", help="time each pipeline stage and record peak VRAM")
     f.add_argument("--config", type=Path, default=Path("configs/profile.yaml"))
@@ -101,7 +107,113 @@ def _parser() -> argparse.ArgumentParser:
     c.add_argument("out_dir", type=Path, help="directory holding result.json")
     c.add_argument("--file", type=Path, required=True, help="corrections.json")
     c.add_argument("--pairs", type=Path, help="also write consented training pairs (JSONL)")
+
+    q = sub.add_parser("review-queue", help="rank finished jobs by matcher uncertainty")
+    q.add_argument("jobs", type=Path, help="a job dir, or a dir of job dirs with result.json")
+    q.add_argument("--out", type=Path, default=Path("results/review_queue.jsonl"))
+    q.add_argument("--top", type=int, help="keep only the N most uncertain jobs")
+    q.add_argument("--include-reviewed", action="store_true", help="keep jobs with corrected/")
+
+    m = sub.add_parser("models", help="matcher checkpoint registry")
+    m.add_argument("--root", type=Path, default=Path("models"))
+    msub = m.add_subparsers(dest="models_cmd", required=True)
+    msub.add_parser("list", help="list registered versions and the current one")
+    mr = msub.add_parser("register", help="register a checkpoint (does not promote it)")
+    mr.add_argument("checkpoint", type=Path)
+    mr.add_argument("--dataset-version", default="")
+    mr.add_argument("--recipe-version", default="")
+    mr.add_argument("--config", type=Path, help="YAML/JSON training config to record")
+    mr.add_argument("--metrics", type=Path, help="JSON file of metrics to record")
+    mp = msub.add_parser("promote", help="gate a version against the current model, then promote")
+    mp.add_argument("version")
+    mp.add_argument("--frozen-gt", type=Path, help="frozen-split ground truth JSON")
+    mp.add_argument(
+        "--frozen-predictions", type=Path, help="dir holding <version>.json predictions"
+    )
+    mp.add_argument("--golden-config", type=Path, help="golden set config (default: built in)")
+    mp.add_argument("--no-golden", action="store_true", help="skip the CPU golden set")
+    mp.add_argument("--allow-no-frozen", action="store_true", help="do not require a frozen eval")
+    mp.add_argument("--tol-mae-rel", type=float, default=0.05)
+    mp.add_argument("--tol-f1", type=float, default=0.01)
+    mp.add_argument("--tol-golden-mape", type=float, default=0.02)
+    mp.add_argument("--tol-golden-f1", type=float, default=0.02)
     return p
+
+
+def _review_queue(args: argparse.Namespace) -> int:
+    from countonce.active import export_review_queue, find_jobs, rank_jobs
+    from countonce.errors import CountOnceError
+
+    try:
+        items = rank_jobs(find_jobs(args.jobs), skip_reviewed=not args.include_reviewed)
+    except (FileNotFoundError, ValueError, CountOnceError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    export_review_queue(items, args.out, args.top)
+    print(f"review-queue: {len(items[: args.top])} of {len(items)} jobs -> {args.out}")
+    return 0
+
+
+def _read_doc(path: Path | None) -> dict[str, Any]:
+    import yaml
+
+    return (yaml.safe_load(path.read_text()) or {}) if path else {}
+
+
+def _models(args: argparse.Namespace) -> int:
+
+    from countonce.match.registry import (
+        GateConfig,
+        Registry,
+        RegistryError,
+        frozen_evaluator,
+        golden_evaluator,
+    )
+
+    reg = Registry(args.root)
+    try:
+        if args.models_cmd == "list":
+            rows = reg.models()
+            if not rows:
+                print("models: registry is empty")
+            for m in rows:
+                print(
+                    f"{'*' if m['current'] else ' '} {m['version']}  {m['sha256'][:12]}  "
+                    f"data={m['dataset_version'] or '-'}  git={(m['git_sha'] or '-')[:8]}"
+                )
+            return 0
+        if args.models_cmd == "register":
+            entry = reg.register(
+                args.checkpoint,
+                dataset_version=args.dataset_version,
+                recipe_version=args.recipe_version,
+                config=_read_doc(args.config),
+                metrics=_read_doc(args.metrics),
+            )
+            print(f"models: registered {entry['version']} ({entry['sha256'][:12]})")
+            return 0
+        gate = GateConfig(
+            frozen_mae_rel=args.tol_mae_rel,
+            frozen_assoc_f1_abs=args.tol_f1,
+            require_frozen=not args.allow_no_frozen,
+        )
+        gate.golden["mape"] = args.tol_golden_mape
+        gate.golden["assoc_f1"] = args.tol_golden_f1
+        frozen = None
+        if args.frozen_gt and args.frozen_predictions:
+            frozen = frozen_evaluator(args.frozen_gt, args.frozen_predictions)
+        golden = None if args.no_golden else golden_evaluator(args.golden_config)
+        decision = reg.promote(args.version, gate=gate, frozen_eval=frozen, golden_eval=golden)
+    except (FileNotFoundError, ValueError, KeyError, RegistryError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    if decision.passed:
+        print(f"models: promoted {decision.candidate} (was {decision.incumbent})")
+        return 0
+    print(f"models: REFUSED {decision.candidate}: logged to {reg.log_path}", file=sys.stderr)
+    for r in decision.reasons:
+        print(f"  - {r}", file=sys.stderr)
+    return 1
 
 
 def _correct(args: argparse.Namespace) -> int:
@@ -186,7 +298,10 @@ def _train(args: argparse.Namespace) -> int:
     from countonce.match.train import TrainConfig, train
 
     try:
-        history = train(TrainConfig.from_yaml(args.config))
+        tcfg = TrainConfig.from_yaml(args.config)
+        if args.corrections:
+            tcfg = dataclasses.replace(tcfg, corrections=str(args.corrections))
+        history = train(tcfg)
     except (FileNotFoundError, ValueError) as exc:
         print(f"countonce: error: {exc}", file=sys.stderr)
         return 2
@@ -332,6 +447,10 @@ def main(argv: list[str] | None = None) -> int:
         return _explain(args)
     if args.cmd == "correct":
         return _correct(args)
+    if args.cmd == "models":
+        return _models(args)
+    if args.cmd == "review-queue":
+        return _review_queue(args)
     if args.cmd == "report":
         return _report(args)
 

@@ -174,14 +174,18 @@ def _scene_row(
     }
 
 
-def run_synthetic(cfg: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def run_synthetic(cfg: dict[str, Any], checkpoint: Path | None = None) -> dict[str, dict[str, Any]]:
+    """Run the CPU golden scenes; ``checkpoint`` forces ``assoc=v3`` with that matcher."""
     out: dict[str, dict[str, Any]] = {}
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         for spec in verify_synthetic_pins(cfg):
             img_dir, script, gt_of = synthetic_scene(spec, root / "scenes")
             conf = Config(
-                out_dir=root / "out" / spec["id"], max_frames=0, assoc=spec.get("assoc", "v2")
+                out_dir=root / "out" / spec["id"],
+                max_frames=0,
+                assoc="v3" if checkpoint else spec.get("assoc", "v2"),
+                v3_checkpoint=checkpoint,
             )
             t0 = time.perf_counter()
             res = run(
