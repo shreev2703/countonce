@@ -106,6 +106,13 @@ def _make_associator(config: Config, k: float) -> Associator:
     base = V2Config()
     gate = base.max_reproj_norm * k / config.merge_k
     v2cfg = V2Config(**{**base.__dict__, "max_reproj_norm": gate})
+    if config.assoc == "v3":
+        from countonce.merge.v3 import V3Associator, load_cached
+
+        # k is the sensitivity grid's merge strictness: larger k merges more, so the match
+        # probability threshold drops (0.5 at the configured merge_k).
+        thr = min(max(1.0 - 0.5 * k / config.merge_k, 0.05), 0.95)
+        return V3Associator(model=load_cached(config.v3_checkpoint), threshold=thr)
     if config.assoc == "sync":
         return SyncAssociator(v2_config=v2cfg)
     return V2Associator(v2cfg)
@@ -141,8 +148,12 @@ def run(
 
     ``detector`` / ``reconstructor`` override the config-selected backends (tests, notebooks).
     """
-    if config.assoc not in ("v1", "v2", "sync"):
+    if config.assoc not in ("v1", "v2", "v3", "sync"):
         raise NotImplementedError(f"associator {config.assoc!r} is not implemented yet")
+    if config.assoc == "v3":
+        from countonce.merge.v3 import require_checkpoint
+
+        require_checkpoint(config.v3_checkpoint)  # fail before any expensive stage
     timings: dict[str, float] = {}
     t0 = time.perf_counter()
 

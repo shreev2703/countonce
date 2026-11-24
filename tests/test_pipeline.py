@@ -113,9 +113,9 @@ def test_end_to_end_v2_counts_each_object_once(tmp_path):
     assert any(e.merged and e.reproj_error_px >= 0 for e in res.match_evidence)
 
 
-def test_unimplemented_backends_raise(tmp_path):
+def test_v3_without_checkpoint_raises_clear_error(tmp_path):
     img_dir, _ = make_scene(tmp_path)
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(FileNotFoundError, match="v3_checkpoint"):
         run(img_dir, "x", Config(assoc="v3", out_dir=tmp_path / "o"))
 
 
@@ -130,12 +130,12 @@ def test_config_yaml_roundtrip(tmp_path):
         Config.from_yaml(p)
 
 
-def test_cli_reports_unimplemented_as_error(tmp_path, capsys):
+def test_cli_reports_missing_v3_checkpoint_as_error(tmp_path, capsys):
     img_dir, _ = make_scene(tmp_path)
     code = main(["run", "--images", str(img_dir), "--prompt", "x", "--assoc", "v3",
                  "--out", str(tmp_path / "o")])  # fmt: skip
     assert code == 2
-    assert "not implemented" in capsys.readouterr().err
+    assert "v3_checkpoint" in capsys.readouterr().err
 
 
 def test_run_reports_sensitivity_interval_and_warnings(tmp_path):

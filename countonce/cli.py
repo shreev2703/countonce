@@ -22,6 +22,7 @@ def _parser() -> argparse.ArgumentParser:
     r.add_argument("--detector", choices=["countgd", "gdino", "countgdpp"])
     r.add_argument("--backbone", choices=["vggt", "vggt_omega", "vggt_t3", "colmap"])
     r.add_argument("--assoc", choices=["v1", "v2", "v3", "sync"])
+    r.add_argument("--v3-checkpoint", type=Path, help="matcher checkpoint for --assoc v3")
     r.add_argument("--out", type=Path)
     r.add_argument("--fps", type=float)
 
@@ -82,6 +83,7 @@ def main(argv: list[str] | None = None) -> int:
         detector=args.detector,
         backbone=args.backbone,
         assoc=args.assoc,
+        v3_checkpoint=args.v3_checkpoint,
         out_dir=args.out,
         fps=args.fps,
     )

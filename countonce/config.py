@@ -44,6 +44,8 @@ class Config(BaseModel):
     # (bench.calibration + countonce.conformal.CalibrationArtifact JSON).
     interval_method: IntervalMethodName = "sensitivity"
     calibration_path: Path | None = None
+    # Trained CountOnce-Match checkpoint (match.model.save_checkpoint); required for assoc: v3.
+    v3_checkpoint: Path | None = None
 
     # Backend options passed to the real detector / reconstructor (paths, device, ...)
     detector_options: dict[str, Any] = Field(default_factory=dict)

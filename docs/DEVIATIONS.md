@@ -155,3 +155,12 @@ One entry per decision: date, what the plan said, what was done, why.
 - >= 15 real-scene rule: `conformal` with fewer real calibration scenes falls back to Jackknife+ (if the artifact has LOO fits) else to the sensitivity range, with a `conformal_fallback` warning. Missing artifact or too few scenes for the level (e.g. 95% with n < 19) is a hard `CalibrationError`.
 - Builder refuses `split="test"`, any scene recorded in `test`, and real scenes not in `val`. Synthetic scenes are not in `splits.json` and are accepted as `domain="synthetic"`.
 - No calibration artifact is produced from real data yet (no real runs): TODO: fill from results. Figure 11 (`bench.figures.fig_conformal_coverage`) takes coverage curves and is not in `make_all`.
+
+## CountOnce-Match v3 (model, instances, `assoc: v3`)
+- Synthetic episodes carry no box or object size, so `episode_inputs` uses a nominal 0.1-unit object (size and a pinhole box derived from depth). Real runs use the detection box and lifted size.
+- Added a geometric pair term to the score (even MLP of the 3D offset, added to the descriptor dot product). Descriptor dot products alone did not overfit 10 episodes in the time budget. The term is even in the offset so view order cannot change scores.
+- No learned view-index embedding: the view enters only through camera centre and ray direction, so permuting views leaves the instances unchanged. `match_probs` averages both Sinkhorn orientations for the same reason.
+- Features are centred on the detection centroid and divided by `scene_scale` (episodes use the median camera-to-detection distance).
+- Cannot-link splitting uses an s-t min-cut (scipy max-flow, probabilities scaled to ints) between two same-view detections, recursively, on above-threshold weights only. Not a global Stoer-Wagner cut.
+- Under `assoc: v3` the sensitivity grid's merge strictness `k` maps to the match threshold `1 - 0.5*k/merge_k` (0.5 at the configured `merge_k`), clipped to [0.05, 0.95].
+- The CLI gained `--v3-checkpoint`; the missing-checkpoint error is raised at the start of `run()`. No checkpoint is trained or shipped: `train.py` is a later task, so v3 is untested on real data.
