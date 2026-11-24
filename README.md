@@ -97,6 +97,17 @@ countonce run --images path/to/photos --prompt "apple" --assoc v2 --out results/
 countonce run --video path/to/clip.mp4 --prompt "apple" --fps 2 --out results/run1
 ```
 
+No GPU or weights? `examples/tiny_scene/` bundles five rendered views of five red spheres (plus
+blue and green distractors) with known cameras and depth. The test-only `color_blob` detector and
+`fixture` backbone count it on CPU (expected: 5):
+
+```bash
+countonce run examples/tiny_scene --prompt "red sphere" --detector color_blob --backbone fixture --assoc v2 --out results/tiny
+```
+
+These two backends exist only to exercise the CLI end to end (`tests/test_cli_e2e.py`); they are
+not real detection or reconstruction. Regenerate the scene with `python examples/tiny_scene/generate.py`.
+
 Flags: `--detector {countgd,gdino,countgdpp}`, `--backbone {vggt,vggt_omega,vggt_t3,colmap}`,
 `--assoc {v1,v2,v3,sync}`, `--config file.yaml` (flags override the file). Not every choice has an
 implementation yet; unimplemented ones exit with an error.

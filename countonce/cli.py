@@ -21,12 +21,13 @@ def _parser() -> argparse.ArgumentParser:
 
     r = sub.add_parser("run", help="count instances in images or a video")
     src = r.add_mutually_exclusive_group(required=True)
+    src.add_argument("source", type=Path, nargs="?", help="image directory, image or video file")
     src.add_argument("--images", type=Path, nargs="+", help="image directory or files")
     src.add_argument("--video", type=Path, help="video file")
     r.add_argument("--prompt", required=True)
     r.add_argument("--config", type=Path, help="YAML Config file; flags override it")
-    r.add_argument("--detector", choices=["countgd", "gdino", "countgdpp"])
-    r.add_argument("--backbone", choices=["vggt", "vggt_omega", "vggt_t3", "colmap"])
+    r.add_argument("--detector", choices=["countgd", "gdino", "countgdpp", "color_blob"])
+    r.add_argument("--backbone", choices=["vggt", "vggt_omega", "vggt_t3", "colmap", "fixture"])
     r.add_argument("--assoc", choices=["v1", "v2", "v3", "sync"])
     r.add_argument("--v3-checkpoint", type=Path, help="matcher checkpoint for --assoc v3")
     r.add_argument("--out", type=Path)
@@ -511,9 +512,14 @@ def main(argv: list[str] | None = None) -> int:
         out_dir=args.out,
         fps=args.fps,
     )
-    inputs = args.images if args.images is not None else args.video
+    inputs = args.images if args.images is not None else (args.source or args.video)
     if isinstance(inputs, list) and len(inputs) == 1:
         inputs = inputs[0]
+    if config.backbone == "fixture" and "scene" not in config.backbone_options:
+        scene_dir = inputs if isinstance(inputs, Path) and inputs.is_dir() else None
+        if scene_dir is not None:  # test backend: scene.json sits next to the views
+            opts = {**config.backbone_options, "scene": str(scene_dir / "scene.json")}
+            config = config.model_copy(update={"backbone_options": opts})
     try:
         result = run(inputs, args.prompt, config)
     except (NotImplementedError, FileNotFoundError, ValueError) as exc:

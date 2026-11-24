@@ -11,8 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 if TYPE_CHECKING:
     from countonce.warnings import WarningThresholds
 
-DetectorName = Literal["countgd", "gdino", "countgdpp"]
-BackboneName = Literal["vggt", "vggt_omega", "vggt_t3", "colmap"]
+DetectorName = Literal["countgd", "gdino", "countgdpp", "color_blob"]
+BackboneName = Literal["vggt", "vggt_omega", "vggt_t3", "colmap", "fixture"]
 AssocName = Literal["v1", "v2", "v3", "sync"]
 HallucinationMode = Literal["off", "downweight", "drop"]
 LiftRegion = Literal["mask", "box"]

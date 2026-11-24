@@ -143,6 +143,10 @@ def build_detector(config: Config) -> Detector:
         from countonce.detect.countgd import CountGDDetector
 
         return CountGDDetector(**config.detector_options)
+    if config.detector == "color_blob":  # test backend only (docs/DEVIATIONS.md)
+        from countonce.detect.color_blob import ColorBlobDetector
+
+        return ColorBlobDetector(**config.detector_options)
     raise NotImplementedError(f"detector {config.detector!r} is not implemented yet")
 
 
@@ -151,6 +155,12 @@ def build_reconstructor(config: Config) -> Reconstructor:
         from countonce.recon.adapter import load_method
 
         return load_method(config.backbone, **config.backbone_options)
+    if config.backbone == "fixture":  # test backend only (docs/DEVIATIONS.md)
+        from countonce.recon.fixture import FixtureReconstructor
+
+        if "scene" not in config.backbone_options:
+            raise ValueError("backbone 'fixture' needs backbone_options.scene (a scene.json path)")
+        return FixtureReconstructor(**config.backbone_options)
     raise NotImplementedError(f"backbone {config.backbone!r} is not implemented yet")
 
 
