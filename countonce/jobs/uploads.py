@@ -153,6 +153,11 @@ class UploadService:
         return {r["idx"]: r for r in rows}
 
     # -- API ------------------------------------------------------------------------------
+    def owner(self, session_id: str) -> str | None:
+        """The user who opened a session, or None if it does not exist."""
+        rows = self.store._query("SELECT user_id FROM upload_sessions WHERE id = ?", (session_id,))
+        return str(rows[0]["user_id"]) if rows else None
+
     def create_session(
         self, user_id: str, filename: str, total_bytes: int, sha256: str, chunk_size: int
     ) -> dict[str, Any]:
@@ -369,7 +374,7 @@ class UploadService:
             raise _err(ErrorCode.ERR_INVALID_INPUT, f"no such job: {job_id}")
         if job["user_id"] != user_id:
             raise _err(ErrorCode.ERR_INVALID_INPUT, "job belongs to another user")
-        if job["status"] != "queued":
+        if job["status"] not in ("draft", "queued"):
             raise _err(ErrorCode.ERR_INVALID_INPUT, f"job is {job['status']}; cannot add files")
 
     def _attach(self, job_id: str, path: Path, digest: str, exif_stripped: bool) -> None:

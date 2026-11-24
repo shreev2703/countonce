@@ -329,6 +329,80 @@ class SqliteJobStore:
                 )
         return job_id, True
 
+    # -- draft jobs (HTTP API: POST /jobs, then upload, then POST /jobs/{id}/submit) ----------
+    def create_draft(
+        self,
+        user_id: str,
+        prompt: str,
+        *,
+        options: dict[str, Any] | None = None,
+        negative_prompts: Sequence[str] = (),
+        idempotency_key: str | None = None,
+        site_id: str | None = None,
+        captured_at: float | None = None,
+    ) -> tuple[str, bool]:
+        """Create a ``draft`` job (never claimed by a worker); same idempotency rule as submit."""
+        job_id = uuid.uuid4().hex
+        with self._tx() as conn:
+            cur = conn.execute(
+                _INSERT_JOB,
+                (
+                    job_id,
+                    user_id,
+                    prompt,
+                    json.dumps(list(negative_prompts)),
+                    json.dumps(options or {}, sort_keys=True),
+                    idempotency_key,
+                    None,
+                    None,
+                    site_id,
+                    captured_at,
+                    self.clock(),
+                ),
+            )
+            if cur.rowcount == 0:
+                row = conn.execute(
+                    "SELECT id FROM jobs WHERE user_id = ? AND idempotency_key = ?",
+                    (user_id, idempotency_key),
+                ).fetchone()
+                return str(row["id"]), False
+            conn.execute(
+                "UPDATE jobs SET status = 'draft', stage = 'draft' WHERE id = ?", (job_id,)
+            )
+        return job_id, True
+
+    def queue_draft(self, job_id: str) -> bool:
+        """``draft -> queued`` (consumes a rate-limit token). False if it was not a draft."""
+        with self._tx() as conn:
+            row = conn.execute(
+                "SELECT user_id, status FROM jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+            if row is None or row["status"] != "draft":
+                return False
+            self._consume_token(conn, row["user_id"])
+            conn.execute(
+                "UPDATE jobs SET status = 'queued', stage = 'queued', created_at = ? WHERE id = ?",
+                (self.clock(), job_id),
+            )
+        return True
+
+    def add_feedback(
+        self,
+        job_id: str,
+        user_id: str | None,
+        correct: bool,
+        user_count: int | None = None,
+        comment: str | None = None,
+    ) -> str:
+        fid = uuid.uuid4().hex
+        with self._tx() as conn:
+            conn.execute(
+                "INSERT INTO feedback (id, job_id, user_id, correct, user_count, comment, "
+                "created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (fid, job_id, user_id, int(correct), user_count, comment, self.clock()),
+            )
+        return fid
+
     def get(self, job_id: str) -> dict[str, Any] | None:
         rows = self._query("SELECT * FROM jobs WHERE id = ?", (job_id,))
         return rows[0] if rows else None
@@ -535,7 +609,7 @@ class SqliteJobStore:
         now = self.clock() if now is None else now
         cutoff = now - retention_days * DAY_S
         rows = self._query(
-            "SELECT id FROM jobs WHERE status IN ('done', 'failed', 'dead_letter') "
+            "SELECT id FROM jobs WHERE status IN ('done', 'failed', 'dead_letter', 'draft') "
             "AND COALESCE(finished_at, created_at) <= ? ORDER BY created_at, id",
             (cutoff,),
         )

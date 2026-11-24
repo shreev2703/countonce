@@ -28,6 +28,11 @@ recon = [
 mcp = [
     "mcp>=1.0",
 ]
+api = [
+    "fastapi>=0.110",
+    "httpx>=0.27",
+    "uvicorn>=0.29",
+]
 data = [
     "pyarrow>=15",
     "duckdb>=1.0",
@@ -84,5 +89,5 @@ files = ["countonce"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*", "sam2.*", "opentelemetry.*", "pyarrow.*", "duckdb.*"]
+module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*", "sam2.*", "opentelemetry.*", "uvicorn.*", "pyarrow.*", "duckdb.*"]
 ignore_missing_imports = true

@@ -253,6 +253,15 @@ def _parser() -> argparse.ArgumentParser:
     )
     rt.add_argument("--config", type=Path, default=Path("configs/retrain.yaml"))
 
+    sa = sub.add_parser("serve-api", help="serve the HTTP API over a sqlite job store (api extra)")
+    sa.add_argument("--db", type=Path, default=Path("jobs.db"))
+    sa.add_argument("--upload-root", type=Path, help="default: <db dir>/uploads")
+    sa.add_argument("--host", default="127.0.0.1")
+    sa.add_argument("--port", type=int, default=8000)
+    sa.add_argument("--rate-limit", type=int, help="job submits per minute per user")
+    sa.add_argument("--request-rate-limit", type=int, help="requests per minute per user")
+    sa.add_argument("--write-docs", type=Path, help="write the OpenAPI spec as Markdown and exit")
+
     lt = sub.add_parser("loadtest", help="queue load test with fake workers (sqlite job store)")
     lt.add_argument("--config", type=Path, default=Path("configs/loadtest.yaml"))
 
@@ -434,6 +443,32 @@ def _correct(args: argparse.Namespace) -> int:
         pairs = export_training_pairs(corrections, jobs)
         write_training_pairs_jsonl(pairs, args.pairs)
         print(f"correct: wrote {len(pairs)} consented pairs to {args.pairs}")
+    return 0
+
+
+def _serve_api(args: argparse.Namespace) -> int:
+    try:
+        from countonce.api.app import open_app
+        from countonce.api.docs import render_api_md
+    except ImportError:
+        print(
+            "countonce: error: serve-api needs the api extra: pip install .[api]", file=sys.stderr
+        )
+        return 2
+    app = open_app(
+        args.db,
+        args.upload_root,
+        rate_limit=args.rate_limit,
+        request_rate_limit=args.request_rate_limit,
+    )
+    if args.write_docs:
+        args.write_docs.parent.mkdir(parents=True, exist_ok=True)
+        args.write_docs.write_text(render_api_md(app))
+        print(f"serve-api: wrote {args.write_docs}")
+        return 0
+    import uvicorn
+
+    uvicorn.run(app, host=args.host, port=args.port)
     return 0
 
 
@@ -1000,6 +1035,8 @@ def main(argv: list[str] | None = None) -> int:
         return _sites(args)
     if args.cmd == "worker":
         return _worker(args)
+    if args.cmd == "serve-api":
+        return _serve_api(args)
     if args.cmd == "loadtest":
         return _loadtest(args)
     if args.cmd == "etl":
