@@ -10,6 +10,7 @@ region; use a lower ``min_pixels`` and ``conf_percentile=0`` for them.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from typing import TypedDict, Unpack
 
 import numpy as np
@@ -201,6 +202,34 @@ def lift_detection(
     spread_term = 1.0 / (1.0 + spread / depth_spread_scale)
     lift_conf = float(np.clip(det.score, 0.0, 1.0) * conf_term * spread_term)
     return LiftedDetection(det=det, xyz=xyz, size=float(size), lift_conf=lift_conf)
+
+
+def apply_lift_region(
+    detections: Sequence[Detection], region: str
+) -> tuple[list[Detection], int]:
+    """Honour ``Config.lift_region``. Returns (detections, n_fallbacks).
+
+    ``"mask"`` leaves detections as is: ``_region_mask`` already uses ``Detection.mask`` when
+    present; each detection without one falls back to its box/point and is counted.
+    ``"box"`` drops masks so the central box region is lifted; a mask-only detection (no box)
+    keeps its mask and is counted as a fallback.
+    """
+    if region not in ("mask", "box"):
+        raise ValueError(f"unknown lift_region {region!r}")
+    out: list[Detection] = []
+    fallbacks = 0
+    for d in detections:
+        if region == "mask":
+            fallbacks += d.mask is None
+            out.append(d)
+        elif d.mask is None:
+            out.append(d)
+        elif d.box_xyxy is None and d.point_xy is None:
+            fallbacks += 1
+            out.append(d)
+        else:
+            out.append(replace(d, mask=None))
+    return out, fallbacks
 
 
 def lift_detections(

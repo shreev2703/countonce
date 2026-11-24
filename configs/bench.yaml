@@ -21,6 +21,8 @@ methods:
   - {name: median, kind: baseline, baseline: median}
   - {name: co_v1_vggt, kind: countonce, config: {assoc: v1, backbone: vggt}}
   - {name: co_v2_vggt, kind: countonce, config: {assoc: v2, backbone: vggt}}
+  # Skipped (status=skipped_no_checkpoint) until a trained matcher exists at v3_checkpoint.
+  - {name: co_v3_vggt, kind: countonce, config: {assoc: v3, backbone: vggt, v3_checkpoint: runs/match/best.pt}}
   - {name: co_sync_vggt, kind: countonce, config: {assoc: sync, backbone: vggt}}
   - {name: co_v1_colmap, kind: countonce, config: {assoc: v1, backbone: colmap}}
 
@@ -30,3 +32,10 @@ ablations:
   merge_k: {field: merge_k, values: [0.25, 0.5, 1.0]}
   detector: {field: detector, values: [countgd, gdino]}
   backbone: {field: backbone, values: [vggt, colmap]}
+  # Only non-default values: the default is the base method itself.
+  assoc: {field: assoc, values: [v1, v2]}   # v3 is the separate co_v3_vggt method
+  cannot_link: {field: cannot_link, values: [false]}
+  appearance: {field: appearance, values: [false]}
+  # "off" is quoted: a bare off is a YAML boolean
+  hallucination: {field: hallucination, values: ["off", drop]}
+  lift_region: {field: lift_region, values: [box]}

@@ -45,6 +45,16 @@ class Job:
         return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
+class SkipRun(Exception):  # noqa: N818 - control flow, not an error
+    """Raised by an executor when a run cannot happen for a known, non-failure reason
+    (e.g. the v3 checkpoint is absent). Recorded with ``status`` = ``status`` and not retried
+    as an error; skipped rows are re-attempted on resume."""
+
+    def __init__(self, status: str, reason: str = ""):
+        super().__init__(reason or status)
+        self.status = status
+
+
 @dataclass(frozen=True)
 class RunOutput:
     pred: float
@@ -109,7 +119,8 @@ def run_jobs(
     """Run ``fn`` for each job not already completed, appending a row (flushed) after each.
 
     Exceptions from ``fn`` are recorded as ``status=error`` rows and the loop continues;
-    KeyboardInterrupt propagates. Returns (ran, skipped, errored).
+    KeyboardInterrupt propagates. ``SkipRun`` rows are recorded with their own status and
+    counted as skipped. Returns (ran, skipped, errored).
     """
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -132,15 +143,20 @@ def run_jobs(
             t0 = time.perf_counter()
             out: RunOutput | None = None
             err = ""
+            status = "ok"
             try:
                 out = fn(job)
+            except SkipRun as e:
+                status, err = e.status, str(e)
+                skipped += 1
             except Exception as e:  # noqa: BLE001 - recorded, run continues
                 err = f"{type(e).__name__}: {e}"
+                status = "error"
                 errored += 1
             wall = time.perf_counter() - t0
             row = {
                 "run_key": key,
-                "status": "ok" if out is not None else "error",
+                "status": status,
                 "scene_id": job.scene_id,
                 "split": job.split,
                 "method": job.method,

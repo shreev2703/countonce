@@ -18,7 +18,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from bench.baselines import BASELINES
-from bench.runner import DEFAULT_CSV, Job, RunOutput, run_jobs
+from bench.runner import DEFAULT_CSV, Job, RunOutput, SkipRun, run_jobs
 from countonce.detect.base import Detector, filter_by_score
 from countonce.detect.cache import CachedDetector, DetectionCache
 from countonce.ingest.frames import list_images, sample_frames
@@ -191,6 +191,11 @@ def make_executor(
     make_det = detector_factory or build_detector
 
     def fn(job: Job) -> RunOutput:
+        opts = job.config["options"]
+        if job.config["kind"] == "countonce" and opts.get("assoc") == "v3":
+            ckpt = opts.get("v3_checkpoint")
+            if ckpt is None or not Path(ckpt).is_file():
+                raise SkipRun("skipped_no_checkpoint", f"v3 checkpoint not found: {ckpt}")
         scene = by_id[job.scene_id]
         gt = scene["gt"]
         prompt = gt.get(cfg.prompt_key, cfg.prompt)

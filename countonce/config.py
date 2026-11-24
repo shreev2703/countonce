@@ -11,6 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field
 DetectorName = Literal["countgd", "gdino", "countgdpp"]
 BackboneName = Literal["vggt", "vggt_omega", "vggt_t3", "colmap"]
 AssocName = Literal["v1", "v2", "v3", "sync"]
+HallucinationMode = Literal["off", "downweight", "drop"]
+LiftRegion = Literal["mask", "box"]
 IntervalMethodName = Literal["sensitivity", "conformal", "jackknife_plus"]
 
 
@@ -20,6 +22,12 @@ class Config(BaseModel):
     detector: DetectorName = "countgd"
     backbone: BackboneName = "vggt"
     assoc: AssocName = "v1"
+
+    # Ablation switches (PLAN 9.6). Defaults reproduce the shipped behaviour.
+    cannot_link: bool = True  # v1/v2: never merge two detections from the same frame
+    appearance: bool = True  # v2/sync: use Detection.feature (cost, gate, split check)
+    hallucination: HallucinationMode = "downweight"  # v2: one-view ghost filter
+    lift_region: LiftRegion = "mask"  # "mask": use Detection.mask when present; "box": box centre
 
     # Ingest
     fps: float = Field(2.0, gt=0)  # video sampling rate

@@ -34,8 +34,12 @@ def _evidence(
     )
 
 
-def cluster_detections(lifted: Sequence[LiftedDetection], k: float = DEFAULT_K) -> ClusterResult:
-    """Cluster lifted detections into instances. Failed lifts are marked rejected."""
+def cluster_detections(
+    lifted: Sequence[LiftedDetection], k: float = DEFAULT_K, cannot_link: bool = True
+) -> ClusterResult:
+    """Cluster lifted detections into instances. Failed lifts are marked rejected.
+
+    ``cannot_link=False`` is the ablation: same-frame detections may merge."""
     if k <= 0:
         raise ValueError("k must be positive")
     res = ClusterResult(instances=[])
@@ -83,11 +87,11 @@ def cluster_detections(lifted: Sequence[LiftedDetection], k: float = DEFAULT_K) 
         ri, rj = find(i), find(j)
         if ri == rj:
             continue
-        if frames[i] == frames[j]:
+        if cannot_link and frames[i] == frames[j]:
             res.evidence.append(
                 _evidence(ok[i], ok[j], norm[i, j], k, False, "same_frame_cannot_link")
             )
-        elif cluster_frames[ri] & cluster_frames[rj]:
+        elif cannot_link and cluster_frames[ri] & cluster_frames[rj]:
             res.evidence.append(
                 _evidence(ok[i], ok[j], norm[i, j], k, False, "cluster_cannot_link")
             )
@@ -128,6 +132,7 @@ class V1Associator:
     """``Associator`` wrapper around :func:`cluster_detections` (geometry only; ignores recon)."""
 
     k: float = DEFAULT_K
+    cannot_link: bool = True
     name: str = "v1"
 
     def associate(
@@ -136,4 +141,4 @@ class V1Associator:
         recon: Recon | None = None,
         frames: Mapping[int, Frame] | None = None,
     ) -> ClusterResult:
-        return cluster_detections(lifted, k=self.k)
+        return cluster_detections(lifted, k=self.k, cannot_link=self.cannot_link)

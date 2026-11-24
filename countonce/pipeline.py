@@ -16,7 +16,7 @@ from countonce.detect.cache import CachedDetector, DetectionCache
 from countonce.export import export_all
 from countonce.ingest.frames import IMAGE_EXTS, drop_blurry, extract_frames
 from countonce.ingest.select import cap_frames, drop_near_duplicates
-from countonce.lift import LiftKwargs, compute_scene_scale, lift_detections
+from countonce.lift import LiftKwargs, apply_lift_region, compute_scene_scale, lift_detections
 from countonce.merge.base import Associator
 from countonce.merge.cluster import V1Associator
 from countonce.merge.match import V2Associator, V2Config
@@ -114,10 +114,18 @@ def _chunk_cap(config: Config) -> int | None:
 def _make_associator(config: Config, k: float) -> Associator:
     """Associator at strictness ``k``: v1 uses it directly, v2 scales its reprojection gate."""
     if config.assoc == "v1":
-        return V1Associator(k=k)
+        return V1Associator(k=k, cannot_link=config.cannot_link)
     base = V2Config()
     gate = base.max_reproj_norm * k / config.merge_k
-    v2cfg = V2Config(**{**base.__dict__, "max_reproj_norm": gate})
+    v2cfg = V2Config(
+        **{
+            **base.__dict__,
+            "max_reproj_norm": gate,
+            "cannot_link": config.cannot_link,
+            "use_appearance": config.appearance,
+            "hallucination": config.hallucination,
+        }
+    )
     if config.assoc == "v3":
         from countonce.merge.v3 import V3Associator, load_cached
 
@@ -244,6 +252,7 @@ def run(
     # Lift + associate
     t = time.perf_counter()
     lift_kw = lift_kwargs(config, recon)
+    detections, lift_fallbacks = apply_lift_region(detections, config.lift_region)
     lifted = lift_detections(detections, recon, {f.id: f for f in frames}, **lift_kw)
     frame_map = {f.id: f for f in frames}
     clustered = _make_associator(config, config.merge_k).associate(lifted, recon, frame_map)
@@ -255,7 +264,7 @@ def run(
 
     def count_at(k: float, thr: float) -> int:
         if thr not in lift_by_thr:
-            kept = filter_by_score(raw_detections, thr)
+            kept = apply_lift_region(filter_by_score(raw_detections, thr), config.lift_region)[0]
             lift_by_thr[thr] = lift_detections(kept, recon, frame_map, **lift_kw)
         assoc = _make_associator(config, k)
         return len(assoc.associate(lift_by_thr[thr], recon, frame_map).instances)
@@ -323,7 +332,7 @@ def run(
         timings=timings,
         oom_fallback_rung=ladder.rung,
         peak_vram_mb=recon.peak_vram_mb,
-        config=run_metadata(config.to_dict()),
+        config={**run_metadata(config.to_dict()), "lift_fallbacks": lift_fallbacks},
     )
     timings["total"] = time.perf_counter() - t0
 

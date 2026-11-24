@@ -186,3 +186,10 @@ One entry per decision: date, what the plan said, what was done, why.
 - `configure_allocator()` runs at `countonce.cli` import and in `main()`. It keeps other `PYTORCH_CUDA_ALLOC_CONF` options and respects an explicit `expandable_segments` setting. Python entry points that skip the CLI must call it themselves.
 - Profile CSV: one row per (repeat, stage) from the pipeline's `timings`. VRAM is filled only for `recon` (run peak) and `total`, and empty without CUDA. `docs/PROFILE.md` is a skeleton; `torch.profiler`/Nsight traces are not wired.
 - Tests ran with `~/vggtProject/.venv` (countonce still has no venv, see GATES.md).
+
+## §9.6 ablation grid
+- `cannot_link: false` for v2 only lets *unassigned* same-frame detections join their cheapest admissible existing track (no tracks exist in the first frame, so same-frame pairs there stay separate). v1 skips both cannot-link checks.
+- `appearance: false` makes `V2Associator._features` return nothing (cost, gate and split check all ignore features); `sync` inherits it.
+- `lift_region: mask` is the old behaviour (mask when present, else box/point). `box` strips masks; mask-only detections keep their mask. Fallback counts are in `result.config["lift_fallbacks"]`, not a warning, to avoid noise on box-only detectors.
+- `assoc=v3` is not a one-factor ablation (it would need a checkpoint in the base); it is the `co_v3_vggt` method. Unchecked-in checkpoint path `runs/match/best.pt` is a guess matching `configs/match.yaml` `out_dir`.
+- `SkipRun` rows count as "skipped" in `run_jobs`' return tuple and are retried on resume. Ablation lists hold only non-default values. YAML `off` is quoted (bare off parses as False).

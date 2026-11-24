@@ -38,6 +38,8 @@ class V2Config:
     split_extent_factor: float = 2.0  # split if member spread > factor * size
     split_min_sim: float = 0.3  # split if two members' appearance sim is below this
     split_check: bool = True
+    cannot_link: bool = True  # False (ablation): extra same-frame detections may join a track
+    use_appearance: bool = True  # False (ablation): ignore all appearance features
 
 
 class _Views:
@@ -143,6 +145,8 @@ class V2Associator:
         self, ok: Sequence[LiftedDetection], frames: Mapping[int, Frame] | None
     ) -> dict[str, np.ndarray]:
         feats: dict[str, np.ndarray] = {}
+        if not self.config.use_appearance:
+            return feats
         missing: dict[int, list[Detection]] = {}
         for ld in ok:
             if ld.det.feature is not None:
@@ -239,6 +243,13 @@ class V2Associator:
         if n_t and n_d:
             rows, cols = linear_sum_assignment(cost)
             matched = {int(c): int(r) for r, c in zip(rows, cols, strict=True) if cost[r, c] < _BIG}
+
+        if not cfg.cannot_link and n_t:
+            # Ablation: unassigned detections may also join their cheapest admissible track,
+            # even though that track already took a detection from this frame.
+            for di in range(n_d):
+                if di not in matched and (cost[:, di] < _BIG).any():
+                    matched[di] = int(np.argmin(cost[:, di]))
 
         new_tracks: list[_Track] = []
         for di, ld in enumerate(dets):
