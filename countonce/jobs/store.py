@@ -19,7 +19,11 @@ is requeued, at most ``MAX_STALE_ATTEMPTS`` tries in total, then ``failed`` with
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import secrets
+import shutil
 import sqlite3
 import time
 import uuid
@@ -37,6 +41,9 @@ MAX_STALE_ATTEMPTS = 2
 
 STATUSES = ("queued", "running", "done", "failed", "dead_letter", "deleted")
 TERMINAL = ("done", "failed", "dead_letter", "deleted")
+
+RETENTION_DAYS = 30.0
+DAY_S = 86400.0
 
 CLAIM_LOCK = ""  # Postgres: "FOR UPDATE SKIP LOCKED"
 
@@ -103,6 +110,31 @@ SCHEMA = [
         comment TEXT,
         created_at DOUBLE PRECISION
     )""",
+    """CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        training_opt_in INTEGER NOT NULL DEFAULT 0,
+        created_at DOUBLE PRECISION
+    )""",
+    """CREATE TABLE IF NOT EXISTS share_tokens (
+        token TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL REFERENCES jobs (id),
+        created_at DOUBLE PRECISION NOT NULL,
+        revoked_at DOUBLE PRECISION
+    )""",
+    """CREATE TABLE IF NOT EXISTS api_keys (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        salt TEXT NOT NULL,
+        hashed_key TEXT NOT NULL,
+        created_at DOUBLE PRECISION NOT NULL,
+        last_used_at DOUBLE PRECISION,
+        revoked_at DOUBLE PRECISION
+    )""",
+    """CREATE TABLE IF NOT EXISTS rate_buckets (
+        user_id TEXT PRIMARY KEY,
+        tokens DOUBLE PRECISION NOT NULL,
+        updated_at DOUBLE PRECISION NOT NULL
+    )""",
     """CREATE TABLE IF NOT EXISTS workers (
         id TEXT PRIMARY KEY,
         name TEXT,
@@ -135,6 +167,19 @@ WHERE status = 'running' AND heartbeat_at < ? AND attempts >= ?"""
 _REQUEUE_STALE = """UPDATE jobs SET status = 'queued', stage = 'queued', progress = 0,
     worker_id = NULL, next_attempt_at = ?
 WHERE status = 'running' AND heartbeat_at < ? AND attempts < ?"""
+
+
+class RateLimitError(RuntimeError):
+    """A user exceeded their submit token bucket; retry after ``retry_after_s``."""
+
+    def __init__(self, user_id: str, retry_after_s: float) -> None:
+        super().__init__(f"rate limit exceeded for {user_id!r}; retry in {retry_after_s:.1f}s")
+        self.user_id = user_id
+        self.retry_after_s = retry_after_s
+
+
+def _hash_key(salt: str, key: str) -> str:
+    return hashlib.pbkdf2_hmac("sha256", key.encode(), bytes.fromhex(salt), 100_000).hex()
 
 
 @dataclass(frozen=True)
@@ -186,7 +231,17 @@ class SqliteJobStore:
         max_stale_attempts: int = MAX_STALE_ATTEMPTS,
         max_attempts: int | None = None,
         backoff_base_s: float | None = None,
+        rate_limit: int | None = None,
+        rate_window_s: float = 60.0,
+        output_root: str | Path | None = None,
     ) -> None:
+        """``rate_limit`` submits per ``rate_window_s`` per user (token bucket; None = off).
+
+        ``output_root`` is where the worker writes ``<output_root>/<job_id>``.
+        """
+        self.rate_limit = rate_limit
+        self.rate_window_s = rate_window_s
+        self.output_root = Path(output_root) if output_root is not None else None
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.clock = clock
@@ -266,6 +321,7 @@ class SqliteJobStore:
                     (user_id, idempotency_key),
                 ).fetchone()
                 return str(row["id"]), False
+            self._consume_token(conn, user_id)
             for path in inputs:
                 conn.execute(
                     "INSERT INTO job_files (id, job_id, kind, key) VALUES (?, ?, 'input', ?)",
@@ -393,3 +449,198 @@ class SqliteJobStore:
             failed = conn.execute(_FAIL_STALE, (now, cutoff, self.max_stale_attempts)).rowcount
             requeued = conn.execute(_REQUEUE_STALE, (now, cutoff, self.max_stale_attempts)).rowcount
         return requeued, failed
+
+    # -- rate limit -----------------------------------------------------------------------
+    def _consume_token(self, conn: sqlite3.Connection, user_id: str) -> None:
+        """Token bucket: capacity ``rate_limit``, refilled evenly over ``rate_window_s``."""
+        if self.rate_limit is None:
+            return
+        now = self.clock()
+        cap = float(self.rate_limit)
+        row = conn.execute(
+            "SELECT tokens, updated_at FROM rate_buckets WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        tokens = cap
+        if row is not None:
+            refill = (now - float(row["updated_at"])) * cap / self.rate_window_s
+            tokens = min(cap, float(row["tokens"]) + max(refill, 0.0))
+        if tokens < 1.0:
+            raise RateLimitError(user_id, (1.0 - tokens) * self.rate_window_s / cap)
+        conn.execute(
+            "INSERT INTO rate_buckets (user_id, tokens, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT (user_id) DO UPDATE SET tokens = excluded.tokens, "
+            "updated_at = excluded.updated_at",
+            (user_id, tokens - 1.0, now),
+        )
+
+    # -- deletion and retention -----------------------------------------------------------
+    def _remove_files(self, conn: sqlite3.Connection, job_id: str, kinds: Sequence[str]) -> int:
+        """Delete a job's files on disk and their rows; returns the number of files removed."""
+        n = 0
+        marks = ", ".join("?" for _ in kinds)
+        rows = conn.execute(
+            f"SELECT id, key FROM job_files WHERE job_id = ? AND kind IN ({marks})",
+            (job_id, *kinds),
+        ).fetchall()
+        for r in rows:
+            try:
+                Path(r["key"]).unlink()
+                n += 1
+            except FileNotFoundError:
+                pass
+        conn.execute(
+            f"DELETE FROM job_files WHERE job_id = ? AND kind IN ({marks})", (job_id, *kinds)
+        )
+        if "output" in kinds and self.output_root is not None:
+            out = self.output_root / job_id
+            if out.is_dir():
+                shutil.rmtree(out, ignore_errors=True)
+                n += 1
+        return n
+
+    def delete_job(self, job_id: str) -> bool:
+        """Remove output files (and inputs), revoke share tokens, set status ``deleted``.
+
+        Returns False if the job does not exist or is already deleted. A running job is refused
+        (``ValueError``) so a worker is never writing into a directory being removed.
+        """
+        with self._tx() as conn:
+            row = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            if row is None or row["status"] == "deleted":
+                return False
+            if row["status"] == "running":
+                raise ValueError(f"job {job_id} is running; cannot delete")
+            self._remove_files(conn, job_id, ("input", "output"))
+            now = self.clock()
+            conn.execute(
+                "UPDATE share_tokens SET revoked_at = ? WHERE job_id = ? AND revoked_at IS NULL",
+                (now, job_id),
+            )
+            conn.execute("DELETE FROM results WHERE job_id = ?", (job_id,))
+            conn.execute(
+                "UPDATE jobs SET status = 'deleted', stage = 'deleted', finished_at = COALESCE("
+                "finished_at, ?) WHERE id = ?",
+                (now, job_id),
+            )
+        return True
+
+    def purge_expired(
+        self, now: float | None = None, retention_days: float = RETENTION_DAYS
+    ) -> list[str]:
+        """Delete inputs and outputs of finished jobs older than ``retention_days``.
+
+        Age is ``finished_at`` (falling back to ``created_at``). Queued/running jobs are never
+        purged. Returns purged job ids; their rows stay with status ``deleted`` for the audit trail.
+        """
+        now = self.clock() if now is None else now
+        cutoff = now - retention_days * DAY_S
+        rows = self._query(
+            "SELECT id FROM jobs WHERE status IN ('done', 'failed', 'dead_letter') "
+            "AND COALESCE(finished_at, created_at) <= ? ORDER BY created_at, id",
+            (cutoff,),
+        )
+        purged = []
+        for r in rows:
+            if self.delete_job(r["id"]):
+                purged.append(r["id"])
+        return purged
+
+    # -- share tokens ---------------------------------------------------------------------
+    def create_share_token(self, job_id: str) -> str:
+        """A random, revocable, read-only token for one job's result."""
+        token = secrets.token_urlsafe(32)
+        with self._tx() as conn:
+            row = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            if row is None or row["status"] == "deleted":
+                raise KeyError(f"no such job: {job_id}")
+            conn.execute(
+                "INSERT INTO share_tokens (token, job_id, created_at) VALUES (?, ?, ?)",
+                (token, job_id, self.clock()),
+            )
+        return token
+
+    def resolve_share_token(self, token: str) -> dict[str, Any] | None:
+        """Read-only view ``{job, result}`` for a live token; None if unknown/revoked/deleted."""
+        rows = self._query(
+            "SELECT job_id FROM share_tokens WHERE token = ? AND revoked_at IS NULL", (token,)
+        )
+        if not rows:
+            return None
+        job = self.get(rows[0]["job_id"])
+        if job is None or job["status"] == "deleted":
+            return None
+        public = ("id", "status", "stage", "progress", "prompt", "created_at", "finished_at")
+        return {"job": {k: job[k] for k in public}, "result": self.get_result(job["id"])}
+
+    def revoke_share_token(self, token: str) -> bool:
+        with self._tx() as conn:
+            cur = conn.execute(
+                "UPDATE share_tokens SET revoked_at = ? WHERE token = ? AND revoked_at IS NULL",
+                (self.clock(), token),
+            )
+            return cur.rowcount == 1
+
+    # -- API keys -------------------------------------------------------------------------
+    def create_api_key(self, user_id: str) -> tuple[str, str]:
+        """Returns ``(key_id, plaintext)``; the plaintext is never stored and shown only once.
+
+        The key is ``co_<key_id>_<secret>``; only a salted PBKDF2 hash of it is kept.
+        """
+        key_id = uuid.uuid4().hex[:12]
+        plaintext = f"co_{key_id}_{secrets.token_urlsafe(32)}"
+        salt = secrets.token_hex(16)
+        with self._tx() as conn:
+            conn.execute(
+                "INSERT INTO api_keys (id, user_id, salt, hashed_key, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (key_id, user_id, salt, _hash_key(salt, plaintext), self.clock()),
+            )
+        return key_id, plaintext
+
+    def verify_api_key(self, plaintext: str) -> str | None:
+        """The owning user id for a live key (recording ``last_used_at``), else None."""
+        parts = plaintext.split("_", 2)
+        if len(parts) != 3 or parts[0] != "co":
+            return None
+        with self._tx() as conn:
+            row = conn.execute(
+                "SELECT user_id, salt, hashed_key FROM api_keys WHERE id = ? "
+                "AND revoked_at IS NULL",
+                (parts[1],),
+            ).fetchone()
+            if row is None or not hmac.compare_digest(
+                _hash_key(row["salt"], plaintext), row["hashed_key"]
+            ):
+                return None
+            conn.execute(
+                "UPDATE api_keys SET last_used_at = ? WHERE id = ?", (self.clock(), parts[1])
+            )
+            return str(row["user_id"])
+
+    def revoke_api_key(self, key_id: str) -> bool:
+        with self._tx() as conn:
+            cur = conn.execute(
+                "UPDATE api_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+                (self.clock(), key_id),
+            )
+            return cur.rowcount == 1
+
+    def api_keys(self, user_id: str | None = None) -> list[dict[str, Any]]:
+        """Key metadata (never the hash or plaintext)."""
+        sql = "SELECT id, user_id, created_at, last_used_at, revoked_at FROM api_keys"
+        if user_id is None:
+            return self._query(sql + " ORDER BY created_at, id")
+        return self._query(sql + " WHERE user_id = ? ORDER BY created_at, id", (user_id,))
+
+    # -- training opt-in ------------------------------------------------------------------
+    def set_training_opt_in(self, user_id: str, opt_in: bool) -> None:
+        with self._tx() as conn:
+            conn.execute(
+                "INSERT INTO users (id, training_opt_in, created_at) VALUES (?, ?, ?) "
+                "ON CONFLICT (id) DO UPDATE SET training_opt_in = excluded.training_opt_in",
+                (user_id, int(opt_in), self.clock()),
+            )
+
+    def opted_in_users(self) -> set[str]:
+        rows = self._query("SELECT id FROM users WHERE training_opt_in = 1")
+        return {r["id"] for r in rows}

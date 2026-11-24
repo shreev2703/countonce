@@ -168,6 +168,23 @@ def _parser() -> argparse.ArgumentParser:
     sj.add_argument("--idempotency-key")
     sj.add_argument("--config", type=Path, help="YAML Config stored as the job options")
 
+    jb = sub.add_parser("jobs", help="job retention, sharing and API keys on a job database")
+    jb.add_argument("--db", type=Path, required=True)
+    jb.add_argument("--out", type=Path, help="job output root (default: <db dir>/outputs)")
+    jsub = jb.add_subparsers(dest="jobs_cmd", required=True)
+    jsub.add_parser("delete", help="delete a job's files and mark it deleted").add_argument(
+        "job_id"
+    )
+    jp = jsub.add_parser("purge", help="delete files of jobs older than the retention window")
+    jp.add_argument("--retention-days", type=float, default=30.0)
+    jsub.add_parser("share", help="create a read-only share token").add_argument("job_id")
+    jsub.add_parser("revoke-share", help="revoke a share token").add_argument("token")
+    jk = jsub.add_parser("apikey", help="create or revoke API keys").add_subparsers(
+        dest="apikey_cmd", required=True
+    )
+    jk.add_parser("create", help="create a key (plaintext shown once)").add_argument("user")
+    jk.add_parser("revoke", help="revoke a key by id").add_argument("key_id")
+
     ad = sub.add_parser("admin-stats", help="job-store metrics and alerts (JSON / static HTML)")
     ad.add_argument("--db", type=Path, required=True)
     ad.add_argument("--alerts", type=Path, default=Path("configs/alerts.yaml"))
@@ -387,6 +404,37 @@ def _submit(args: argparse.Namespace) -> int:
         idempotency_key=args.idempotency_key,
     )
     print(f"{job_id} {'queued' if created else 'duplicate (existing job)'}")
+    return 0
+
+
+def _jobs(args: argparse.Namespace) -> int:
+    from countonce.jobs.store import SqliteJobStore
+
+    store = SqliteJobStore(args.db, output_root=args.out or args.db.parent / "outputs")
+    try:
+        if args.jobs_cmd == "delete":
+            ok = store.delete_job(args.job_id)
+            print(f"jobs: {'deleted' if ok else 'not found or already deleted'} {args.job_id}")
+            return 0 if ok else 1
+        if args.jobs_cmd == "purge":
+            ids = store.purge_expired(retention_days=args.retention_days)
+            print(f"jobs: purged {len(ids)} job(s) older than {args.retention_days:g} days")
+        elif args.jobs_cmd == "share":
+            print(store.create_share_token(args.job_id))
+        elif args.jobs_cmd == "revoke-share":
+            ok = store.revoke_share_token(args.token)
+            print(f"jobs: {'revoked' if ok else 'unknown or already revoked'}")
+            return 0 if ok else 1
+        elif args.apikey_cmd == "create":
+            key_id, plaintext = store.create_api_key(args.user)
+            print(f"id: {key_id}\nkey: {plaintext}\n(shown once; only a salted hash is stored)")
+        else:
+            ok = store.revoke_api_key(args.key_id)
+            print(f"jobs: {'revoked' if ok else 'unknown or already revoked'} key {args.key_id}")
+            return 0 if ok else 1
+    except (KeyError, ValueError) as exc:
+        print(f"jobs: {exc}", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -712,6 +760,8 @@ def main(argv: list[str] | None = None) -> int:
         return _admin_stats(args)
     if args.cmd == "submit":
         return _submit(args)
+    if args.cmd == "jobs":
+        return _jobs(args)
     if args.cmd == "report":
         return _report(args)
 

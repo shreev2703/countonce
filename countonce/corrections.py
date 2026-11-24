@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -245,13 +245,22 @@ def apply_corrections(result: ResultV11, corrections: Sequence[Correction]) -> R
 
 # ------------------------------------------------------------------------------ dataset
 def export_training_pairs(
-    corrections: Sequence[Correction], results: Mapping[str, ResultV11]
+    corrections: Sequence[Correction],
+    results: Mapping[str, ResultV11],
+    opted_in_users: Collection[str] | None = None,
 ) -> list[LabeledPair]:
-    """Labelled pairs from consented corrections. ``results`` are the ORIGINAL results by job id."""
+    """Labelled pairs from consented corrections. ``results`` are the ORIGINAL results by job id.
+
+    ``opted_in_users`` (e.g. ``JobStore.opted_in_users()``, PLAN 14.5 ``training_opt_in``) is a
+    second gate: when given, only corrections by those users are exported, and corrections with
+    no user are excluded. ``None`` keeps the per-correction ``consent`` flag as the only gate.
+    """
     pairs: list[LabeledPair] = []
     for c in corrections:
         res = results.get(c.job_id)
         if not c.consent or res is None:
+            continue
+        if opted_in_users is not None and (c.user is None or c.user not in opted_in_users):
             continue
         recs = {d.id: d.model_dump(mode="json") for d in res.detections}
         inst_of = {m: i for i in res.instances for m in i.members}
