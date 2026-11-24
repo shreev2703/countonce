@@ -1,0 +1,1 @@
+"""CountOnce detect subpackage."""

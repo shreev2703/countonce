@@ -1,0 +1,1 @@
+"""CountOnce ingest subpackage."""
