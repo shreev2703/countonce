@@ -122,6 +122,22 @@ def _parser() -> argparse.ArgumentParser:
     r.add_argument("out_dir", type=Path, help="directory holding result.json")
     r.add_argument("--pdf", action="store_true", help="also write report.pdf (needs weasyprint)")
 
+    st = sub.add_parser("sites", help="group runs into sites and compare counts over visits")
+    st.add_argument("--file", type=Path, default=Path("sites.json"), help="sites.json index")
+    ssub = st.add_subparsers(dest="sites_cmd", required=True)
+    sa = ssub.add_parser("add", help="create a site")
+    sa.add_argument("name")
+    sa.add_argument("--id", dest="site_id")
+    sa.add_argument("--description", default="")
+    ssub.add_parser("list", help="list sites and their visits")
+    sat = ssub.add_parser("attach", help="attach a run output dir as a visit")
+    sat.add_argument("site_id")
+    sat.add_argument("run_dir", type=Path)
+    sat.add_argument("--captured-at", help="ISO 8601; default from result metadata")
+    srp = ssub.add_parser("report", help="counts-over-time table and figure")
+    srp.add_argument("site_id")
+    srp.add_argument("--out", type=Path, default=Path("."), help="output directory")
+
     lb = sub.add_parser("label", help="write a static label.html for identity labeling a run")
     lb.add_argument("out_dir", type=Path, help="directory holding result.json")
     lb.add_argument("--prelabel", action="store_true", help="seed ids from the run's instances")
@@ -366,6 +382,32 @@ def _submit(args: argparse.Namespace) -> int:
         idempotency_key=args.idempotency_key,
     )
     print(f"{job_id} {'queued' if created else 'duplicate (existing job)'}")
+    return 0
+
+
+def _sites(args: argparse.Namespace) -> int:
+    from countonce import sites
+
+    try:
+        idx = sites.SiteIndex.load(args.file)
+        if args.sites_cmd == "add":
+            site = idx.add(args.name, args.description, args.site_id)
+            idx.save()
+            print(f"sites: added {site.id}")
+        elif args.sites_cmd == "list":
+            for s in idx.sites:
+                print(f"{s.id}\t{s.name}\t{len(s.visits)} visits")
+        elif args.sites_cmd == "attach":
+            v = idx.attach(args.site_id, args.run_dir, args.captured_at)
+            idx.save()
+            print(f"sites: attached {v.run_dir} at {v.captured_at}")
+        else:
+            paths = sites.write_report(idx.get(args.site_id), args.out)
+            for p in paths.values():
+                print(f"sites: wrote {p}")
+    except sites.SiteError as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
     return 0
 
 
@@ -630,6 +672,8 @@ def main(argv: list[str] | None = None) -> int:
         return _review_queue(args)
     if args.cmd == "label":
         return _label(args)
+    if args.cmd == "sites":
+        return _sites(args)
     if args.cmd == "worker":
         return _worker(args)
     if args.cmd == "admin-stats":
