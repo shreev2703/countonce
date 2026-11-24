@@ -138,3 +138,22 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   captures, interviews and the professor meeting.
 - **Autonomous work after this batch is nearly exhausted.** After these 6 tasks, the remaining PLAN items all need data, weights, GPU time,
   new dependencies or your approval. Biggest unblockers: Fuji-SfM plus the detector weights (real Core numbers), `pyarrow`+`duckdb` (Track J), and mockup approval (web product).
+
+## 2026-11-24: Tenth tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state: all 75 earlier overnight tasks are checked. In the countonce `.venv`, the full `pytest` run gives 609 passed and 3 skipped, `ruff check .`
+  is clean and `mypy countonce` reports no issues (79 files). **`tests/test_job_retention.py::test_cli` is flaky**: it failed once under `-x`, then passed
+  on reruns, because share tokens can start with `-` and break argparse. The fix is queued first. The system PATH has no `ruff` or `rtk pytest`. Use `.venv/bin/…`.
+- **Uncommitted working-tree diffs:** `synth/dag.py` and `examples/tiny_scene/generate.py` hold `ruff format` fixes, and the queued first task commits them.
+  The formatter-only `docs/PLAN.md` diff is still yours to keep or revert (unchanged from the ninth audit). Untracked `logs/`, `scripts/*.sh` and `uv.lock`
+  are the orchestrator's own files and were left alone. Decide whether `uv.lock` should be committed.
+- **Pilot and interviews:** the queued pilot-report task builds the generator and an empty `docs/INTERVIEWS.md` template. Running the pilot, recruiting
+  3–10 users and doing the interviews are yours.
+- **Load-test numbers:** the queued harness measures the sqlite queue on your laptop only. A real API load test (k6/Locust) waits for the FastAPI layer.
+- **Still unqueued (unchanged):** Track J (install `pyarrow`+`duckdb`, both still missing from `.venv`), the web API/frontend/auth/SSE/Postgres and R2 multipart (mockup approval
+  plus `fastapi`/`sqlalchemy`/Postgres), Triton kernel and FP8/NVFP4 (interactive GPU), VGGT-Ω/VGG-T³/CountGD++ and the real CountGD/GroundingDINO/SAM forward
+  passes (weights), the Fuji-SfM download and license, the C-DOG/CountVid/DG-Net baselines plus RGBD-VideoCount/VideoCount, Kubric (Docker), the v3 GPU training run and
+  sim-to-real ablations (data and GPU), the cloud worker and cold start (account), the OTLP endpoint, HF releases, the LICENSE choice, the demo video and project page, captures,
+  interviews and the professor meeting.
+- **After this batch, the autonomous backlog really is empty.** Every remaining PLAN item then needs data, weights, GPU time, new dependencies,
+  accounts or your approval. Biggest unblockers, in order: Fuji-SfM plus the detector weights (real Core numbers), mockup approval plus `fastapi`/`sqlalchemy`
+  (web product), and `pyarrow`+`duckdb` (Track J).
