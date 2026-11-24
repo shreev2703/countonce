@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from countonce.schemas import CURRENT_VERSION, MarkersV1, ResultV1
-from countonce.types import CountResult, Detection
+from countonce.types import CountResult, Detection, Frame
 
 
 def to_result(result: CountResult) -> ResultV1:
@@ -85,7 +85,7 @@ def write_counts_csv(result: CountResult, path: Path) -> Path:
 def export_all(
     result: CountResult,
     out_dir: Path,
-    frames: Sequence | None = None,
+    frames: Sequence[Frame] | None = None,
     detections: Sequence[Detection] | None = None,
     scene_scale: float | None = None,
 ) -> dict[str, Path | list[Path]]:

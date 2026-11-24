@@ -19,7 +19,9 @@ from countonce.types import Frame, Instance, LiftedDetection, MatchEvidence, Rec
 DEFAULT_K = 0.5
 
 
-def _evidence(a, b, dist, k, merged, reason) -> MatchEvidence:
+def _evidence(
+    a: LiftedDetection, b: LiftedDetection, dist: float, k: float, merged: bool, reason: str
+) -> MatchEvidence:
     return MatchEvidence(
         det_a=a.det.id,
         det_b=b.det.id,
@@ -62,7 +64,8 @@ def cluster_detections(lifted: Sequence[LiftedDetection], k: float = DEFAULT_K) 
     norm = diff / ((sizes[:, None] + sizes[None, :]) / 2.0)
     ii, jj = np.where(np.triu(norm < k, 1))
 
-    def tie_key(p: tuple[int, int]):  # order-independent: distance, then detection ids
+    def tie_key(p: tuple[int, int]) -> tuple[float | str, ...]:
+        # order-independent: distance, then detection ids
         return (norm[p], *sorted((ok[p[0]].det.id, ok[p[1]].det.id)))
 
     order = sorted(zip(ii.tolist(), jj.tolist(), strict=True), key=tie_key)

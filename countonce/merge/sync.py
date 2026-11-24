@@ -18,7 +18,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from countonce.merge.appearance import cosine_sim
+from countonce.merge.appearance import FeatureExtractor, cosine_sim
 from countonce.merge.base import ClusterResult
 from countonce.merge.match import V2Associator, V2Config, _det_center_scale, _size, _Views
 from countonce.types import Frame, LiftedDetection, MatchEvidence, Recon
@@ -92,14 +92,20 @@ class SyncAssociator:
         self,
         config: SyncConfig | None = None,
         v2_config: V2Config | None = None,
-        extractor=None,
+        extractor: FeatureExtractor | None = None,
         frame_to_view: Mapping[int, int] | None = None,
     ):
         self.config = config or SyncConfig()
         self._v2 = V2Associator(v2_config, extractor, frame_to_view)
         self.frame_to_view = frame_to_view
 
-    def _pair_affinity(self, a, b, geo: _Views, feats) -> float:
+    def _pair_affinity(
+        self,
+        a: LiftedDetection,
+        b: LiftedDetection,
+        geo: _Views,
+        feats: dict[str, np.ndarray],
+    ) -> float:
         """Symmetric match score in [0, 1] from mutual reprojection of the two detections."""
         gate = self._v2.config.max_reproj_norm
         cfg = self._v2.config
@@ -107,6 +113,7 @@ class SyncAssociator:
         for src, dst in ((a, b), (b, a)):
             view = geo.view(dst.det.frame_id)
             sx, sy, _, _ = geo.affine(dst.det.frame_id)
+            assert src.xyz is not None  # callers pass lifted (ok) detections
             vis, uv, z = geo.project(src.xyz, _size(src), view, cfg.depth_tol)
             if not vis:
                 return 0.0
@@ -130,7 +137,9 @@ class SyncAssociator:
             score *= 1.0 - cfg.appearance_weight * (1.0 - sim) / 2.0
         return float(np.clip(score, 0.0, 1.0))
 
-    def pairwise_matrix(self, ok, geo, feats) -> np.ndarray:
+    def pairwise_matrix(
+        self, ok: Sequence[LiftedDetection], geo: _Views, feats: dict[str, np.ndarray]
+    ) -> np.ndarray:
         """Block match matrix: per frame pair, Hungarian-assigned affinities (else 0)."""
         n = len(ok)
         mat = np.zeros((n, n))
@@ -179,6 +188,7 @@ class SyncAssociator:
             rep = members[0]
             for j in members[1:]:
                 a, b = ok[rep], ok[j]
+                assert a.xyz is not None and b.xyz is not None  # `ok` holds lifted detections
                 res.evidence.append(
                     MatchEvidence(
                         det_a=a.det.id,

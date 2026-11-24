@@ -43,7 +43,12 @@ class V2Config:
 class _Views:
     """Camera geometry per frame id, in frame-pixel coordinates."""
 
-    def __init__(self, recon: Recon, frames, frame_to_view):
+    def __init__(
+        self,
+        recon: Recon,
+        frames: Mapping[int, Frame] | None,
+        frame_to_view: Mapping[int, int] | None,
+    ):
         self.recon = recon
         self.h, self.w = recon.depth.shape[1:]
         self.frames = frames or {}
@@ -67,9 +72,12 @@ class _Views:
     def to_frame(self, frame_id: int, uv: np.ndarray) -> np.ndarray:
         """Recon pixels -> frame pixels (inverse of `affine`)."""
         sx, sy, ox, oy = self.affine(frame_id)
-        return (uv - np.array([ox, oy])) / np.array([sx, sy])
+        out: np.ndarray = (uv - np.array([ox, oy])) / np.array([sx, sy])
+        return out
 
-    def project(self, xyz: np.ndarray, size: float, view: int, depth_tol: float):
+    def project(
+        self, xyz: np.ndarray, size: float, view: int, depth_tol: float
+    ) -> tuple[bool, np.ndarray, float]:
         """Return (visible, uv_in_depth_grid, z). Visible = inside image and passes depth test."""
         ext, k = self.recon.extrinsics[view], self.recon.intrinsics[view]
         cam = ext[:, :3] @ xyz + ext[:, 3]
@@ -131,7 +139,9 @@ class V2Associator:
         self.frame_to_view = frame_to_view
 
     # ------------------------------------------------------------------ features
-    def _features(self, ok, frames) -> dict[str, np.ndarray]:
+    def _features(
+        self, ok: Sequence[LiftedDetection], frames: Mapping[int, Frame] | None
+    ) -> dict[str, np.ndarray]:
         feats: dict[str, np.ndarray] = {}
         missing: dict[int, list[Detection]] = {}
         for ld in ok:
@@ -139,9 +149,11 @@ class V2Associator:
                 feats[ld.det.id] = np.asarray(ld.det.feature, float)
             elif self.extractor is not None:
                 missing.setdefault(ld.det.frame_id, []).append(ld.det)
+        extractor = self.extractor
         for fid in sorted(missing):
+            assert extractor is not None  # `missing` is only filled when an extractor is set
             dets = sorted(missing[fid], key=lambda d: d.id)
-            out = np.asarray(self.extractor.extract(frames.get(fid) if frames else None, dets))
+            out = np.asarray(extractor.extract(frames.get(fid) if frames else None, dets))
             for d, f in zip(dets, out, strict=True):
                 feats[d.id] = np.asarray(f, float)
         return feats
@@ -185,7 +197,15 @@ class V2Associator:
         return res
 
     # ------------------------------------------------------------------ matching
-    def _match_frame(self, fid, dets, tracks, geo: _Views, feats, res: ClusterResult) -> None:
+    def _match_frame(
+        self,
+        fid: int,
+        dets: list[LiftedDetection],
+        tracks: list[_Track],
+        geo: _Views,
+        feats: dict[str, np.ndarray],
+        res: ClusterResult,
+    ) -> None:
         cfg = self.config
         view = geo.view(fid)
         sx, sy, _, _ = geo.affine(fid)
@@ -244,7 +264,15 @@ class V2Associator:
             tr.refresh()
         tracks.extend(new_tracks)
 
-    def _evidence(self, tr: _Track, ld, info, merged: bool, reason: str, cost: float):
+    def _evidence(
+        self,
+        tr: _Track,
+        ld: LiftedDetection,
+        info: tuple[float, float, float, bool],
+        merged: bool,
+        reason: str,
+        cost: float,
+    ) -> MatchEvidence:
         err, sim, rn, have = info
         rep = min(tr.members, key=lambda m: (m.det.frame_id, m.det.id))
         d3 = float(np.linalg.norm(tr.xyz - ld.xyz)) / ((tr.size + _size(ld)) / 2)
@@ -261,7 +289,9 @@ class V2Associator:
         )
 
     # ------------------------------------------------------------------ output
-    def _build(self, groups: list[list[LiftedDetection]], geo: _Views, res: ClusterResult):
+    def _build(
+        self, groups: list[list[LiftedDetection]], geo: _Views, res: ClusterResult
+    ) -> None:
         cfg = self.config
         groups = sorted(groups, key=lambda g: min(m.det.id for m in g))
         n_views = geo.recon.n_views
@@ -322,14 +352,14 @@ def _split(
                 sim[i, j] = sim[j, i] = cosine_sim(fi, fj)
 
     if dist.max() > cfg.split_extent_factor * size:
-        a, b = np.unravel_index(np.argmax(dist), dist.shape)
+        a, b = (int(v) for v in np.unravel_index(np.argmax(dist), dist.shape))
         left = [i for i in range(n) if dist[i, a] <= dist[i, b]]
     elif sim.min() < cfg.split_min_sim:
-        a, b = np.unravel_index(np.argmin(sim), sim.shape)
+        a, b = (int(v) for v in np.unravel_index(np.argmin(sim), sim.shape))
         left = [i for i in range(n) if sim[i, a] >= sim[i, b]]
     else:
         return [members]
-    a, b = int(min(a, b)), int(max(a, b))
+    a, b = min(a, b), max(a, b)
     left_set = {i for i in left if i != b} | {a}
     part_a = [ms[i] for i in range(n) if i in left_set]
     part_b = [ms[i] for i in range(n) if i not in left_set]

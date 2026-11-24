@@ -62,14 +62,14 @@ class GroundingDinoDetector:
                 raise ModelUnavailableError(
                     "GroundingDINO config/checkpoint missing; see docs/GATES.md"
                 )
-            from groundingdino.util.inference import load_model  # type: ignore[import-not-found]
+            from groundingdino.util.inference import load_model
 
             self._model = load_model(str(self.config_path), str(self.checkpoint_path))
         return self._model
 
     def _infer(self, frame: Frame, caption: str) -> tuple[np.ndarray, np.ndarray]:
         """Returns (scores (n,), boxes cxcywh normalized (n,4))."""
-        from groundingdino.util.inference import (  # type: ignore[import-not-found]
+        from groundingdino.util.inference import (
             load_image,
             predict,
         )

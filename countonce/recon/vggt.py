@@ -103,12 +103,12 @@ class VGGTMethod:
 
         return load_and_preprocess_images([str(p) for p in image_paths], mode="crop")
 
-    @torch.no_grad()
     def forward(self, images: torch.Tensor) -> dict[str, torch.Tensor]:
         """Raw model forward on a (S, 3, H, W) tensor already on the GPU."""
         assert self.model is not None, "call load() first"
-        with torch.autocast("cuda", dtype=self.autocast_dtype):
-            return self.model(images)
+        with torch.no_grad(), torch.autocast("cuda", dtype=self.autocast_dtype):
+            out: dict[str, torch.Tensor] = self.model(images)
+            return out
 
     def reconstruct(self, image_paths: list[Path]) -> Recon:
         self.load()

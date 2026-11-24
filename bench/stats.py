@@ -49,7 +49,7 @@ def _boot_stats(
 
 def bootstrap_ci(
     values: Sequence[float],
-    statistic: Statistic = np.mean,  # type: ignore[assignment]
+    statistic: Statistic = np.mean,
     n_boot: int = 10_000,
     level: float = 0.95,
     seed: int = 0,
@@ -85,7 +85,7 @@ def paired_bootstrap(
     if d.size == 0:
         raise ValueError("no finite paired differences")
     rng = np.random.default_rng(seed)
-    boots = _boot_stats(d, np.mean, n_boot, rng)  # type: ignore[arg-type]
+    boots = _boot_stats(d, np.mean, n_boot, rng)
     al = (1.0 - level) / 2.0
     lo, hi = np.quantile(boots, [al, 1.0 - al])
     p = 2.0 * min((boots <= 0).mean(), (boots >= 0).mean())

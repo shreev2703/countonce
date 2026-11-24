@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib
@@ -10,6 +11,7 @@ import matplotlib
 matplotlib.use("Agg")  # headless: write files, never open windows
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+from matplotlib.figure import Figure  # noqa: E402
 
 METHOD_COLORS = {"vggt": "#1D9E75", "colmap": "#534AB7"}
 METHOD_LABELS = {"vggt": "VGGT (GPU)", "colmap": "COLMAP (CPU SIFT)"}
@@ -32,7 +34,7 @@ def apply_style() -> None:
     )
 
 
-def save(fig: plt.Figure, path: Path) -> None:
+def save(fig: Figure, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
     fig.savefig(path, bbox_inches="tight")
@@ -47,7 +49,8 @@ def depth_to_rgb(depth: np.ndarray, conf: np.ndarray | None = None) -> np.ndarra
     rgb = plt.get_cmap("turbo_r")(norm)[..., :3]
     if conf is not None:
         rgb[conf < np.percentile(conf, 25)] = 0.5
-    return (rgb * 255).astype(np.uint8)
+    out: np.ndarray = (rgb * 255).astype(np.uint8)
+    return out
 
 
 def point_cloud_preview(
@@ -104,7 +107,12 @@ def point_cloud_preview(
 
 
 def vram_vs_frames(
-    path: Path, frames, peak_mb, total_mb: float, bench_median: dict[int, float], title: str
+    path: Path,
+    frames: Sequence[int],
+    peak_mb: np.ndarray,
+    total_mb: float,
+    bench_median: dict[int, float],
+    title: str,
 ) -> None:
     """Calibrated VGGT peak memory curve with the benchmark's per-N medians overlaid."""
     apply_style()

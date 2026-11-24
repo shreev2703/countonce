@@ -47,8 +47,9 @@ class DustbinSinkhorn:
 
     def __new__(cls, iters: int = 50, init_bin: float = 1.0) -> Any:
         torch = _torch()
+        module_base: Any = torch.nn.Module  # torch is an optional dependency
 
-        class _Module(torch.nn.Module):  # type: ignore[misc]
+        class _Module(module_base):  # type: ignore[misc]
             def __init__(self) -> None:
                 super().__init__()
                 self.iters = iters

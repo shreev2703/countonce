@@ -16,11 +16,11 @@ DEFAULT_PROFILE = Path("results/memory_profile.json")
 
 
 def total_vram_mb() -> float:
-    return torch.cuda.get_device_properties(0).total_memory / MB
+    return float(torch.cuda.get_device_properties(0).total_memory / MB)
 
 
 def allocated_mb() -> float:
-    return torch.cuda.memory_allocated() / MB
+    return float(torch.cuda.memory_allocated() / MB)
 
 
 def reset_peak() -> None:
@@ -29,11 +29,11 @@ def reset_peak() -> None:
 
 
 def peak_allocated_mb() -> float:
-    return torch.cuda.max_memory_allocated() / MB
+    return float(torch.cuda.max_memory_allocated() / MB)
 
 
 def peak_reserved_mb() -> float:
-    return torch.cuda.max_memory_reserved() / MB
+    return float(torch.cuda.max_memory_reserved() / MB)
 
 
 @contextmanager

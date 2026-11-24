@@ -109,7 +109,8 @@ def density_to_points(
             before = (dy, dx) < (r, r)  # earlier in raster order wins ties
             is_max &= (d > nb) if before else (d >= nb)
     is_max &= d > min_value
-    ys, xs = np.nonzero(is_max)
+    yx = np.argwhere(is_max)  # row-major, same order as nonzero
+    ys, xs = yx[:, 0], yx[:, 1]
     return np.stack([xs, ys], axis=1).astype(np.float64), d[ys, xs]
 
 

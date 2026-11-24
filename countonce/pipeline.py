@@ -13,7 +13,8 @@ from countonce.detect.cache import CachedDetector, DetectionCache
 from countonce.export import export_all
 from countonce.ingest.frames import IMAGE_EXTS, drop_blurry, extract_frames
 from countonce.ingest.select import cap_frames, drop_near_duplicates
-from countonce.lift import compute_scene_scale, lift_detections
+from countonce.lift import LiftKwargs, compute_scene_scale, lift_detections
+from countonce.merge.base import Associator
 from countonce.merge.cluster import V1Associator
 from countonce.merge.match import V2Associator, V2Config
 from countonce.merge.sync import SyncAssociator
@@ -96,7 +97,7 @@ def _chunk_cap(config: Config) -> int | None:
     return max_frames_from_profile(dtype)
 
 
-def _make_associator(config: Config, k: float):
+def _make_associator(config: Config, k: float) -> Associator:
     """Associator at strictness ``k``: v1 uses it directly, v2 scales its reprojection gate."""
     if config.assoc == "v1":
         return V1Associator(k=k)
@@ -108,10 +109,10 @@ def _make_associator(config: Config, k: float):
     return V2Associator(v2cfg)
 
 
-def lift_kwargs(config: Config, recon: DenseRecon) -> dict[str, float | int]:
+def lift_kwargs(config: Config, recon: DenseRecon) -> LiftKwargs:
     """Lift thresholds from the config; sparse (COLMAP) input gets a lower pixel floor."""
     sparse = recon.backbone == "colmap"
-    kw: dict[str, float | int] = {}
+    kw: LiftKwargs = {}
     min_px = config.lift_min_pixels
     if min_px is None and sparse:
         min_px = 3

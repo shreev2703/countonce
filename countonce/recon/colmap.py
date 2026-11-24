@@ -88,7 +88,7 @@ class ColmapConfig:
         Only the shipped default is allowed to be absent.
         """
         explicit = path is not None
-        path = Path(path) if explicit else DEFAULT_CONFIG
+        path = DEFAULT_CONFIG if path is None else Path(path)
         if not path.exists():
             if explicit:
                 raise FileNotFoundError(f"COLMAP config not found: {path}")

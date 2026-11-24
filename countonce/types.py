@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -266,7 +266,7 @@ class CountResult:
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-friendly dict (numpy -> lists, Path -> str)."""
-        return _to_plain(self)
+        return cast("dict[str, Any]", _to_plain(self))
 
 
 def _to_plain(obj: Any) -> Any:

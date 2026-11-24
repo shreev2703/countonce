@@ -10,10 +10,22 @@ region; use a lower ``min_pixels`` and ``conf_percentile=0`` for them.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from typing import TypedDict, Unpack
 
 import numpy as np
 
 from countonce.types import Detection, Frame, LiftedDetection, Recon
+
+
+class LiftKwargs(TypedDict, total=False):
+    """Optional per-run overrides forwarded to :func:`lift_detection`."""
+
+    min_score: float
+    conf_percentile: float
+    min_point_conf: float
+    min_pixels: int
+    point_disk_radius: float
+    depth_spread_scale: float
 
 
 def compute_scene_scale(recon: Recon, conf_percentile: float = 50.0) -> float:
@@ -74,7 +86,7 @@ def _region_mask(
     aff: tuple[float, float, float, float],
     valid: tuple[float, float, float, float],
     disk_radius: float,
-):
+) -> tuple[np.ndarray, float]:
     """Boolean HxW region in recon pixel coordinates, plus the 2D extent in px."""
     sx, sy, ox, oy = aff
     ys, xs = np.mgrid[0:h, 0:w]
@@ -104,7 +116,11 @@ def _region_mask(
     return m, 2.0 * disk_radius
 
 
-def _outside_recon(det: Detection, aff, valid) -> bool:
+def _outside_recon(
+    det: Detection,
+    aff: tuple[float, float, float, float],
+    valid: tuple[float, float, float, float],
+) -> bool:
     """True when the detection lies wholly in the cropped-away / padded part of the frame."""
     sx, sy, ox, oy = aff
     u0, v0, u1, v1 = valid
@@ -192,7 +208,7 @@ def lift_detections(
     recon: Recon,
     frames: Mapping[int, Frame] | None = None,
     frame_to_view: Mapping[int, int] | None = None,
-    **kwargs,
+    **kwargs: Unpack[LiftKwargs],
 ) -> list[LiftedDetection]:
     """Lift all detections. ``frame_id`` indexes recon views unless ``frame_to_view`` is given."""
     out = []

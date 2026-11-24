@@ -18,7 +18,8 @@ class Sim3:
 
     def apply(self, pts: np.ndarray) -> np.ndarray:
         """Transform (...,3) points."""
-        return self.s * (np.asarray(pts, dtype=np.float64) @ self.R.T) + self.t
+        out: np.ndarray = self.s * (np.asarray(pts, dtype=np.float64) @ self.R.T) + self.t
+        return out
 
     def inverse(self) -> Sim3:
         Ri = self.R.T
@@ -63,7 +64,7 @@ def umeyama(src: np.ndarray, dst: np.ndarray, with_scale: bool = True) -> Sim3:
 def camera_centers(extrinsics: np.ndarray) -> np.ndarray:
     """Camera centres of world-to-camera (N,3,4) extrinsics: ``C = -R^T t``."""
     ext = np.asarray(extrinsics, dtype=np.float64)
-    return -np.einsum("nji,nj->ni", ext[:, :3, :3], ext[:, :3, 3])
+    return np.asarray(-np.einsum("nji,nj->ni", ext[:, :3, :3], ext[:, :3, 3]))
 
 
 def align_by_camera_centers(src_extrinsics: np.ndarray, dst_extrinsics: np.ndarray) -> Sim3:

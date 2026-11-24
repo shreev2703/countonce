@@ -64,7 +64,7 @@ class Recon:
         assert self.extrinsics is not None
         rot = self.extrinsics[:, :, :3]
         trans = self.extrinsics[:, :, 3]
-        return -np.einsum("nji,nj->ni", rot, trans)
+        return np.asarray(-np.einsum("nji,nj->ni", rot, trans))
 
     @classmethod
     def failure(cls, method: str, image_paths: list[Path], reason: str, **kwargs: Any) -> Recon:
