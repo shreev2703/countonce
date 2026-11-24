@@ -318,3 +318,10 @@ One entry per decision: date, what the plan said, what was done, why.
 - Masks are attached to all raw detections (not only those above `score_threshold`) so the sensitivity sweep over thresholds also lifts masks; cost is extra SAM prompts on low-score boxes.
 - Mask cache is separate from the detection cache (`<cache_dir>/masks/*.npz`, packed bits), keyed by frame hash, detector@version, mask model, mask version and the exact boxes.
 - Ablation row `masks: box_fill` only; `sam` is not in `configs/bench.yaml` because weights are gated.
+
+## Synthetic-data DAG (`synth/dag.py`)
+- Stage stamps key on the upstream stages' *output hashes*, the stage's config slice, recipe version and seed. The git sha is recorded in each stamp but excluded from the key, otherwise every commit would rerun everything.
+- No renderer exists, so `validate` runs on `proxy_scene` (tiny constant frames, real recipe camera centres); only a degenerate rig can quarantine a proxy scene. A real renderer plugs in via `Dag(scene_loader=...)`.
+- `episodes` converts each clean recipe into a geometry episode (seed = recipe seed) with view and instance counts pinned to the recipe; recipe randomization knobs are not used by the geometry generator.
+- Dataset version for the DAG is a sha256 content hash of the episode set (train, val), passed to `TrainConfig.data_version`; checkpoints now carry it in `meta` (`checkpoint_meta`). `evaluate` scores `best.pt` on the test episodes and runs the ablation grid only when `ablate:` is non-empty.
+- Fixed 11 latent mypy errors in `synth/` and `bench/` that became visible once the CLI imported `synth.dag`.

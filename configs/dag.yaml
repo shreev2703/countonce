@@ -1,0 +1,9 @@
+# Synthetic-data DAG. Run: countonce dag run --config configs/dag.yaml   (status: countonce dag status)
+# Stages: recipe -> validate (quarantine) -> episodes -> train -> evaluate. Nothing here is a result.
+work_dir: data/dag
+seed: 0
+splits: {train: 200, val: 20, test: 20}   # scenes per split, disjoint seed ranges
+recipe: {n_objects: 30, n_views: 5}       # pins for make_recipe; drop a key to draw it per scene
+geometry: {drop_prob: 0.15, false_positive_rate: 0.1, pixel_noise: 2.0}
+train: {epochs: 10, batch_size: 8, model: {width: 64, layers: 2, heads: 4}}
+ablate: {}                                 # {} skips; set seeds/arms/epochs to run the ablation grid

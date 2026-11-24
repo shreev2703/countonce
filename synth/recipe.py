@@ -205,7 +205,7 @@ def make_recipe(
     n_occ = int(rng.integers(0, max(2, n // 4) + 1))
     occluders = [
         OccluderSpec(
-            kind=str(rng.choice(("leaf_plane", "branch", "box"))),  # type: ignore[arg-type]
+            kind=str(rng.choice(("leaf_plane", "branch", "box"))),
             position=_vec(np.array([*rng.uniform(-radius, radius, 2), rng.uniform(0.1, 1.5)])),
             size=_vec(rng.uniform(0.05, 0.4, 3)),
             yaw=float(rng.uniform(0, 2 * np.pi)),
@@ -241,11 +241,11 @@ def make_recipe(
     return SceneRecipe(
         seed=seed,
         prompt=_PROMPTS[fruit],
-        arrangement=arr,  # type: ignore[arg-type]
+        arrangement=arr,
         objects=objects,
         occluders=occluders,
         distractors=distractors,
         lighting=lighting,
-        rig=CameraRigSpec(kind=kind, cameras=_rig(rng, kind, v, radius)),  # type: ignore[arg-type]
+        rig=CameraRigSpec(kind=kind, cameras=_rig(rng, kind, v, radius)),
         randomization=rand,
     )

@@ -86,6 +86,12 @@ def _parser() -> argparse.ArgumentParser:
     y = sub.add_parser("synth", help="write synthetic geometry episodes for the matcher")
     y.add_argument("--config", type=Path, default=Path("configs/synth.yaml"))
 
+    g = sub.add_parser("dag", help="rerunnable synthetic-data DAG with lineage")
+    g.add_argument("dag_cmd", choices=["run", "status"])
+    g.add_argument("--config", type=Path, default=Path("configs/dag.yaml"))
+    g.add_argument("--from", dest="from_stage", help="rerun this stage and everything after it")
+    g.add_argument("--force", action="store_true", help="rerun every stage")
+
     d = sub.add_parser("drift", help="population-stability drift of current jobs vs a reference")
     d.add_argument("--reference", type=Path, required=True, help="bench CSV or dir of result.json")
     d.add_argument("--current", type=Path, required=True, help="dir of result.json files")
@@ -309,6 +315,22 @@ def _train(args: argparse.Namespace) -> int:
     return 0
 
 
+def _dag(args: argparse.Namespace) -> int:
+    from synth.dag import Dag, DagConfig, DagError, format_status
+
+    try:
+        dag = Dag(DagConfig.from_yaml(args.config))
+        if args.dag_cmd == "status":
+            print(format_status(dag.status()))
+            return 0
+        for stage, state in dag.run(from_stage=args.from_stage, force=args.force).items():
+            print(f"dag: {stage}: {state}")
+    except (FileNotFoundError, DagError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
 def _synth(args: argparse.Namespace) -> int:
     import yaml
 
@@ -437,6 +459,8 @@ def main(argv: list[str] | None = None) -> int:
         return _ablate(args)
     if args.cmd == "train":
         return _train(args)
+    if args.cmd == "dag":
+        return _dag(args)
     if args.cmd == "synth":
         return _synth(args)
     if args.cmd == "profile":

@@ -140,7 +140,7 @@ def synthetic_scene(
     script: dict[int, list[tuple[float, float, float, float, float]]] = {}
     gt_of: dict[str, int] = {}
     for i, cx in enumerate(CAM_X):
-        boxes = []
+        boxes: list[Any] = []
         for j, (ox, oy) in enumerate(zip(xs, ys, strict=True)):
             u = F * (ox - cx) / DEPTH + W / 2
             v = F * oy / DEPTH + H / 2

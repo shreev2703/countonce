@@ -369,7 +369,7 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
         history.append(rec)
         if rec["val_f1"] > best_f1:
             best_f1 = rec["val_f1"]
-            save_checkpoint(model, best)
+            save_checkpoint(model, best, meta={"data_version": version, "seed": cfg.seed})
         torch.save(
             {
                 "model": model.state_dict(),

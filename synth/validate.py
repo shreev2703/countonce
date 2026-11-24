@@ -12,6 +12,7 @@ from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -60,16 +61,16 @@ class RenderedScene:
     """images (V,H,W,3) uint8; depth (V,H,W) float; instance_masks (V,H,W) int (0 = background);
     camera centres (V,3) in world coordinates; metadata is a raw dict (schema-checked here)."""
 
-    metadata: dict
+    metadata: dict[str, Any]
     images: np.ndarray
     depth: np.ndarray
     instance_masks: np.ndarray
     camera_centers: np.ndarray
     camera_forward: np.ndarray | None = None  # (V,3) optional viewing directions
-    extras: dict = field(default_factory=dict)
+    extras: dict[str, Any] = field(default_factory=dict)
 
 
-def check_schema(metadata: dict) -> list[str]:
+def check_schema(metadata: dict[str, Any]) -> list[str]:
     try:
         SceneMetadata.model_validate(metadata)
     except ValidationError as e:
@@ -140,7 +141,7 @@ class QuarantineReport:
         c = Counter(r for rs in self.quarantined.values() for r in rs)
         return {r: c.get(r, 0) for r in REASONS}
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "n_scenes": self.n_scenes,
             "n_quarantined": self.n_quarantined,

@@ -162,7 +162,7 @@ def evaluate(
         "kind": preds.kind,
         "split": preds.split,
         "n_scenes": len(ids),
-        "mae": stats.bootstrap_ci(abs_err, n_boot=n_boot, seed=seed).__dict__,
+        "mae": stats.bootstrap_ci(list(abs_err), n_boot=n_boot, seed=seed).__dict__,
         "mape": metrics.mape(p, g),
         "within_10pct": metrics.within_rate(p, g, 0.10),
         "frozen_problems": frozen_problems(preds.split, set(ids), splits_path),
@@ -191,7 +191,7 @@ def evaluate(
         if set(ref) != set(ids):
             raise PredictionFormatError("reference method must cover exactly the same scenes")
         ref_err = metrics.abs_errors([ref[i] for i in ids], g)
-        res = stats.paired_compare(abs_err, ref_err, n_boot=n_boot, seed=seed)
+        res = stats.paired_compare(list(abs_err), list(ref_err), n_boot=n_boot, seed=seed)
         out["vs_reference"] = {"reference": reference.method, **res.__dict__}
     return out
 
