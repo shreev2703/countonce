@@ -164,3 +164,12 @@ One entry per decision: date, what the plan said, what was done, why.
 - Cannot-link splitting uses an s-t min-cut (scipy max-flow, probabilities scaled to ints) between two same-view detections, recursively, on above-threshold weights only. Not a global Stoer-Wagner cut.
 - Under `assoc: v3` the sensitivity grid's merge strictness `k` maps to the match threshold `1 - 0.5*k/merge_k` (0.5 at the configured `merge_k`), clipped to [0.05, 0.95].
 - The CLI gained `--v3-checkpoint`; the missing-checkpoint error is raised at the start of `run()`. No checkpoint is trained or shipped: `train.py` is a later task, so v3 is untested on real data.
+
+## Matcher training, cycle loss, calibration (overnight)
+- Cycle loss is the mean squared gap between `P_ij @ P_jk` and `P_ik` on the real-detection blocks (dustbin row/column dropped), over up to `max_triplets` sampled view triplets per episode. Default `cycle_weight: 0` (the "pairwise only" ablation); the "+ cycle loss" arm sets it above 0.
+- Count-consistency term: differentiable count `sum_i 1/(1+sum_j P_ij)` built from the forward Sinkhorn blocks, L1 against the true count, normalized by the true count.
+- "Association F1" for checkpoint selection is pairwise F1 over cross-view detection pairs at `match_threshold` (0.5) on the val split, not the instance-level F1 of the benchmark.
+- Resume is exact because shuffling and triplet sampling derive from `(seed, epoch)`; `last.pt` holds model, optimizer, scheduler and history. `stop_after_epoch` pauses a run without changing the cosine horizon.
+- Calibration is fitted on the val split only after the final epoch and written to `<out_dir>/calibration.json`; test-split ECE reporting is left to the evaluation step.
+- Temperature scaling recalibrates the symmetric match probability `match_probs`, not Sinkhorn log-scores.
+- `countonce synth` writes train/val/test geometry episodes with disjoint seed ranges. No training was run.

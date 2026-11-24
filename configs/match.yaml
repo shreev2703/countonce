@@ -1,0 +1,18 @@
+# Matcher training. Run: countonce train --config configs/match.yaml
+# Needs episodes from `countonce synth --config configs/synth.yaml`. Nothing here is a result.
+train_dir: data/synth/train
+val_dir: data/synth/val
+out_dir: runs/match
+run_name: match
+epochs: 30
+batch_size: 8
+lr: 0.0003
+weight_decay: 0.01
+grad_clip: 1.0
+count_weight: 0.1
+cycle_weight: 0.0      # set > 0 for the "+ cycle loss" ablation
+max_triplets: 8
+seed: 0
+device: auto
+resume: true
+model: {width: 128, layers: 4, heads: 4}

@@ -35,7 +35,49 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument(
         "--figures", type=Path, metavar="DIR", help="render figures/gallery from the CSV"
     )
+
+    t = sub.add_parser("train", help="train the CountOnce-Match v3 matcher")
+    t.add_argument("--config", type=Path, default=Path("configs/match.yaml"))
+
+    y = sub.add_parser("synth", help="write synthetic geometry episodes for the matcher")
+    y.add_argument("--config", type=Path, default=Path("configs/synth.yaml"))
     return p
+
+
+def _train(args: argparse.Namespace) -> int:
+    from countonce.match.train import TrainConfig, train
+
+    try:
+        history = train(TrainConfig.from_yaml(args.config))
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    print(f"train: {len(history)} epochs logged")
+    return 0
+
+
+def _synth(args: argparse.Namespace) -> int:
+    import yaml
+
+    from synth.geometry import GeometryConfig, write_dataset
+
+    try:
+        raw = yaml.safe_load(args.config.read_text()) or {}
+        geo = {
+            k: tuple(v) if isinstance(v, list) else v
+            for k, v in (raw.get("geometry") or {}).items()
+        }
+        cfg = GeometryConfig(**geo)
+        seed, out = int(raw.get("seed", 0)), Path(raw.get("out_dir", "data/synth"))
+        offset = 0
+        for split, n in (raw.get("splits") or {"train": 100}).items():
+            paths = write_dataset(out / split, int(n), seed0=seed + offset, cfg=cfg)
+            offset += int(n)
+            print(f"synth: {split}: {len(paths)} episodes -> {out / split}")
+    except (FileNotFoundError, TypeError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    return 0
 
 
 def _bench(args: argparse.Namespace) -> int:
@@ -75,6 +117,10 @@ def main(argv: list[str] | None = None) -> int:
         return env_check.main(args.out)
     if args.cmd == "bench":
         return _bench(args)
+    if args.cmd == "train":
+        return _train(args)
+    if args.cmd == "synth":
+        return _synth(args)
 
     from countonce.pipeline import run
 

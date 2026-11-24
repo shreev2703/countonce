@@ -1,0 +1,10 @@
+# Synthetic geometry episodes. Run: countonce synth --config configs/synth.yaml
+out_dir: data/synth
+splits: {train: 2000, val: 200, test: 200}   # episodes per split, disjoint seed ranges
+seed: 0
+geometry:
+  n_views: [3, 8]
+  n_instances: [5, 60]
+  drop_prob: 0.15
+  false_positive_rate: 0.1
+  pixel_noise: 2.0
