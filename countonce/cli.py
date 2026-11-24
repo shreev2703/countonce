@@ -138,6 +138,11 @@ def _parser() -> argparse.ArgumentParser:
     srp.add_argument("site_id")
     srp.add_argument("--out", type=Path, default=Path("."), help="output directory")
 
+    pf = sub.add_parser("preflight", help="check photos for blur, duplicates and overlap")
+    pf.add_argument("images", nargs="+", type=Path)
+    pf.add_argument("--config", type=Path, help="YAML config with a preflight: threshold block")
+    pf.add_argument("--json", action="store_true", help="print the report as JSON")
+
     lb = sub.add_parser("label", help="write a static label.html for identity labeling a run")
     lb.add_argument("out_dir", type=Path, help="directory holding result.json")
     lb.add_argument("--prelabel", action="store_true", help="seed ids from the run's instances")
@@ -411,6 +416,31 @@ def _sites(args: argparse.Namespace) -> int:
     return 0
 
 
+def _preflight(args: argparse.Namespace) -> int:
+    import json
+
+    from countonce.ingest.preflight import load_thresholds, preflight
+
+    try:
+        overrides: dict[str, float] = {}
+        if args.config:
+            import yaml
+
+            overrides = (yaml.safe_load(args.config.read_text()) or {}).get("preflight", {})
+        rep = preflight(args.images, load_thresholds(overrides))
+    except (OSError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(rep.to_dict(), indent=2))
+    else:
+        print(f"preflight: {len(rep.photos)} photos, diversity {rep.diversity:.3f}")
+        for i, (n, s) in enumerate(zip(rep.photos, rep.sharpness, strict=True), 1):
+            print(f"  {i}. {n}: sharpness {s:.1f}")
+        print("\n".join(rep.tips) if rep.tips else "Looks good.")
+    return 0 if rep.ok else 1
+
+
 def _label(args: argparse.Namespace) -> int:
     from bench.label.html import write_label_html
     from bench.label.io import LabelError
@@ -670,6 +700,8 @@ def main(argv: list[str] | None = None) -> int:
         return _models(args)
     if args.cmd == "review-queue":
         return _review_queue(args)
+    if args.cmd == "preflight":
+        return _preflight(args)
     if args.cmd == "label":
         return _label(args)
     if args.cmd == "sites":
