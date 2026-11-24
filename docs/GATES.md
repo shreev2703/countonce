@@ -55,3 +55,17 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   your approval of the prompts and the scene subset (see the third audit).
 - **Kubric/BlenderProc rendering:** still human-gated. The renderer-agnostic recipe and validation gates are queued. The renderers
   are not.
+
+## 2026-11-24: Fifth tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state: all 35 earlier overnight tasks are checked. `pytest` passes 345 tests and `ruff check .` is clean, both still run from
+  `~/vggtProject/.venv`. mypy is still not installed anywhere (`~/vggtProject/.venv/bin/mypy` is missing), so the pre-commit mypy hook
+  has never run. The countonce venv item stays open.
+- **Privacy region detector weights:** the installed `cv2` (5.1.0) has no bundled Haar cascades. For face/plate blurring to run for real,
+  download a face model (e.g. OpenCV YuNet ONNX or `haarcascade_frontalface_default.xml`) and a plate cascade, and set their paths
+  in config. The queued task builds the blur/mask plumbing with a fake detector only.
+- **Unimplemented backbones/detector in `run()`:** `countgdpp`, `vggt_omega` and `vggt_t3` still raise `NotImplementedError` in
+  `countonce/pipeline.py`. They need gated or unreleased weights (CountGD++, VGGT-Ω non-commercial gated weights, VGG-T³ code/weights), so
+  they are not queued.
+- **Track F GPU measurements:** the queued optimization switches and `docs/PROFILE.md` generator are CPU-tested only. Filling the
+  profile table needs an interactive RTX 5070 run with VGGT and detector weights present.
+- **Web API/DB/queue (PLAN §14.2-14.4):** still deferred until the Core benchmark has real numbers, and the frontend still waits for mockup approval.
