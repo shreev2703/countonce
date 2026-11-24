@@ -179,8 +179,9 @@ def load_episode(path: str | Path) -> Episode:
     )
 
 
-def write_dataset(out_dir: str | Path, n_episodes: int, seed0: int = 0,
-                  cfg: GeometryConfig | None = None) -> list[Path]:
+def write_dataset(
+    out_dir: str | Path, n_episodes: int, seed0: int = 0, cfg: GeometryConfig | None = None
+) -> list[Path]:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     paths = []
@@ -208,9 +209,9 @@ class EpisodeDataset:
     @staticmethod
     def features(ep: Episode, idx: np.ndarray) -> np.ndarray:
         uv = ep.uv[idx] / IMAGE_SIZE
-        return np.concatenate(
-            [uv, ep.depth[idx, None] / 5.0, ep.score[idx, None]], axis=1
-        ).astype(np.float32)
+        return np.concatenate([uv, ep.depth[idx, None] / 5.0, ep.score[idx, None]], axis=1).astype(
+            np.float32
+        )
 
     def __getitem__(self, i: int) -> dict[str, np.ndarray]:
         ep = load_episode(self.paths[i])

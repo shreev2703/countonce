@@ -42,8 +42,9 @@ def test_false_positives_and_drops_present():
     cfg = GeometryConfig(drop_prob=0.5, false_positive_rate=0.5, n_instances=(40, 40))
     ep = generate_episode(1, cfg)
     assert (ep.identity == -1).any()
-    clean = generate_episode(1, GeometryConfig(drop_prob=0.0, false_positive_rate=0.0,
-                                               n_instances=(40, 40)))
+    clean = generate_episode(
+        1, GeometryConfig(drop_prob=0.0, false_positive_rate=0.0, n_instances=(40, 40))
+    )
     assert ep.n_detections != clean.n_detections or (ep.identity == -1).any()
     assert (clean.identity >= 0).all()
 
@@ -84,10 +85,12 @@ def test_sinkhorn_marginals(shape):
     assert p.shape == (2, m + 1, n + 1)
     assert torch.allclose(p[:, :m].sum(-1), torch.ones(2, m, dtype=torch.float64), atol=1e-6)
     assert torch.allclose(p[:, :, :n].sum(-2), torch.ones(2, n, dtype=torch.float64), atol=1e-6)
-    assert torch.allclose(p[:, m].sum(-1), torch.full((2,), float(n), dtype=torch.float64),
-                          atol=1e-6)
-    assert torch.allclose(p[:, :, n].sum(-1), torch.full((2,), float(m), dtype=torch.float64),
-                          atol=1e-6)
+    assert torch.allclose(
+        p[:, m].sum(-1), torch.full((2,), float(n), dtype=torch.float64), atol=1e-6
+    )
+    assert torch.allclose(
+        p[:, :, n].sum(-1), torch.full((2,), float(m), dtype=torch.float64), atol=1e-6
+    )
 
 
 def test_dustbin_learnable_and_absorbs_outliers():

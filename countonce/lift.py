@@ -204,9 +204,7 @@ def lift_detection(
     return LiftedDetection(det=det, xyz=xyz, size=float(size), lift_conf=lift_conf)
 
 
-def apply_lift_region(
-    detections: Sequence[Detection], region: str
-) -> tuple[list[Detection], int]:
+def apply_lift_region(detections: Sequence[Detection], region: str) -> tuple[list[Detection], int]:
     """Honour ``Config.lift_region``. Returns (detections, n_fallbacks).
 
     ``"mask"`` leaves detections as is: ``_region_mask`` already uses ``Detection.mask`` when

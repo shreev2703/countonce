@@ -68,9 +68,7 @@ class FakeVLMClient:
         self._tokens = (tokens_in, tokens_out)
         self.calls: list[tuple[str, list[Path], int]] = []
 
-    def complete(
-        self, prompt: str, images: Sequence[Path], max_output_tokens: int
-    ) -> VLMResponse:
+    def complete(self, prompt: str, images: Sequence[Path], max_output_tokens: int) -> VLMResponse:
         self.calls.append((prompt, list(images), max_output_tokens))
         r = self._replies[(len(self.calls) - 1) % len(self._replies)]
         return r if isinstance(r, VLMResponse) else VLMResponse(r, *self._tokens)
@@ -90,9 +88,7 @@ class AnthropicClient:
         self.model = model
         self._c = anthropic.Anthropic(api_key=os.environ[PROVIDERS["anthropic"].env_var or ""])
 
-    def complete(
-        self, prompt: str, images: Sequence[Path], max_output_tokens: int
-    ) -> VLMResponse:
+    def complete(self, prompt: str, images: Sequence[Path], max_output_tokens: int) -> VLMResponse:
         content: list[dict] = []
         for p in images:
             mime, data = _b64(p)
@@ -118,9 +114,7 @@ class OpenAIClient:
         self.model = model
         self._c = openai.OpenAI(api_key=os.environ[PROVIDERS["openai"].env_var or ""])
 
-    def complete(
-        self, prompt: str, images: Sequence[Path], max_output_tokens: int
-    ) -> VLMResponse:
+    def complete(self, prompt: str, images: Sequence[Path], max_output_tokens: int) -> VLMResponse:
         content: list[dict] = [{"type": "text", "text": prompt}]
         for p in images:
             mime, data = _b64(p)
@@ -148,14 +142,10 @@ class GoogleClient:
         self._genai = genai
         self._c = genai.Client(api_key=os.environ[PROVIDERS["google"].env_var or ""])
 
-    def complete(
-        self, prompt: str, images: Sequence[Path], max_output_tokens: int
-    ) -> VLMResponse:
+    def complete(self, prompt: str, images: Sequence[Path], max_output_tokens: int) -> VLMResponse:
         from google.genai import types
 
-        parts = [
-            types.Part.from_bytes(data=p.read_bytes(), mime_type=_b64(p)[0]) for p in images
-        ]
+        parts = [types.Part.from_bytes(data=p.read_bytes(), mime_type=_b64(p)[0]) for p in images]
         r = self._c.models.generate_content(
             model=self.model,
             contents=[*parts, prompt],

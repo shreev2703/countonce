@@ -98,9 +98,7 @@ def triplet_cycle_loss(
         return None
     pick = rng.permutation(len(triplets))[:max_triplets]
     terms = [
-        cycle_consistency_loss(
-            _core(logps[(a, b)]), _core(logps[(b, c)]), _core(logps[(a, c)])
-        )
+        cycle_consistency_loss(_core(logps[(a, b)]), _core(logps[(b, c)]), _core(logps[(a, c)]))
         for a, b, c in (triplets[i] for i in pick)
     ]
     return sum(terms) / len(terms)

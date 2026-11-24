@@ -300,9 +300,7 @@ class V2Associator:
         )
 
     # ------------------------------------------------------------------ output
-    def _build(
-        self, groups: list[list[LiftedDetection]], geo: _Views, res: ClusterResult
-    ) -> None:
+    def _build(self, groups: list[list[LiftedDetection]], geo: _Views, res: ClusterResult) -> None:
         cfg = self.config
         groups = sorted(groups, key=lambda g: min(m.det.id for m in g))
         n_views = geo.recon.n_views

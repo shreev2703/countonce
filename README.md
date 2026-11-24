@@ -122,6 +122,22 @@ ruff check .
 pytest -m "not slow and not gpu"
 ```
 
+## Development
+
+Install the git hooks once per clone (they are local to this repository, not global):
+
+```bash
+pip install pre-commit && pre-commit install
+```
+
+On commit they run ruff, `ruff format --check`, end-of-file / trailing-whitespace fixers and
+`mypy countonce` (strict, a local hook that needs the dev extras). Run them on demand with
+`pre-commit run --all-files`.
+
+Schema compatibility fixtures live in `tests/fixtures/schemas/v<version>/`. After a
+`schema_version` bump, add an upgrader and run `python scripts/regen_schema_fixture.py`; it writes
+only the newest version's directory and refuses to overwrite an existing one.
+
 ## Credits, citations and licenses
 
 This repo ships download scripts, not datasets or model weights. Verify each license before use.

@@ -1,0 +1,23 @@
+# Install for this clone only:  pre-commit install   (see README, Development)
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+        exclude: ^tests/fixtures/
+      - id: trailing-whitespace
+        exclude: ^tests/fixtures/
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.7
+    hooks:
+      - id: ruff
+      - id: ruff-format
+        args: [--check]
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (countonce/)
+        entry: mypy countonce
+        language: system
+        types: [python]
+        pass_filenames: false

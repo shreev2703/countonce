@@ -217,3 +217,10 @@ One entry per decision: date, what the plan said, what was done, why.
 - Refusals (no integer plus refusal wording) are logged in `results/vlm_calls.csv` and recorded as `status=refused`; non-`ok` rows are retried on resume, so a rerun would pay again for refused jobs. Unparseable replies are `status=error`.
 - Per-call log is a separate CSV (`results/vlm_calls.csv`) since its columns (tokens, cost, prompt version) do not fit `bench.csv`. `order: [ordered, shuffled]` doubles VLM calls; set `order: [ordered]` to halve cost.
 - Figure 10 (`python -m bench.vlm.fig10`) groups by the scene's `overlap` key in `gt.json` (copied into the job config only when present, so existing job keys are unchanged) and falls back to number of views.
+
+## Schema fixtures and pre-commit (overnight)
+- Fixtures are stored per version as `tests/fixtures/schemas/v1.0/{result,markers}.json`. Provenance (git commit, timestamp, torch, gpu) is scrubbed to constants and `out_dir`/`cache_dir` made relative.
+- Result documents carry no pixel boxes, so the render test synthesizes a box per stored detection id on tiny generated frames; it checks overlays draw, not geometry.
+- `ruff format` was applied to 10 pre-existing files (formatting only) so the `ruff-format --check` hook passes repo-wide.
+- The mypy hook is `language: system`; mypy is not installed in the CPU venv used overnight, so it was NOT run here (TODO: run `pre-commit run --all-files` with dev extras).
+- `pre-commit install` was not run.

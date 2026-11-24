@@ -121,9 +121,7 @@ def test_paid_run_with_fake_logs_call(tmp_path):
 def test_image_count_capped_at_provider_limit(tmp_path, monkeypatch):
     from bench.vlm import client
 
-    monkeypatch.setitem(
-        client.PROVIDERS, "fake", client.ProviderInfo(None, 2, 1.0, 2.0, 1000)
-    )
+    monkeypatch.setitem(client.PROVIDERS, "fake", client.ProviderInfo(None, 2, 1.0, 2.0, 1000))
     scenes = _scene(tmp_path, n_img=5)
     cfg = _cfg(tmp_path, allow_paid=True, spend_cap_usd=5.0)
     fake = FakeVLMClient()

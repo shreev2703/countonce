@@ -35,9 +35,16 @@ def clean(v=3, h=8, w=8):
     masks = np.zeros((v, h, w), dtype=int)
     masks[:, 2:4, 2:4] = 1
     meta = {
-        "scene_id": "s0", "recipe_version": "1.0", "seed": 0, "renderer": "test", "prompt": "x",
-        "n_objects": 1, "n_views": v, "target_ids": [1],
-        "object_positions": [(0.0, 0.0, 0.0)], "resolution": (h, w),
+        "scene_id": "s0",
+        "recipe_version": "1.0",
+        "seed": 0,
+        "renderer": "test",
+        "prompt": "x",
+        "n_objects": 1,
+        "n_views": v,
+        "target_ids": [1],
+        "object_positions": [(0.0, 0.0, 0.0)],
+        "resolution": (h, w),
     }
     ang = np.linspace(0, 1.5, v)
     centers = np.stack([3 * np.cos(ang), 3 * np.sin(ang), np.ones(v)], axis=1)

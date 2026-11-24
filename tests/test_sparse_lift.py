@@ -41,7 +41,9 @@ def _blob(center, n=6, spread=0.05):
 
 def _box_det(frame_id=0):
     return Detection(
-        id=f"{frame_id}:0", frame_id=frame_id, score=0.9,
+        id=f"{frame_id}:0",
+        frame_id=frame_id,
+        score=0.9,
         box_xyxy=np.array([20.0, 10.0, 60.0, 50.0]),
     )
 
