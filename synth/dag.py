@@ -219,9 +219,7 @@ def _train_config(dag: Dag) -> Any:
         "seed": dag.cfg.seed,
         "resume": False,
         "device": "cpu",
-        "data_version": dataset_version(
-            [work / "episodes" / "train", work / "episodes" / "val"]
-        ),
+        "data_version": dataset_version([work / "episodes" / "train", work / "episodes" / "val"]),
     }
     return TrainConfig(**{**base, **dag.cfg.train})
 

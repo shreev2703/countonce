@@ -96,9 +96,7 @@ def main(out: Path | None = None) -> None:
         "format": "countonce-tiny-scene-1",
         "image_size": [W, H],
         "gt_count": sum(1 for s in SPHERES if s[2] == "red"),
-        "spheres": [
-            {"xyz": list(c), "radius": RADIUS, "colour": name} for c, _, name in SPHERES
-        ],
+        "spheres": [{"xyz": list(c), "radius": RADIUS, "colour": name} for c, _, name in SPHERES],
         "views": views,
     }
     (out / "scene.json").write_text(json.dumps(scene, separators=(",", ":")) + "\n")
