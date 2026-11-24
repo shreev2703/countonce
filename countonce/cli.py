@@ -265,6 +265,13 @@ def _parser() -> argparse.ArgumentParser:
     lt = sub.add_parser("loadtest", help="queue load test with fake workers (sqlite job store)")
     lt.add_argument("--config", type=Path, default=Path("configs/loadtest.yaml"))
 
+    cs = sub.add_parser("coldstart", help="time worker cold start (loads, warm p50/p95)")
+    cs.add_argument("--model", action="append", default=[], metavar="NAME=PATH", help="weights")
+    cs.add_argument("--weights-dir", type=Path, default=Path("/weights"))
+    cs.add_argument("--warm-iters", type=int, default=20)
+    cs.add_argument("--worker-kind", default="cloud")
+    cs.add_argument("--out", type=Path, default=Path("results/coldstart.csv"))
+
     m = sub.add_parser("models", help="matcher checkpoint registry")
     m.add_argument("--root", type=Path, default=Path("models"))
     msub = m.add_subparsers(dest="models_cmd", required=True)
@@ -483,6 +490,43 @@ def _loadtest(args: argparse.Namespace) -> int:
     summary = run_load_test(cfg)
     print(format_summary(summary))
     return 0 if summary["reconciled"] else 1
+
+
+def _coldstart(args: argparse.Namespace) -> int:
+    from countonce.serving.coldstart import (
+        append_rows,
+        run_coldstart,
+        touch_warm,
+        weight_loaders,
+    )
+
+    paths: dict[str, Path] = {}
+    for spec in args.model:
+        name, sep, path = spec.partition("=")
+        if not sep or not name or not path:
+            print(f"countonce: error: --model expects NAME=PATH, got {spec!r}", file=sys.stderr)
+            return 2
+        paths[name] = Path(path)
+    if not paths and args.weights_dir.is_dir():
+        paths = {p.stem: p for p in sorted(args.weights_dir.iterdir()) if p.is_file()}
+    missing = [str(p) for p in paths.values() if not p.is_file()]
+    if missing:
+        print(f"countonce: error: weights not found: {missing}", file=sys.stderr)
+        return 2
+    import importlib
+
+    rows = run_coldstart(
+        weight_loaders(paths),
+        touch_warm,
+        importer=lambda: importlib.import_module("countonce.pipeline"),
+        warm_iters=args.warm_iters,
+        worker_kind=args.worker_kind,
+    )
+    append_rows(rows, args.out)
+    for r in rows:
+        print(f"{r.phase:16s} {r.name:20s} {r.seconds:.4f}s")
+    print(f"appended {len(rows)} rows to {args.out}")
+    return 0
 
 
 def _pilot_report(args: argparse.Namespace) -> int:
@@ -1043,6 +1087,8 @@ def main(argv: list[str] | None = None) -> int:
         return _worker(args)
     if args.cmd == "serve-api":
         return _serve_api(args)
+    if args.cmd == "coldstart":
+        return _coldstart(args)
     if args.cmd == "loadtest":
         return _loadtest(args)
     if args.cmd == "etl":

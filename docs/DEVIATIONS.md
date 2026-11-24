@@ -457,3 +457,9 @@ One entry per decision: date, what the plan said, what was done, why.
 ## Video / multi-view dataset loaders
 - Loaders return a new `BenchScene` (bench/datasets/common.py) rather than a Fuji-style per-dataset class, since the sweep needs one count per scene. `to_sweep_scenes` symlinks frames into `<csv dir>/datasets/<name>/<id>/images` plus `gt.json`; `bench.evaluate` takes `to_gt_doc` output. `bench/evaluate.py` itself is unchanged (it scores predictions, not datasets).
 - RGBD-VideoCount: one scene per (clip, category). Only the top-level layout is documented (HF README); sub-folders and JSON schemas are assumed. VideoCount/OneScene layouts are fully assumed; their download scripts refuse to run until `DATA_URLS` is filled.
+
+## 2026-11-24: Cloud-worker image and cold-start harness
+- Dockerfile never built (no Docker overnight). Weights are mounted, not baked; baking means deriving an image. Base `nvidia/cuda:12.8.0-cudnn-runtime-ubuntu22.04`, torch from the cu128 index.
+- `safetensors` is not installed in `.venv`, so the mmap test skips here; it is imported lazily. TODO: add to a `serve` extra when the image is first built.
+- Cost per 1,000 frames counts one warm inference as one frame; rates in `cost.yaml` are still null, so the report shows `TODO: set rate`.
+- The default `countonce coldstart` warm call only touches loaded weights; real pipeline inference needs injected loaders (`run_coldstart`). No numbers recorded.
