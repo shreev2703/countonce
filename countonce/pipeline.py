@@ -126,6 +126,22 @@ def _chunk_cap(config: Config) -> int | None:
 
 
 def _make_associator(config: Config, k: float) -> Associator:
+    """Associator at strictness ``k``, wrapped by the motion filter when it is enabled."""
+    inner = _make_base_associator(config, k)
+    if not config.motion_filter:
+        return inner
+    from countonce.merge.motion import MotionAwareAssociator, MotionConfig
+
+    cfg = MotionConfig(
+        residual_norm=config.motion_residual_norm,
+        min_agree=config.motion_min_agree,
+        min_views=config.motion_min_views,
+        conf_factor=config.motion_conf_factor,
+    )
+    return MotionAwareAssociator(inner, cfg)  # type: ignore[return-value]
+
+
+def _make_base_associator(config: Config, k: float) -> Associator:
     """Associator at strictness ``k``: v1 uses it directly, v2 scales its reprojection gate."""
     if config.assoc == "v1":
         return V1Associator(k=k, cannot_link=config.cannot_link)

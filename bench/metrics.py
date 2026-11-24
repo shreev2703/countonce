@@ -96,6 +96,28 @@ def duplicate_rate(clusters: Sequence[Hashable], gt_ids: Sequence[Hashable | Non
     return (len(maj) - len(set(maj.values()))) / len(maj)
 
 
+def ghost_duplicate_rate(
+    clusters: Sequence[Hashable],
+    gt_ids: Sequence[Hashable | None],
+    moving_gt: Sequence[Hashable],
+) -> float:
+    """Share of predicted instances that are extra copies of a *moving* GT object (PLAN 8.3b).
+
+    Like :func:`duplicate_rate` (majority GT id per cluster) but only counts clusters beyond the
+    first for GT objects in ``moving_gt``. NaN when there are no labelled detections or no
+    moving objects are listed.
+    """
+    maj = _cluster_majorities(_labeled(clusters, gt_ids))
+    moving = set(moving_gt)
+    if not maj or not moving:
+        return float("nan")
+    ghosts = 0
+    for g in moving:
+        n = sum(1 for v in maj.values() if v == g)
+        ghosts += max(n - 1, 0)
+    return ghosts / len(maj)
+
+
 def miss_rate(
     clusters: Sequence[Hashable],
     gt_ids: Sequence[Hashable | None],

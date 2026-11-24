@@ -224,3 +224,9 @@ One entry per decision: date, what the plan said, what was done, why.
 - `ruff format` was applied to 10 pre-existing files (formatting only) so the `ruff-format --check` hook passes repo-wide.
 - The mypy hook is `language: system`; mypy is not installed in the CPU venv used overnight, so it was NOT run here (TODO: run `pre-commit run --all-files` with dev extras).
 - `pre-commit install` was not run.
+
+## Dynamic-object residual filter (overnight)
+- `motion_filter` defaults to **off** so shipped behaviour and stored results are unchanged; the `motion_filter=True` ablation row is in `configs/bench.yaml`.
+- "Downweight in v1/v2/v3 association" is implemented as `MotionAwareAssociator`, a wrapper over any associator, not edits inside each one. Instances made only of flagged detections get `conf * motion_conf_factor`; flagged instances whose disagreeing-view nearest detection is a flagged detection of another instance are merged as one moving object (cannot-link on frames respected). Without that merge, downweighting alone could not fix the ghost count.
+- Residual = pixel distance from the projected `xyz` to the nearest detection in the other frame, over box size (floored at 2% of `scene_scale` projected). Views with no detections at all are skipped. A static object the detector missed in a view looks like disagreement; `motion_min_agree=0.5` and `motion_min_views=2` tolerate that. All thresholds are untuned defaults; no benchmark numbers exist.
+- `bench.metrics.ghost_duplicate_rate` takes the moving GT ids explicitly; it is not yet wired into `bench.csv` (no motion captures exist).

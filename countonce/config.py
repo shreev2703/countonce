@@ -28,6 +28,13 @@ class Config(BaseModel):
     appearance: bool = True  # v2/sync: use Detection.feature (cost, gate, split check)
     hallucination: HallucinationMode = "downweight"  # v2: one-view ghost filter
     lift_region: LiftRegion = "mask"  # "mask": use Detection.mask when present; "box": box centre
+    # Dynamic-object residual filter (PLAN 8.3b): flag detections that do not reproject onto a
+    # detection in the other views, downweight them and merge moving-object ghosts.
+    motion_filter: bool = False
+    motion_residual_norm: float = Field(0.5, gt=0)  # view agrees if residual / box size <= this
+    motion_min_agree: float = Field(0.5, ge=0, le=1)  # flag if agreeing share of views is below
+    motion_min_views: int = Field(2, ge=1)  # checked views needed before flagging
+    motion_conf_factor: float = Field(0.5, ge=0, le=1)  # conf multiplier, fully flagged instance
 
     # Ingest
     fps: float = Field(2.0, gt=0)  # video sampling rate
