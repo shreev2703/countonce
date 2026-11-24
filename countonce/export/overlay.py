@@ -1,0 +1,64 @@
+"""Annotated per-frame overlays: new = green, duplicate = blue, rejected = gray."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from pathlib import Path
+
+from countonce.types import CountResult, Detection, Frame
+
+STATUS_COLORS = {
+    "new": (46, 160, 67),
+    "duplicate": (47, 111, 224),
+    "rejected": (140, 140, 140),
+}
+
+
+def render_overlays(
+    frames: Sequence[Frame],
+    detections: Sequence[Detection],
+    result: CountResult,
+    out_dir: Path,
+) -> list[Path]:
+    """Draw every detection on its frame, labelled with its instance ID.
+
+    Pillow is imported lazily so the rest of ``export`` has no image dependency.
+    """
+    from PIL import Image, ImageDraw
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    det_to_instance = {m: inst.id for inst in result.instances for m in inst.members}
+    by_frame: dict[int, list[Detection]] = {}
+    for d in detections:
+        by_frame.setdefault(d.frame_id, []).append(d)
+
+    written: list[Path] = []
+    for frame in frames:
+        img = Image.open(frame.path).convert("RGB")
+        sx = img.width / frame.width
+        sy = img.height / frame.height
+        draw = ImageDraw.Draw(img)
+        for d in by_frame.get(frame.id, []):
+            status = result.detection_status.get(d.id, "rejected")
+            color = STATUS_COLORS.get(status, STATUS_COLORS["rejected"])
+            label = f"#{det_to_instance[d.id]}" if d.id in det_to_instance else status[:3]
+            if d.box_xyxy is not None:
+                x0, y0, x1, y1 = (float(v) for v in d.box_xyxy)
+                x0, x1, y0, y1 = x0 * sx, x1 * sx, y0 * sy, y1 * sy
+                draw.rectangle((x0, y0, x1, y1), outline=color, width=3)
+                anchor = (x0 + 2, max(0.0, y0 - 12))
+            else:
+                assert d.point_xy is not None or d.mask is not None
+                if d.point_xy is not None:
+                    px, py = float(d.point_xy[0]) * sx, float(d.point_xy[1]) * sy
+                else:
+                    ys, xs = d.mask.nonzero()  # type: ignore[union-attr]
+                    px, py = float(xs.mean()) * sx, float(ys.mean()) * sy
+                draw.ellipse((px - 5, py - 5, px + 5, py + 5), outline=color, width=3)
+                anchor = (px + 7, py - 6)
+            draw.text(anchor, label, fill=color)
+        dest = out_dir / f"frame_{frame.id:04d}.png"
+        img.save(dest)
+        written.append(dest)
+    return written
