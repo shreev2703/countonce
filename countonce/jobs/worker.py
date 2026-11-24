@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict
@@ -14,6 +15,7 @@ from typing import Any
 
 from countonce.errors import CountOnceError, ErrorCode
 from countonce.jobs.store import HEARTBEAT_INTERVAL_S, JobStore
+from countonce.monitor import tracing
 from countonce.types import CountResult
 
 log = logging.getLogger("countonce.jobs")
@@ -84,9 +86,11 @@ class Worker:
         worker_id: str | None = None,
         heartbeat_interval_s: float = HEARTBEAT_INTERVAL_S,
         info: dict[str, Any] | None = None,
+        tracing_cfg: tracing.TracingConfig | None = None,
     ) -> None:
         self.store = store
         self.runner = runner
+        self.tracing_cfg = tracing_cfg  # None or exporter 'none': no spans, no files
         self.worker_id = worker_id or f"w-{uuid.uuid4().hex[:8]}"
         self.heartbeat_interval_s = heartbeat_interval_s
         store.register_worker(
@@ -96,10 +100,14 @@ class Worker:
     def step(self) -> bool:
         """Reap stale jobs, then claim and process at most one. True if a job was processed."""
         self.store.requeue_stale()
+        t_claim = time.perf_counter()
         job = self.store.claim(self.worker_id)
         if job is None:
             return False
-        self._process(job)
+        # the job id is only known after the claim, so the trace opens backdated to its start
+        with tracing.trace(job["id"], self.tracing_cfg, "job", start_perf=t_claim):
+            tracing.record_span("claim", t_claim, time.perf_counter(), worker=self.worker_id)
+            self._process(job)
         return True
 
     def _process(self, job: dict[str, Any]) -> None:
@@ -113,15 +121,19 @@ class Worker:
         hb = threading.Thread(target=beat, daemon=True)
         hb.start()
         try:
-            inputs = [Path(f["key"]) for f in self.store.job_files(jid, "input")]
+            with tracing.span("download"):
+                inputs = [Path(f["key"]) for f in self.store.job_files(jid, "input")]
 
             def progress(stage: str, frac: float) -> None:
                 self.store.set_progress(jid, self.worker_id, stage, frac)
 
-            res = self.runner(job, inputs, progress)
-            if not self.store.complete(jid, self.worker_id, result_row(res)):
-                log.warning("job %s was reassigned; dropping result", jid)
+            with tracing.span("run"):  # pipeline stages (and export) nest under this span
+                res = self.runner(job, inputs, progress)
+            with tracing.span("upload"):
+                if not self.store.complete(jid, self.worker_id, result_row(res)):
+                    log.warning("job %s was reassigned; dropping result", jid)
         except Exception as exc:  # BaseException (e.g. a killed worker) leaves the job running
+            tracing.mark_error(exc)
             code = classify(exc)
             outcome = self.store.fail(jid, self.worker_id, code, str(exc))
             log.info("job %s failed %s -> %s", jid, code.value, outcome.status)

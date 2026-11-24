@@ -81,6 +81,9 @@ class Config(BaseModel):
     warnings: dict[str, float] = Field(default_factory=dict)
     # Pre-flight capture-check threshold overrides (countonce.ingest.preflight), PROVISIONAL.
     preflight: dict[str, float] = Field(default_factory=dict)
+    # Stage tracing (countonce.monitor.tracing): {exporter: none|jsonl|otlp, dir: runs/traces}.
+    # Empty means off. Not a result input; a worker traces by its own settings instead.
+    tracing: dict[str, str] = Field(default_factory=dict)
     # Trained CountOnce-Match checkpoint (match.model.save_checkpoint); required for assoc: v3.
     v3_checkpoint: Path | None = None
 
@@ -129,6 +132,14 @@ class Config(BaseModel):
         bad = set(v) - set(PreflightThresholds.__dataclass_fields__)
         if bad:
             raise ValueError(f"unknown preflight threshold(s): {sorted(bad)}")
+        return v
+
+    @field_validator("tracing")
+    @classmethod
+    def _check_tracing(cls, v: dict[str, str]) -> dict[str, str]:
+        from countonce.monitor.tracing import TracingConfig
+
+        TracingConfig.from_dict(v)  # raises ValueError on a bad exporter or unknown key
         return v
 
     def warning_thresholds(self) -> WarningThresholds:

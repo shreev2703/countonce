@@ -376,3 +376,9 @@ One entry per decision: date, what the plan said, what was done, why.
 - Rates live in a new `configs/cost.yaml` (`cost_per_hour.laptop|cloud`, both null; `admin-stats --cost`), not in the pipeline `Config`, since they are ops settings. No default rate; null rate gives null cost, shown as `TODO: set rate` in HTML.
 - GPU-seconds per job = sum of all stored stage `timings` (the store does not mark which stages are GPU). Worker kind comes from `workers.kind` via `jobs.worker_id`; jobs from unknown workers group as `unknown` with no rate. Frames = `n_frames` or `len(per_frame_counts)` in `result_json`; cost per 1,000 frames covers only jobs with a frame count.
 - `cost_per_job` alert: mean cost of done jobs finished in `window_s` > `max_cost`; disabled while `max_cost` is null (shipped state).
+
+## Stage tracing (overnight)
+- Tracing is off by default. A worker traces via `countonce worker --tracing jsonl|otlp [--trace-dir]`; `pipeline.run` also self-traces when `Config.tracing: {exporter, dir}` is set and no trace is active (trace id = out_dir name).
+- Stage spans reuse the pipeline's `timings` readings via `tracing.record_span` (one clock). A failing stage gets an error span from the end of the last finished stage.
+- With `exporter: otlp` and no `opentelemetry` installed, a warning is logged and nothing is exported (no jsonl fallback). The OTLP path is untested against the real package; it uses `OTLPSpanExporter` (http/proto) with default env config. `opentelemetry.*` added to the mypy missing-imports override.
+- OTLP spans get fresh OTel ids (our ids go in the JSONL only).

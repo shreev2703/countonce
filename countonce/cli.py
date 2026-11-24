@@ -159,6 +159,8 @@ def _parser() -> argparse.ArgumentParser:
     wk.add_argument("--once", action="store_true", help="drain claimable jobs, then exit")
     wk.add_argument("--out", type=Path, help="job output root (default: <db dir>/outputs)")
     wk.add_argument("--poll", type=float, default=1.0, help="idle poll interval, seconds")
+    wk.add_argument("--tracing", choices=["none", "jsonl", "otlp"], default="none")
+    wk.add_argument("--trace-dir", type=Path, default=Path("runs/traces"))
 
     sj = sub.add_parser("submit", help="queue a counting job in a job database")
     sj.add_argument("--db", type=Path, required=True)
@@ -167,6 +169,12 @@ def _parser() -> argparse.ArgumentParser:
     sj.add_argument("--user", default="local")
     sj.add_argument("--idempotency-key")
     sj.add_argument("--config", type=Path, help="YAML Config stored as the job options")
+
+    tr = sub.add_parser("trace", help="inspect stage traces written by a traced worker or run")
+    tsub = tr.add_subparsers(dest="trace_cmd", required=True)
+    ts = tsub.add_parser("show", help="print an indented waterfall for a job's trace")
+    ts.add_argument("job_id")
+    ts.add_argument("--dir", type=Path, default=Path("runs/traces"))
 
     jb = sub.add_parser("jobs", help="job retention, sharing and API keys on a job database")
     jb.add_argument("--db", type=Path, required=True)
@@ -343,12 +351,26 @@ def _worker(args: argparse.Namespace) -> int:
 
     store = SqliteJobStore(args.db)
     out = args.out or args.db.resolve().parent / "outputs"
-    worker = Worker(store, pipeline_runner(out))
+    from countonce.monitor.tracing import TracingConfig
+
+    tcfg = TracingConfig(args.tracing, args.trace_dir)
+    worker = Worker(store, pipeline_runner(out), tracing_cfg=tcfg)
     try:
         n = worker.run_loop(until_idle=args.once, poll_s=args.poll)
     except KeyboardInterrupt:
         return 0
     print(f"worker {worker.worker_id}: processed {n} job(s); {store.counts()}")
+    return 0
+
+
+def _trace(args: argparse.Namespace) -> int:
+    from countonce.monitor.tracing import load_trace, waterfall
+
+    path = args.dir / f"{args.job_id}.jsonl"
+    if not path.exists():
+        print(f"countonce: error: no trace for job {args.job_id} in {args.dir}", file=sys.stderr)
+        return 2
+    print(waterfall(load_trace(path)))
     return 0
 
 
@@ -764,6 +786,8 @@ def main(argv: list[str] | None = None) -> int:
         return _submit(args)
     if args.cmd == "jobs":
         return _jobs(args)
+    if args.cmd == "trace":
+        return _trace(args)
     if args.cmd == "report":
         return _report(args)
 

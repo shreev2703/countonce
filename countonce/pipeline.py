@@ -39,6 +39,7 @@ from countonce.merge.base import Associator
 from countonce.merge.cluster import V1Associator
 from countonce.merge.match import V2Associator, V2Config
 from countonce.merge.sync import SyncAssociator
+from countonce.monitor import tracing
 from countonce.oom import Attempt, RungUnavailable, free_cache, run_with_oom_ladder
 from countonce.optim import check_sdpa, configure_inference, wrap_detector
 from countonce.provenance import run_metadata
@@ -234,6 +235,36 @@ def lift_kwargs(config: Config, recon: DenseRecon) -> LiftKwargs:
     return kw
 
 
+_STAGES = (
+    ("ingest", "ingest"),
+    ("detect", "detect"),
+    ("recon", "reconstruct"),
+    ("associate", "associate"),
+    ("confidence", "confidence"),
+)  # CountResult.timings key -> span name
+
+
+class _Marks:
+    """The ``timings`` dict plus tracing: each stage is timed once, and that reading is the span."""
+
+    def __init__(self, t0: float) -> None:
+        self.timings: dict[str, float] = {}
+        self.cursor = t0  # end of the last finished stage
+
+    def mark(self, key: str, start: float) -> None:
+        end = time.perf_counter()
+        self.timings[key] = end - start
+        tracing.record_span(dict(_STAGES)[key], start, end)
+        self.cursor = end
+
+    def fail(self, exc: BaseException) -> None:
+        """Attribute an exception to the first stage that never finished."""
+        for key, name in _STAGES:
+            if key not in self.timings:
+                tracing.record_span(name, self.cursor, time.perf_counter(), error=exc)
+                return
+
+
 def run(
     inputs: list[Path] | Path,
     prompt: str,
@@ -248,14 +279,37 @@ def run(
 
     ``detector`` / ``reconstructor`` override the config-selected backends (tests, notebooks);
     ``privacy_detector`` likewise overrides the model-file detector used when ``privacy_blur``.
+    With tracing active (a worker trace, or ``config.tracing``) the stages become spans.
     """
+    cfg = tracing.TracingConfig.from_dict(config.tracing)
+    with tracing.trace(Path(config.out_dir).name or "run", cfg, name="pipeline.run"):
+        marks = _Marks(time.perf_counter())
+        try:
+            return _run(
+                inputs, prompt, config, marks, detector, reconstructor, export, privacy_detector
+            )
+        except BaseException as exc:
+            marks.fail(exc)
+            raise
+
+
+def _run(
+    inputs: list[Path] | Path,
+    prompt: str,
+    config: Config,
+    marks: _Marks,
+    detector: Detector | None,
+    reconstructor: Reconstructor | None,
+    export: bool,
+    privacy_detector: PrivacyRegionDetector | None,
+) -> CountResult:
     if config.assoc not in ("v1", "v2", "v3", "sync"):
         raise NotImplementedError(f"associator {config.assoc!r} is not implemented yet")
     if config.assoc == "v3":
         from countonce.merge.v3 import require_checkpoint
 
         require_checkpoint(config.v3_checkpoint)  # fail before any expensive stage
-    timings: dict[str, float] = {}
+    timings = marks.timings
     t0 = time.perf_counter()
 
     # Ingest
@@ -278,7 +332,7 @@ def run(
     if config.sdpa_check:
         check_sdpa("reconstructor")
     frames = make_frames(paths, getattr(rec, "preprocess_mode", None), privacy_masks)
-    timings["ingest"] = time.perf_counter() - t0
+    marks.mark("ingest", t0)
 
     # Detect
     t = time.perf_counter()
@@ -334,7 +388,7 @@ def run(
                 raw_detections, frames, producer, f"{det.name}@{det.version}", mask_cache
             )
     detections = filter_by_score(raw_detections, config.score_threshold)
-    timings["detect"] = time.perf_counter() - t
+    marks.mark("detect", t)
 
     # Reconstruct, under the OOM degradation ladder (rung 0 = the configured run, unchanged)
     t = time.perf_counter()
@@ -368,7 +422,7 @@ def run(
 
     ladder = run_with_oom_ladder(recon_stage, stage_name="recon", n_frames=len(frames))
     recon, cache_key, cache_hit, frames = ladder.value
-    timings["recon"] = time.perf_counter() - t
+    marks.mark("recon", t)
 
     # Lift + associate
     t = time.perf_counter()
@@ -377,7 +431,7 @@ def run(
     lifted = lift_detections(detections, recon, {f.id: f for f in frames}, **lift_kw)
     frame_map = {f.id: f for f in frames}
     clustered = _make_associator(config, config.merge_k).associate(lifted, recon, frame_map)
-    timings["associate"] = time.perf_counter() - t
+    marks.mark("associate", t)
 
     # Sensitivity range: re-count over a grid of merge strictness and detector threshold.
     t = time.perf_counter()
@@ -415,7 +469,7 @@ def run(
                 mu_at=lambda theta: _mu_at(art, theta, config, count_at),
             )
             interval = Interval(lo, hi, config.interval_level, res.method, art.n_calibration)
-    timings["confidence"] = time.perf_counter() - t
+    marks.mark("confidence", t)
 
     per_frame: dict[int, int] = {f.id: 0 for f in frames}
     for ld in lifted:
@@ -475,13 +529,14 @@ def run(
     timings["total"] = time.perf_counter() - t0
 
     if export:
-        export_all(
-            result,
-            out_dir,
-            frames=frames,
-            detections=detections,
-            scene_scale=compute_scene_scale(recon),
-        )
+        with tracing.span("export"):
+            export_all(
+                result,
+                out_dir,
+                frames=frames,
+                detections=detections,
+                scene_scale=compute_scene_scale(recon),
+            )
     return result
 
 
