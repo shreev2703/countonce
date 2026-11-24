@@ -239,3 +239,9 @@ One entry per decision: date, what the plan said, what was done, why.
 - `privacy_blur` defaults to **off** so bench pixels and stored results are unchanged. When on, `privacy_model_path` (an OpenCV `.xml` cascade or `.onnx` YuNet-style face model) is required; the installed `cv2` has no bundled models and nothing is downloaded. Missing path raises `ValueError`/`FileNotFoundError`. No model file is committed, so the real adapter is untested beyond its missing-file behaviour (tests use a fake detector).
 - Blur runs after sanitization and after blurry/dedup/cap filtering (fewer images to process) and writes PNGs to `out_dir/privacy/`; detection and recon then see blurred pixels. The mask is stored at native frame size; `lift.py` already maps it through `Frame.grid_map`. `privacy.mask_to_grid` gives the same mask on the backbone grid (crop/pad aware) for viewers and tests.
 - Blur sigma (`privacy_blur_sigma`, 12 px) is an untuned default. Plates are only covered if the supplied model detects them.
+
+## Drift monitoring (countonce/monitor/drift.py)
+- `result.json` does not record resolution or mean depth confidence, so they are read from optional `mean_depth_conf` / `config.image_width|image_height` keys, with depth confidence otherwise parsed from the `low_depth_confidence` warning text (only present when that warning fired). Features absent on either side are listed under `skipped`, never scored.
+- `lift_failure_rate` = `config.lift_fallbacks` / detections; `detection_density` = detections per frame (the bench CSV `density` column is per megapixel; the two are not mixed unless both sides come from the same source).
+- Categorical drift is flagged on PSI; the chi-square statistic is reported but not used for flagging (no p-value; scipy not assumed). Min 2 rows per side, else a ValueError / CLI exit 2.
+- Ran with the shared venv `~/vggtProject/.venv` since the repo has none.

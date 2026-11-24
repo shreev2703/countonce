@@ -78,7 +78,30 @@ def _parser() -> argparse.ArgumentParser:
 
     y = sub.add_parser("synth", help="write synthetic geometry episodes for the matcher")
     y.add_argument("--config", type=Path, default=Path("configs/synth.yaml"))
+
+    d = sub.add_parser("drift", help="population-stability drift of current jobs vs a reference")
+    d.add_argument("--reference", type=Path, required=True, help="bench CSV or dir of result.json")
+    d.add_argument("--current", type=Path, required=True, help="dir of result.json files")
+    d.add_argument("--out", type=Path, help="write the drift report JSON here")
+    d.add_argument("--warn", type=float, default=0.1, help="PSI warn threshold")
+    d.add_argument("--alert", type=float, default=0.25, help="PSI alert threshold")
     return p
+
+
+def _drift(args: argparse.Namespace) -> int:
+    from countonce.monitor.drift import DriftThresholds, run_drift
+
+    try:
+        rep = run_drift(
+            args.reference, args.current, args.out, DriftThresholds(args.warn, args.alert)
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    for name, v in rep["features"].items():
+        print(f"drift: {name}: psi={v['psi']:.4f} {v['level']}")
+    print(f"drift: status {rep['status']} ({len(rep['flagged'])} flagged)")
+    return 0
 
 
 def _train(args: argparse.Namespace) -> int:
@@ -225,6 +248,8 @@ def main(argv: list[str] | None = None) -> int:
         return _synth(args)
     if args.cmd == "profile":
         return _profile(args)
+    if args.cmd == "drift":
+        return _drift(args)
 
     from countonce.pipeline import run
 
