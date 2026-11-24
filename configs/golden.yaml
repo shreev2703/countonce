@@ -1,0 +1,43 @@
+# Frozen golden set (PLAN 16B.2). Do not edit pins casually: a change is a new baseline.
+# synthetic_scenes: CPU mode, pinned by sha256 of the canonical spec JSON.
+# scenes: 5 real GPU scenes under --data-root, pinned with `python -m bench.golden freeze`.
+#   TODO: choose 5 real scenes (dir, prompt, gt_count) once the datasets are on disk; until
+#   then the GPU job refuses to run (no fabricated scenes).
+version: 1
+tolerances:
+  mape: 0.02
+  assoc_f1: 0.02
+  peak_vram_mb: 0.1
+  latency_s: 0.25
+synthetic_scenes:
+- id: syn0
+  seed: 1234
+  n_objects: 6
+  prompt: widgets
+  assoc: v2
+  sha256: d329f2db8c03a1cd8a79184edc5c0bbb58770401e2b29886b17f265e6c5da115
+- id: syn1
+  seed: 2201
+  n_objects: 4
+  prompt: widgets
+  assoc: v2
+  sha256: 12450a8baacc2a879ad749c65cd85e948f8585a1451f27929c5dd868866856bc
+- id: syn2
+  seed: 3307
+  n_objects: 8
+  prompt: widgets
+  assoc: v2
+  sha256: d3ea932e88e70d0fe1e8fd95c268213bd52b713c7b823164a1db28647ea24a48
+- id: syn3
+  seed: 4410
+  n_objects: 5
+  prompt: widgets
+  assoc: v2
+  sha256: 1f28e9af0dab1c83532bf750bde4f49488c6d2b39680fdc5f47e11b391e02e52
+- id: syn4
+  seed: 5513
+  n_objects: 7
+  prompt: widgets
+  assoc: v2
+  sha256: 7727f399eb3b504a547799e721f7524200b51a10f743d3d31af237bc129da1de
+scenes: []

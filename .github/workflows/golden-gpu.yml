@@ -1,0 +1,38 @@
+# GPU golden benchmark gate (PLAN 16B.2). Runs on the owner's self-hosted runner, so it must
+# never be triggered by pull requests: fork code would run on the laptop. See docs/GOLDEN.md.
+name: Golden GPU
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  golden:
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install
+        run: pip install -e .[dev]
+      - name: Run golden set
+        run: python -m bench.golden run --out results/golden/current.json
+      - name: Compare with the last main result
+        run: |
+          python -m bench.golden compare \
+            --baseline configs/golden_gpu_baseline.json \
+            --current results/golden/current.json \
+            --table-out golden-table.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: golden-table
+          path: |
+            golden-table.md
+            results/golden/current.json
+          if-no-files-found: ignore

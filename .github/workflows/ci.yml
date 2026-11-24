@@ -21,3 +21,14 @@ jobs:
         run: mypy countonce
       - name: Test
         run: pytest -m "not slow and not gpu"
+      - name: Golden gate (CPU synthetic geometry)
+        run: |
+          python -m bench.golden compare --cpu-synthetic \
+            --baseline configs/golden_cpu_baseline.json \
+            --tol latency_s=off --table-out golden-cpu.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: golden-cpu-table
+          path: golden-cpu.md
+          if-no-files-found: ignore

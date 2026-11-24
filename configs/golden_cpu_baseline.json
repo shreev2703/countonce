@@ -1,0 +1,53 @@
+{
+  "git_sha": "629feeda6044",
+  "mode": "cpu-synthetic",
+  "overall": {
+    "assoc_f1": 1.0,
+    "latency_s": 0.15242092420085102,
+    "mape": 0.0,
+    "peak_vram_mb": 0.0
+  },
+  "scenes": {
+    "syn0": {
+      "assoc_f1": 1.0,
+      "gt": 6.0,
+      "latency_s": 0.18655062899779296,
+      "mape": 0.0,
+      "peak_vram_mb": 0.0,
+      "pred": 6.0
+    },
+    "syn1": {
+      "assoc_f1": 1.0,
+      "gt": 4.0,
+      "latency_s": 0.10188458199991146,
+      "mape": 0.0,
+      "peak_vram_mb": 0.0,
+      "pred": 4.0
+    },
+    "syn2": {
+      "assoc_f1": 1.0,
+      "gt": 8.0,
+      "latency_s": 0.20019517000037013,
+      "mape": 0.0,
+      "peak_vram_mb": 0.0,
+      "pred": 8.0
+    },
+    "syn3": {
+      "assoc_f1": 1.0,
+      "gt": 5.0,
+      "latency_s": 0.1159041250066366,
+      "mape": 0.0,
+      "peak_vram_mb": 0.0,
+      "pred": 5.0
+    },
+    "syn4": {
+      "assoc_f1": 1.0,
+      "gt": 7.0,
+      "latency_s": 0.15757011499954388,
+      "mape": 0.0,
+      "peak_vram_mb": 0.0,
+      "pred": 7.0
+    }
+  },
+  "version": 1
+}

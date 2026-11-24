@@ -260,3 +260,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - Synthetic scenes are written to `results/zero_suite/scenes`; a distractor's scores go up to 0.45, so at the default 0.3 threshold some are intentional false positives. Negative prompts (CountGD++) are not covered here (no detector support yet).
 - `ghost_duplicate_rate` is an append-only column; the default executor leaves it blank (no moving GT ids on real scenes). NaN is written as blank.
 - Tests ran via `~/vggtProject/.venv` again (no repo venv).
+
+## Golden benchmark gate
+- The real-scene (GPU) half of `configs/golden.yaml` is empty: no datasets are on disk, so no scenes or hashes were invented. `bench.golden run` without `--cpu-synthetic` refuses unpinned scenes; `freeze` pins them. `configs/golden_gpu_baseline.json` does not exist yet (`TODO: fill from results`), so `golden-gpu.yml` fails until the owner adds it.
+- CPU mode writes `results/golden/<sha>-cpu.json` (suffix added to keep it apart from GPU results). Hosted CI compares to `configs/golden_cpu_baseline.json` with latency ignored (`--tol latency_s=off`). Association F1 is only defined for synthetic scenes (real scenes have counts only).
+- pytest on this box lacks matplotlib/torch/cv2 so 6 unrelated tests fail and 5 modules fail collection; not caused by this task.
