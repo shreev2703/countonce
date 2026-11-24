@@ -121,3 +121,20 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 - **Remaining autonomous work after this batch is thin:** almost every remaining PLAN item needs data, weights, GPU time, new deps or your approval.
   The best next unblockers are installing `pyarrow`+`duckdb` (unlocks Track J), approving mockups and adding `fastapi`/`sqlalchemy` (unlocks the
   web API), and downloading Fuji-SfM plus the detector weights (unlocks real Core numbers).
+
+## 2026-11-24: Ninth tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state: all 69 earlier overnight tasks are checked. In the countonce `.venv` (now with CPU torch), `pytest` gives 573 passed and 3 skipped
+  (mcp, pycolmap x2), and `ruff check .` is clean. **`mypy countonce` regressed to 3 errors** (privacy.py, appearance.py, vggt.py). The fix is queued first.
+- **Uncommitted `docs/PLAN.md` edit:** the working tree has a formatter-only diff in the §7 code blocks (comment spacing, blank lines). The audit
+  did not commit it. Keep it or `git checkout docs/PLAN.md`, your choice.
+- **Cost rates:** the queued cost-per-job task leaves `cost_per_hour` null. Set the laptop electricity rate and a cloud GPU price yourself.
+- **Pre-flight browser port and web API:** the queued pre-flight task is the Python reference only. The browser version, FastAPI endpoints, SSE,
+  Google sign-in and Postgres still wait for mockup approval plus `fastapi`/`sqlalchemy`/Postgres (unchanged from the eighth audit).
+- **OpenTelemetry export:** the queued tracing task writes local JSONL traces. Sending them to Grafana Cloud/Honeycomb needs an account and
+  an OTLP endpoint/token from you.
+- **Still unqueued (unchanged):** Track J (pyarrow/duckdb), Triton kernel and FP8/NVFP4 (interactive GPU), VGGT-Ω/VGG-T³/CountGD++ (gated weights),
+  real CountGD/GroundingDINO/SAM forward passes (weights), the Fuji-SfM download and license, the C-DOG/CountVid/DG-Net baselines and video datasets,
+  Kubric rendering (Docker), a v3 training run on the GPU, the cloud worker and cold-start measurements (account and billing), HF releases, the LICENSE choice,
+  captures, interviews and the professor meeting.
+- **Autonomous work after this batch is nearly exhausted.** After these 6 tasks, the remaining PLAN items all need data, weights, GPU time,
+  new dependencies or your approval. Biggest unblockers: Fuji-SfM plus the detector weights (real Core numbers), `pyarrow`+`duckdb` (Track J), and mockup approval (web product).
