@@ -115,3 +115,38 @@ def test_slice_report_rejects_empty():
 def test_unlabelled_scenes_have_nan_f1():
     r = slices.make_record("s", slices.SceneMeta(gt_count=3, n_views=2), 5)
     assert math.isnan(r.assoc_f1) and r.abs_error == 2
+
+
+def _rig_recon(angle_deg: float, n: int = 6, radius: float = 2.0) -> Recon:
+    ext = np.zeros((n, 3, 4))
+    for i, a in enumerate(np.radians(np.linspace(0, angle_deg, n))):
+        c = radius * np.array([np.sin(a), 0.0, -np.cos(a)])
+        ext[i, :3, :3] = np.eye(3)
+        ext[i, :3, 3] = -c  # R = I so C = -t
+    h = w = 4
+    return Recon(
+        backbone="fake",
+        intrinsics=np.tile(np.eye(3), (n, 1, 1)),
+        extrinsics=ext,
+        depth=np.ones((n, h, w)),
+        depth_conf=np.ones((n, h, w)),
+        world_points=np.zeros((n, h, w, 3)),
+        world_points_conf=np.ones((n, h, w)),
+        scene_scale=2.0,
+    )
+
+
+def test_baseline_spread_wide_arc_exceeds_narrow():
+    assert slices.baseline_spread(_rig_recon(120)) > 3 * slices.baseline_spread(_rig_recon(15))
+    meta = slices.scene_metadata(_result(1), gt_count=1, recon=_rig_recon(60))
+    assert meta.baseline_spread > 0 and math.isnan(meta.mean_occlusion)
+
+
+def test_mean_occlusion_on_crafted_gt():
+    vis = {"a": [1.0, 0.5], "b": [0.0], "c": []}
+    assert slices.mean_occlusion(vis) == pytest.approx((0.0 + 0.5 + 1.0) / 3)
+    assert math.isnan(slices.mean_occlusion({}))
+    # identity "x" seen in frames 0 and 2 only -> missing 1 of 3 views in its span
+    assert slices.occlusion_from_identities([0, 2, 1], ["x", "x", None]) == pytest.approx(1 / 3)
+    meta = slices.scene_metadata(_result(1), gt_count=1, occlusion=0.4)
+    assert meta.mean_occlusion == pytest.approx(0.4)

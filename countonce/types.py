@@ -100,6 +100,7 @@ class Detection:
     point_xy: np.ndarray | None = None  # (2,) pixels
     mask: np.ndarray | None = None  # HxW bool
     feature: np.ndarray | None = None  # appearance embedding, filled on demand
+    label: str | None = None  # detector's own class label, when it reports one
 
     def __post_init__(self) -> None:
         if self.box_xyxy is None and self.point_xy is None and self.mask is None:

@@ -148,3 +148,22 @@ def test_run_reports_sensitivity_interval_and_warnings(tmp_path):
     assert any(w["code"] == "low_depth_confidence" for w in res.warnings)
     raw = json.loads((tmp_path / "out" / "result.json").read_text())
     assert schemas.load_result(raw).warnings
+
+
+def test_zero_count_warning_on_empty_scene_only(tmp_path):
+    img_dir, script = make_scene(tmp_path)
+    weak = {0: [(10, 10, 16, 16, 0.1)]}  # below the default score threshold
+    cfg = Config(out_dir=tmp_path / "out", max_frames=0)
+    empty = run(img_dir, "widgets", cfg, detector=FakeDetector(weak), reconstructor=PlaneRecon())
+    w = [x for x in empty.warnings if x["code"] == "no_objects_found"]
+    assert len(w) == 1 and w[0]["message"].startswith("No widgets found")
+    assert "0.10" in w[0]["message"]
+    raw = json.loads((tmp_path / "out" / "result.json").read_text())
+    assert any(x["code"] == "no_objects_found" for x in raw["warnings"])
+    schemas.load_result(raw)
+
+    cfg2 = Config(out_dir=tmp_path / "out2", max_frames=0)
+    normal = run(
+        img_dir, "widgets", cfg2, detector=FakeDetector(script), reconstructor=PlaneRecon()
+    )
+    assert all(x["code"] != "no_objects_found" for x in normal.warnings)

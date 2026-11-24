@@ -30,7 +30,7 @@ from countonce.recon.cache import CachedReconstructor, ReconCache
 from countonce.recon.chunked import ChunkedReconstructor
 from countonce.types import CountResult, Detection, Frame, Interval, ModelVersions
 from countonce.types import Recon as DenseRecon
-from countonce.warnings import assess_quality
+from countonce.warnings import assess_quality, zero_count_warning
 
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
@@ -326,12 +326,19 @@ def run(
         interval_low=sens.low,
         interval_high=sens.high,
     )
+    zero_warn, below = zero_count_warning(
+        prompt=prompt,
+        count=count,
+        interval_low=interval.low,
+        raw_detections=raw_detections,
+        threshold=config.score_threshold,
+    )
     result = CountResult(
         prompt=prompt,
         count=count,
         interval=interval,
         confidence_method="sensitivity",
-        warnings=quality + interval_warnings,
+        warnings=quality + interval_warnings + ([zero_warn] if zero_warn else []),
         model_versions=ModelVersions(
             detector=f"{det.name}@{det.version}", backbone=recon.backbone, associator=config.assoc
         ),
@@ -350,6 +357,7 @@ def run(
         config={
             **run_metadata(config.to_dict()),
             "lift_fallbacks": lift_fallbacks,
+            **({"below_threshold": below} if zero_warn else {}),
             "exif_stripped": sanitize_report.to_dict()["exif_stripped"],
             "sanitize": sanitize_report.to_dict(),
         },

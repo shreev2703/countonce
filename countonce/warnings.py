@@ -10,13 +10,14 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from countonce.types import Instance, LiftedDetection, Recon
+from countonce.types import Detection, Instance, LiftedDetection, Recon
 
 TOO_FEW_FRAMES = "too_few_frames"
 LOW_OVERLAP = "low_overlap"
 LOW_DEPTH_CONFIDENCE = "low_depth_confidence"
 MANY_FAILED_LIFTS = "many_failed_lifts"
 WIDE_RANGE = "wide_range"
+NO_OBJECTS_FOUND = "no_objects_found"
 
 
 @dataclass
@@ -28,6 +29,8 @@ class WarningThresholds:
     min_detections_for_lift_check: int = 3
     max_range_width_fraction: float = 0.25  # (high - low) / count
     min_range_width: int = 2  # ignore ranges narrower than this many objects
+    small_count: int = 2  # counts up to this with an interval reaching 0 count as 'near zero'
+    top_below_threshold: int = 3  # labels listed in the no-objects summary
 
 
 def _w(code: str, message: str, fix: str) -> dict[str, str]:
@@ -108,3 +111,55 @@ def assess_quality(
                 )
             )
     return out
+
+
+def below_threshold_summary(
+    raw_detections: Sequence[Detection], threshold: float, prompt: str, top: int = 3
+) -> list[dict[str, object]]:
+    """Top (label, best score, n) among detections scored below ``threshold``.
+
+    Detectors without class labels are reported under the prompt itself.
+    """
+    best: dict[str, list[float]] = {}
+    for d in raw_detections:
+        if d.score < threshold:
+            best.setdefault(d.label or prompt, []).append(float(d.score))
+    rows: list[dict[str, object]] = [
+        {"label": k, "best_score": round(max(v), 3), "n": len(v)} for k, v in best.items()
+    ]
+    rows.sort(key=lambda r: -float(r["best_score"]))  # type: ignore[arg-type]
+    return rows[:top]
+
+
+def zero_count_warning(
+    *,
+    prompt: str,
+    count: int,
+    interval_low: int,
+    raw_detections: Sequence[Detection] = (),
+    threshold: float = 0.0,
+    thresholds: WarningThresholds | None = None,
+) -> tuple[dict[str, str] | None, list[dict[str, object]]]:
+    """PLAN 9.8b: a ``no_objects_found`` warning when the count is 0, or small with 0 in range.
+
+    Returns ``(warning or None, below-threshold summary)``.
+    """
+    th = thresholds or WarningThresholds()
+    if not (count == 0 or (count <= th.small_count and interval_low <= 0)):
+        return None, []
+    summary = below_threshold_summary(raw_detections, threshold, prompt, th.top_below_threshold)
+    msg = f"No {prompt} found."
+    if summary:
+        seen = ", ".join(
+            f"'{r['label']}' (best score {float(r['best_score']):.2f}, {r['n']}x)"  # type: ignore[arg-type]
+            for r in summary
+        )
+        msg += f" Only weak detections below the threshold {threshold:.2f}: {seen}."
+    else:
+        msg += " Nothing was detected, not even weakly."
+    return _w(
+        NO_OBJECTS_FOUND,
+        msg,
+        "Check the prompt wording and that the objects are in the photos; "
+        "if they are, retake closer and sharper.",
+    ), summary

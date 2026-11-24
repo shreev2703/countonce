@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from countonce.recon.align import camera_centers
 from countonce.types import CountResult, Detection, Frame, Recon
 
 from .metrics import pairwise_prf
@@ -25,6 +26,8 @@ class SceneMeta:
     score_mean: float = float("nan")
     score_std: float = float("nan")
     score_min: float = float("nan")
+    baseline_spread: float = float("nan")  # RMS camera-centre spread / scene_scale
+    mean_occlusion: float = float("nan")  # 0..1, blank (NaN) without GT or identity labels
 
     def as_dict(self) -> dict[str, float]:
         return {k: float(v) for k, v in self.__dict__.items()}
@@ -38,6 +41,34 @@ def luminance_of(image: np.ndarray) -> float:
     return float(a.mean() / (255.0 if a.max() > 1.0 else 1.0))
 
 
+def baseline_spread(recon: Recon) -> float:
+    """RMS distance of camera centres from their centroid, divided by ``scene_scale``.
+
+    Larger for a wide-arc rig than a narrow-arc one; 0 for a single view.
+    """
+    c = camera_centers(recon.extrinsics)
+    scale = recon.scene_scale if recon.scene_scale > 0 else 1.0
+    return float(np.sqrt(((c - c.mean(axis=0)) ** 2).sum(axis=1).mean()) / scale)
+
+
+def mean_occlusion(visibility: Mapping[Hashable, Sequence[float]]) -> float:
+    """Mean occlusion from synthetic GT: ``visibility[obj]`` = visible fraction per view in
+    which the object is in frame. Occlusion = 1 - visible; NaN when there is no GT."""
+    vals = [1.0 - float(np.clip(v, 0.0, 1.0)) for vs in visibility.values() for v in vs]
+    return float(np.mean(vals)) if vals else float("nan")
+
+
+def occlusion_from_identities(frame_ids: Sequence[int], gt_ids: Sequence[Hashable | None]) -> float:
+    """Proxy from identity labels: per identity, share of views inside its first..last observed
+    span (by frame index) in which it was not detected; averaged over identities. NaN if none."""
+    views: dict[Hashable, set[int]] = {}
+    for f, g in zip(frame_ids, gt_ids, strict=True):
+        if g is not None:
+            views.setdefault(g, set()).add(int(f))
+    miss = [1.0 - len(v) / (max(v) - min(v) + 1) for v in views.values()]
+    return float(np.mean(miss)) if miss else float("nan")
+
+
 def scene_metadata(
     result: CountResult,
     *,
@@ -46,13 +77,17 @@ def scene_metadata(
     detections: Sequence[Detection] | None = None,
     frames: Sequence[Frame] | None = None,
     images: Sequence[np.ndarray] | None = None,
+    occlusion: float | None = None,
 ) -> SceneMeta:
     """Collect slicing covariates from a ``CountResult`` and optional recon/detections/frames."""
     n_views = len(frames) if frames is not None else len(result.per_frame_counts)
     if recon is not None:
         n_views = recon.depth.shape[0]
     meta = SceneMeta(gt_count=float(gt_count), n_views=int(n_views))
+    if occlusion is not None:
+        meta.mean_occlusion = float(occlusion)
     if recon is not None:
+        meta.baseline_spread = baseline_spread(recon)
         meta.mean_depth_conf = float(np.mean(recon.depth_conf))
         area_mpx = recon.depth.shape[0] * recon.depth.shape[1] * recon.depth.shape[2] / 1e6
         meta.density = len(result.instances) / area_mpx if area_mpx else float("nan")
