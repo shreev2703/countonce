@@ -36,7 +36,7 @@ dev = [
 countonce = "countonce.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["countonce*"]
+include = ["countonce*", "synth*"]
 
 [tool.setuptools.package-data]
 countonce = ["py.typed"]

@@ -129,3 +129,7 @@ One entry per decision: date, what the plan said, what was done, why.
 ## Synchronization baseline (`assoc: sync`)
 - v2 does not expose per-pair matches (it is an incremental tracker), so `merge/sync.py` rebuilds pairwise matches with v2's own geometry (symmetric reprojection error + appearance gate, per-frame-pair Hungarian) and synchronizes those. Rounding is spectral embedding + per-view Hungarian into a growing universe (cannot-link holds by construction). v2's hallucination filter is reused; its split check is not.
 - Wired into `run()`/CLI/`configs/bench.yaml` as `co_sync_vggt`. No real-data numbers: TODO: fill from results.
+
+## Track C scaffolding (synth/geometry.py, match/sinkhorn.py)
+- `synth/` is a top-level package (as in PLAN §10.2), added to setuptools `packages.find`. The geometry generator uses a flat-array `.npz` layout and 4-d per-detection features (u, v, depth, score); appearance/camera embeddings are deferred to the model task.
+- Sinkhorn follows SuperGlue marginals (real rows/cols = 1, dustbin row = N, dustbin col = M). Tests skip if torch is missing.
