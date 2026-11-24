@@ -1,0 +1,99 @@
+{
+  "count": 5,
+  "interval_high": 5,
+  "interval_low": 5,
+  "markers": [
+    {
+      "conf": 0.5625,
+      "id": 0,
+      "members": [
+        "0:0",
+        "1:0",
+        "2:0",
+        "3:0"
+      ],
+      "n_views": 4,
+      "possibly_moving": false,
+      "size": 0.6,
+      "xyz": [
+        -1.0,
+        -0.5,
+        5.0
+      ]
+    },
+    {
+      "conf": 0.5625,
+      "id": 1,
+      "members": [
+        "0:1",
+        "1:1",
+        "2:1",
+        "3:1"
+      ],
+      "n_views": 4,
+      "possibly_moving": false,
+      "size": 0.6,
+      "xyz": [
+        0.0,
+        0.0,
+        5.0
+      ]
+    },
+    {
+      "conf": 0.5625,
+      "id": 2,
+      "members": [
+        "0:2",
+        "1:2",
+        "2:2",
+        "3:2"
+      ],
+      "n_views": 4,
+      "possibly_moving": false,
+      "size": 0.6,
+      "xyz": [
+        1.2,
+        0.4,
+        5.0
+      ]
+    },
+    {
+      "conf": 0.5625,
+      "id": 3,
+      "members": [
+        "0:3",
+        "1:3",
+        "2:3",
+        "3:3"
+      ],
+      "n_views": 4,
+      "possibly_moving": false,
+      "size": 0.6,
+      "xyz": [
+        0.6000000000000001,
+        -0.8,
+        5.0
+      ]
+    },
+    {
+      "conf": 0.5625,
+      "id": 4,
+      "members": [
+        "0:4",
+        "1:4",
+        "2:4",
+        "3:4"
+      ],
+      "n_views": 4,
+      "possibly_moving": false,
+      "size": 0.6,
+      "xyz": [
+        -0.7,
+        0.7,
+        5.0
+      ]
+    }
+  ],
+  "scene_scale": 5.467631952110505,
+  "schema_version": "1.1"
+}

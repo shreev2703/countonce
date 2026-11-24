@@ -50,7 +50,7 @@ def make_result() -> CountResult:
 def test_result_json_roundtrip(tmp_path):
     p = write_result_json(make_result(), tmp_path / "result.json")
     raw = json.loads(p.read_text())
-    assert raw["schema_version"] == "1.0"
+    assert raw["schema_version"] == "1.1"
     r = schemas.load_result(raw)
     assert r.count == 2 and r.interval.high == 3
     assert r.per_frame_counts == {"0": 2, "1": 1}
@@ -60,7 +60,7 @@ def test_result_json_roundtrip(tmp_path):
 def test_markers_json(tmp_path):
     p = write_markers_json(make_result(), tmp_path / "markers.json", scene_scale=1.5)
     m = schemas.load_markers(json.loads(p.read_text()))
-    assert m.schema_version == "1.0" and len(m.markers) == 2
+    assert m.schema_version == "1.1" and len(m.markers) == 2
     assert m.markers[0].xyz == (0.0, 0.1, 1.0) and m.scene_scale == 1.5
 
 

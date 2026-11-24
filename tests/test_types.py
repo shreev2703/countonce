@@ -86,7 +86,7 @@ def test_instance_and_interval_validation():
 
 def test_count_result_defaults_and_fields():
     r = _result()
-    assert r.schema_version == SCHEMA_VERSION == "1.0"
+    assert r.schema_version == SCHEMA_VERSION == "1.1"
     assert r.confidence_method == "heuristic"
     assert r.recon_cache_key is None
     assert r.n_possibly_moving == 0

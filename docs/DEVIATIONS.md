@@ -245,3 +245,9 @@ One entry per decision: date, what the plan said, what was done, why.
 - `lift_failure_rate` = `config.lift_fallbacks` / detections; `detection_density` = detections per frame (the bench CSV `density` column is per megapixel; the two are not mixed unless both sides come from the same source).
 - Categorical drift is flagged on PSI; the chi-square statistic is reported but not used for flagging (no p-value; scipy not assumed). Min 2 rows per side, else a ValueError / CLI exit 2.
 - Ran with the shared venv `~/vggtProject/.venv` since the repo has none.
+
+## "Explain this match" and schema 1.1
+- `result.json` 1.0 had no per-detection geometry, so 1.1 appends `detections` (id, frame, recon view, xyz, size, box-centre uv in recon pixels, optional feature) and `cameras` (K, world->camera extrinsics). `UPGRADERS["1.0"]` bumps the version and adds empty lists (markers only change version). `ResultV11` subclasses `ResultV1`; `tests/fixtures/schemas/v1.1/` is new and `v1.0/` is untouched. Existing tests that asserted `"1.0"` for freshly written files now assert `"1.1"`.
+- Reprojection error each way is recomputed from the stored cameras (a's 3D point into b's view vs b's box centre), so any pair can be explained, not only logged ones. For 1.0 documents it is reported as unavailable and the 3D distance falls back to logged evidence if any.
+- Feature vectors are stored only with the new `Config.store_features` (default off, embeddings are large); otherwise the appearance cosine is reported as unavailable. Detection ids carry the frame, which equals the recon view in the pipeline.
+- `match_prob` is the associator's logged probability; v1 logs a heuristic, only `assoc: v3` logs a learned one (the associator name is in the output).

@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-CURRENT_VERSION = "1.0"
+CURRENT_VERSION = "1.1"
 
 
 class _Strict(BaseModel):
@@ -55,6 +55,22 @@ class MatchEvidenceModel(_Strict):
     reason: str
 
 
+class DetectionRecordModel(_Strict):
+    id: str
+    frame_id: int
+    view: int
+    xyz: tuple[float, float, float] | None = None
+    size: float | None = None
+    uv: tuple[float, float] | None = None
+    feature: list[float] | None = None
+
+
+class CameraRecordModel(_Strict):
+    view: int
+    intrinsics: list[list[float]]
+    extrinsics: list[list[float]]
+
+
 class WarningModel(_Strict):
     code: str
     message: str
@@ -85,6 +101,14 @@ class ResultV1(_Strict):
     warnings: list[WarningModel] = []
 
 
+class ResultV11(ResultV1):
+    """1.1 adds per-detection geometry and cameras (append-only)."""
+
+    schema_version: str = "1.1"
+    detections: list[DetectionRecordModel] = []
+    cameras: list[CameraRecordModel] = []
+
+
 class MarkerModel(_Strict):
     id: int
     xyz: tuple[float, float, float]
@@ -96,7 +120,7 @@ class MarkerModel(_Strict):
 
 
 class MarkersV1(_Strict):
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     count: int = Field(ge=0)
     interval_low: int
     interval_high: int
@@ -106,10 +130,19 @@ class MarkersV1(_Strict):
 
 # version -> function upgrading a raw dict of that version to the next one.
 # Add an entry (and a stored example under tests/data/) with every version bump.
-UPGRADERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {}
+def _upgrade_1_0(raw: dict[str, Any]) -> dict[str, Any]:
+    """1.0 -> 1.1: results gain empty ``detections``/``cameras``; markers only change version."""
+    raw["schema_version"] = "1.1"
+    if "instances" in raw:
+        raw.setdefault("detections", [])
+        raw.setdefault("cameras", [])
+    return raw
 
-_RESULT_MODELS: dict[str, type[BaseModel]] = {"1.0": ResultV1}
-_MARKER_MODELS: dict[str, type[BaseModel]] = {"1.0": MarkersV1}
+
+UPGRADERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {"1.0": _upgrade_1_0}
+
+_RESULT_MODELS: dict[str, type[BaseModel]] = {"1.0": ResultV1, "1.1": ResultV11}
+_MARKER_MODELS: dict[str, type[BaseModel]] = {"1.0": MarkersV1, "1.1": MarkersV1}
 
 
 def _upgrade(raw: dict[str, Any]) -> dict[str, Any]:
@@ -126,9 +159,9 @@ def _upgrade(raw: dict[str, Any]) -> dict[str, Any]:
     return raw
 
 
-def load_result(raw: dict[str, Any]) -> ResultV1:
+def load_result(raw: dict[str, Any]) -> ResultV11:
     """Validate (and upgrade, if old) a raw ``result.json`` dict."""
-    return ResultV1.model_validate(_upgrade(raw))
+    return ResultV11.model_validate(_upgrade(raw))
 
 
 def load_markers(raw: dict[str, Any]) -> MarkersV1:

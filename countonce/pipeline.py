@@ -16,6 +16,7 @@ from countonce.conformal import CalibrationArtifact, interval_from_artifact, res
 from countonce.detect.base import Detector, filter_by_score
 from countonce.detect.cache import CachedDetector, DetectionCache
 from countonce.errors import ErrorCode, MediaError
+from countonce.explain import build_camera_records, build_detection_records
 from countonce.export import export_all
 from countonce.ingest.frames import IMAGE_EXTS, drop_blurry, extract_frames
 from countonce.ingest.privacy import (
@@ -407,6 +408,8 @@ def run(
         detection_status=clustered.detection_status,
         reject_reasons=clustered.reject_reasons,
         match_evidence=clustered.evidence,
+        detections=build_detection_records(lifted, recon, frame_map, config.store_features),
+        cameras=build_camera_records(recon),
         timings=timings,
         oom_fallback_rung=ladder.rung,
         peak_vram_mb=recon.peak_vram_mb,

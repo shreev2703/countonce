@@ -85,7 +85,27 @@ def _parser() -> argparse.ArgumentParser:
     d.add_argument("--out", type=Path, help="write the drift report JSON here")
     d.add_argument("--warn", type=float, default=0.1, help="PSI warn threshold")
     d.add_argument("--alert", type=float, default=0.25, help="PSI alert threshold")
+
+    x = sub.add_parser("explain", help="explain why two detections were or were not merged")
+    x.add_argument("out_dir", type=Path, help="directory holding result.json")
+    x.add_argument("det_a")
+    x.add_argument("det_b")
+    x.add_argument("--json", action="store_true", help="print the explanation as JSON")
     return p
+
+
+def _explain(args: argparse.Namespace) -> int:
+    import json
+
+    from countonce.explain import explain_pair, load_result_dir
+
+    try:
+        exp = explain_pair(load_result_dir(args.out_dir), args.det_a, args.det_b)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(exp.to_dict(), indent=2) if args.json else exp.to_text())
+    return 0
 
 
 def _drift(args: argparse.Namespace) -> int:
@@ -250,6 +270,8 @@ def main(argv: list[str] | None = None) -> int:
         return _profile(args)
     if args.cmd == "drift":
         return _drift(args)
+    if args.cmd == "explain":
+        return _explain(args)
 
     from countonce.pipeline import run
 

@@ -69,6 +69,10 @@ class Config(BaseModel):
     # Trained CountOnce-Match checkpoint (match.model.save_checkpoint); required for assoc: v3.
     v3_checkpoint: Path | None = None
 
+    # Persist Detection.feature vectors in result.json (schema 1.1) so "explain" can report the
+    # appearance cosine. Off by default: embeddings are large.
+    store_features: bool = False
+
     # Face/plate blur (PLAN 14.8). Off by default so bench pixels are untouched; when on, a
     # model file (OpenCV .xml cascade or .onnx face model) must be supplied: nothing is downloaded.
     privacy_blur: bool = False

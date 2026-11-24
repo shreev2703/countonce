@@ -12,7 +12,7 @@ from typing import Any, cast
 
 import numpy as np
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 DETECTION_STATUSES = ("new", "duplicate", "rejected")
 LIFT_FAIL_REASONS = ("low_conf", "privacy_mask", "too_few_pixels", "outside_recon")
@@ -187,6 +187,26 @@ class MatchEvidence:
 
 
 @dataclass
+class DetectionRecord:
+    """Per-detection geometry persisted for 'Explain this match' (schema 1.1)."""
+
+    id: str
+    frame_id: int
+    view: int  # recon view (camera) index
+    xyz: list[float] | None = None
+    size: float | None = None
+    uv: list[float] | None = None  # box centre in recon-grid pixels
+    feature: list[float] | None = None  # only when Config.store_features
+
+
+@dataclass
+class CameraRecord:
+    view: int
+    intrinsics: list[list[float]]  # 3x3
+    extrinsics: list[list[float]]  # 3x4, world -> camera
+
+
+@dataclass
 class Instance:
     id: int
     xyz: np.ndarray
@@ -245,6 +265,8 @@ class CountResult:
     detection_status: dict[str, str] = field(default_factory=dict)
     reject_reasons: dict[str, str] = field(default_factory=dict)
     match_evidence: list[MatchEvidence] = field(default_factory=list)
+    detections: list[DetectionRecord] = field(default_factory=list)
+    cameras: list[CameraRecord] = field(default_factory=list)
     warnings: list[dict[str, Any]] = field(default_factory=list)  # {code, message, fix}
     recon_cache_hit: bool = False
     oom_fallback_rung: int = 0  # 0 = no fallback used

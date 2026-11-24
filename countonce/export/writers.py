@@ -8,15 +8,15 @@ from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 
-from countonce.schemas import CURRENT_VERSION, MarkersV1, ResultV1
+from countonce.schemas import CURRENT_VERSION, MarkersV1, ResultV11
 from countonce.types import CountResult, Detection, Frame
 
 
-def to_result(result: CountResult) -> ResultV1:
+def to_result(result: CountResult) -> ResultV11:
     data = result.to_dict()
     data["schema_version"] = CURRENT_VERSION
     data["per_frame_counts"] = {str(k): v for k, v in result.per_frame_counts.items()}
-    return ResultV1.model_validate(data)
+    return ResultV11.model_validate(data)
 
 
 def to_markers(result: CountResult, scene_scale: float | None = None) -> MarkersV1:
@@ -44,7 +44,7 @@ def to_markers(result: CountResult, scene_scale: float | None = None) -> Markers
     )
 
 
-def _write_json(path: Path, model: ResultV1 | MarkersV1) -> Path:
+def _write_json(path: Path, model: ResultV11 | MarkersV1) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(model.model_dump(mode="json"), indent=2) + "\n", encoding="utf-8")
     return path
