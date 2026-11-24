@@ -32,7 +32,7 @@ class MethodSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    kind: Literal["baseline", "countonce", "vlm"]
+    kind: Literal["baseline", "countonce", "vlm", "zero_suite"]
     baseline: Literal["sum", "max", "median"] | None = None
     config: dict[str, Any] = Field(default_factory=dict)
 
@@ -131,6 +131,8 @@ def build_jobs(cfg: BenchConfig, scenes: list[dict[str, Any]]) -> list[Job]:
     jobs: list[Job] = []
     for scene in scenes:
         for method in cfg.all_methods():
+            if method.kind == "zero_suite":
+                continue  # run by bench.zero_suite, not part of the view grid
             for n in cfg.views:
                 for label, _ in view_samples(cfg):
                     for order in cfg.order:
@@ -266,4 +268,28 @@ def run_bench(
 ) -> tuple[int, int, int]:
     jobs = build_jobs(cfg, scenes)
     fn = fn or make_executor(cfg, scenes, detector_factory, reconstructor_factory)
-    return run_jobs(jobs, fn, cfg.csv, cfg.model_dump(mode="json"))
+    ran, skipped, errored = run_jobs(jobs, fn, cfg.csv, cfg.model_dump(mode="json"))
+    zero = [m for m in cfg.methods if m.kind == "zero_suite"]
+    if zero:
+        from bench.zero_suite import run_zero_suite, write_zero_summary
+
+        for m in zero:
+            z = dict(m.config)
+            r = run_zero_suite(
+                cfg.csv,
+                m.name,
+                z.pop("options", {}),
+                Path(z.pop("scenes_dir", cfg.csv.parent / "zero_suite" / "scenes")),
+                scenes,
+                n_synthetic=int(z.pop("n_synthetic", 12)),
+                seed=int(z.pop("seed", cfg.seed)),
+                split=cfg.split,
+                runs_dir=cfg.runs_dir,
+                cache_dir=cfg.cache_dir,
+                n_views=int(z.pop("n_views", 5)),
+                detector_factory=detector_factory,
+                reconstructor_factory=reconstructor_factory,
+            )
+            ran, skipped, errored = ran + r[0], skipped + r[1], errored + r[2]
+        write_zero_summary(cfg.csv, cfg.csv.parent / "zero_suite.md")
+    return ran, skipped, errored

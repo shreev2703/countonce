@@ -254,3 +254,9 @@ One entry per decision: date, what the plan said, what was done, why.
 
 ## One-click report
 - "Top-N overlays" are ranked by file size (proxy for annotation density, ties by name), default N=6; no per-overlay score is stored. PDF output is skipped with a message when `weasyprint` is not installed (not added as a dependency).
+
+## Zero-count / distractor suite (PLAN 9.8b)
+- `kind: zero_suite` is a `MethodSpec` kind skipped by `build_jobs`; `run_bench` runs it afterwards and writes `zero_suite.md` beside the CSV. Its `config` holds `options` (countonce overrides), `n_synthetic`, `seed`, `n_views`, `scenes_dir`.
+- Synthetic scenes are written to `results/zero_suite/scenes`; a distractor's scores go up to 0.45, so at the default 0.3 threshold some are intentional false positives. Negative prompts (CountGD++) are not covered here (no detector support yet).
+- `ghost_duplicate_rate` is an append-only column; the default executor leaves it blank (no moving GT ids on real scenes). NaN is written as blank.
+- Tests ran via `~/vggtProject/.venv` again (no repo venv).

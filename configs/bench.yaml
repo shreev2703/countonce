@@ -25,6 +25,10 @@ methods:
   - {name: co_v3_vggt, kind: countonce, config: {assoc: v3, backbone: vggt, v3_checkpoint: runs/match/best.pt}}
   - {name: co_sync_vggt, kind: countonce, config: {assoc: sync, backbone: vggt}}
   - {name: co_v1_colmap, kind: countonce, config: {assoc: v1, backbone: colmap}}
+  # Zero-count / distractor suite (PLAN 9.8b): seeded synthetic empty/distractor scenes plus
+  # wrong-prompt jobs for scenes whose gt.json lists `wrong_prompts: [...]`. Appends gt=0 rows and
+  # writes zero_suite.md next to the CSV (FPR, mean false count, interval includes 0, bootstrap CI).
+  - {name: zero_v2, kind: zero_suite, config: {options: {assoc: v2, backbone: vggt}, n_synthetic: 12, seed: 0}}
 
 # One-factor-at-a-time ablations around `ablation_base`, expanded into extra methods.
 ablation_base: co_v2_vggt

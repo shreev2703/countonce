@@ -22,6 +22,7 @@ COLUMNS = [
     # Appended later (append-only schema): older CSVs lack these and are upgraded on resume.
     "peak_vram_mb", "timings_json", "assoc_f1", "run_dir",
     "domain", "duplicate_rate", "miss_rate", "count_error",
+    "ghost_duplicate_rate",
 ]  # fmt: skip
 _V1_COLUMN_COUNT = 18  # columns of the original schema; any longer prefix of COLUMNS is valid
 
@@ -71,10 +72,11 @@ class RunOutput:
     duplicate_rate: float | None = None
     miss_rate: float | None = None
     count_error: float | None = None  # |pred - gt|
+    ghost_duplicate_rate: float | None = None  # blank when no moving GT ids (NaN -> blank)
 
 
 def _fmt(v: object) -> str:
-    return "" if v is None else str(v)
+    return "" if v is None or (isinstance(v, float) and v != v) else str(v)
 
 
 def completed_keys(path: str | Path = DEFAULT_CSV) -> set[str]:
@@ -188,6 +190,7 @@ def run_jobs(
                 "duplicate_rate": _fmt(out.duplicate_rate) if out else "",
                 "miss_rate": _fmt(out.miss_rate) if out else "",
                 "count_error": _fmt(out.count_error) if out else "",
+                "ghost_duplicate_rate": _fmt(out.ghost_duplicate_rate) if out else "",
             }
             w.writerow(row)
             f.flush()
