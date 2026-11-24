@@ -1,0 +1,22 @@
+# Declarative alert rules over the job store (PLAN 14.6, 16B.2). Evaluated by
+# `countonce admin-stats`; every rule is optional. Windows are in seconds before "now".
+rules:
+  - id: failure_rate_spike
+    type: failure_rate_spike
+    window_s: 3600        # recent window
+    baseline_s: 86400     # trailing window before the recent one
+    factor: 2.0           # fire when recent rate > factor * baseline rate
+    min_rate: 0.2         # ...and the recent rate is at least this
+    min_jobs: 5           # ...and the recent window finished at least this many jobs
+    severity: critical
+  - id: queue_age
+    type: queue_age
+    max_age_s: 900        # oldest queued job older than this
+    severity: warning
+  - id: p95_regression
+    type: p95_regression
+    window_s: 3600
+    baseline_s: 86400
+    factor: 1.5           # fire when recent p95 total time > factor * baseline p95
+    min_jobs: 5
+    severity: warning

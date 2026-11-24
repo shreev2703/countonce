@@ -93,9 +93,7 @@ def test_mask_lift_is_tighter_than_box_centre():
         def masks(self, image, boxes):
             return [obj.copy()]
 
-    mask_det = attach_masks(
-        [box_det], [_frame_stub()], ObjectMask(), "d@1", None
-    )[0]
+    mask_det = attach_masks([box_det], [_frame_stub()], ObjectMask(), "d@1", None)[0]
     (lb,) = lift_detections([box_det], recon)
     (lm,) = lift_detections([mask_det], recon)
     assert abs(lm.xyz[0] - truth_x) < abs(lb.xyz[0] - truth_x)

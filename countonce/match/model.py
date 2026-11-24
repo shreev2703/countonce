@@ -290,9 +290,7 @@ def episode_loss(model: Any, ep: Any, d: DetInputs | None = None) -> Any:
     return _torch().stack(losses).mean()
 
 
-def save_checkpoint(
-    model: Any, path: str | Path, meta: dict[str, Any] | None = None
-) -> None:
+def save_checkpoint(model: Any, path: str | Path, meta: dict[str, Any] | None = None) -> None:
     """Save hparams + weights; `meta` (e.g. the dataset version) rides along and is ignored by
     `load_checkpoint`. Read it back with `checkpoint_meta`."""
     blob: dict[str, Any] = {"hparams": model.hparams, "state_dict": model.state_dict()}

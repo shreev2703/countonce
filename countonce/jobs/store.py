@@ -94,6 +94,15 @@ SCHEMA = [
         oom_fallback_rung INTEGER NOT NULL DEFAULT 0,
         peak_vram_mb REAL NOT NULL DEFAULT 0
     )""",
+    """CREATE TABLE IF NOT EXISTS feedback (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL REFERENCES jobs (id),
+        user_id TEXT,
+        correct INTEGER NOT NULL,
+        user_count INTEGER,
+        comment TEXT,
+        created_at DOUBLE PRECISION
+    )""",
     """CREATE TABLE IF NOT EXISTS workers (
         id TEXT PRIMARY KEY,
         name TEXT,

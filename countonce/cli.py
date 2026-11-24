@@ -141,6 +141,14 @@ def _parser() -> argparse.ArgumentParser:
     sj.add_argument("--idempotency-key")
     sj.add_argument("--config", type=Path, help="YAML Config stored as the job options")
 
+    ad = sub.add_parser("admin-stats", help="job-store metrics and alerts (JSON / static HTML)")
+    ad.add_argument("--db", type=Path, required=True)
+    ad.add_argument("--alerts", type=Path, default=Path("configs/alerts.yaml"))
+    ad.add_argument("--json", action="store_true", help="print metrics and alerts as JSON")
+    ad.add_argument("--html", nargs="?", const=Path("admin.html"), type=Path, help="write HTML")
+    ad.add_argument("--reference", type=Path, help="drift reference (bench CSV or result.json dir)")
+    ad.add_argument("--current", type=Path, help="current result.json dir for drift")
+
     q = sub.add_parser("review-queue", help="rank finished jobs by matcher uncertainty")
     q.add_argument("jobs", type=Path, help="a job dir, or a dir of job dirs with result.json")
     q.add_argument("--out", type=Path, default=Path("results/review_queue.jsonl"))
@@ -296,6 +304,46 @@ def _worker(args: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         return 0
     print(f"worker {worker.worker_id}: processed {n} job(s); {store.counts()}")
+    return 0
+
+
+def _admin_stats(args: argparse.Namespace) -> int:
+    import json
+    import time
+
+    from countonce.jobs.store import SqliteJobStore
+    from countonce.monitor import admin
+
+    if not args.db.exists():
+        print(f"countonce: error: no such database: {args.db}", file=sys.stderr)
+        return 2
+    store = SqliteJobStore(args.db)
+    now = time.time()
+    try:
+        rules = admin.load_rules(args.alerts) if args.alerts.exists() else []
+        drift = None
+        if args.reference:
+            from countonce.monitor.drift import run_drift
+
+            drift = run_drift(args.reference, args.current or args.reference)
+    except (FileNotFoundError, ValueError, TypeError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    metrics = admin.compute_metrics(store, now)
+    alerts = admin.evaluate_alerts(store, rules, now)
+    if args.html:
+        args.html.write_text(admin.render_html(metrics, alerts, drift))
+        print(f"admin-stats: wrote {args.html}")
+    if args.json:
+        payload = {"metrics": metrics, "alerts": admin.alerts_to_dicts(alerts), "drift": drift}
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    elif not args.html:
+        print(
+            f"admin-stats: {metrics['n_jobs']} jobs, success rate {metrics['success_rate']}, "
+            f"queue depth {metrics['queue_depth']}"
+        )
+        for a in alerts:
+            print(f"ALERT [{a.severity}] {a.rule}: {a.message}")
     return 0
 
 
@@ -566,6 +614,8 @@ def main(argv: list[str] | None = None) -> int:
         return _label(args)
     if args.cmd == "worker":
         return _worker(args)
+    if args.cmd == "admin-stats":
+        return _admin_stats(args)
     if args.cmd == "submit":
         return _submit(args)
     if args.cmd == "report":
