@@ -221,6 +221,9 @@ def make_executor(
             low=float(res.interval.low),
             high=float(res.interval.high),
             runtime_s=time.perf_counter() - t0,
+            peak_vram_mb=float(res.peak_vram_mb),
+            timings={k: float(v) for k, v in res.timings.items()},
+            run_dir=str(conf.out_dir),
         )
 
     return fn

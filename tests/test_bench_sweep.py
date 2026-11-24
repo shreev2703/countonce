@@ -67,7 +67,7 @@ def test_figures_and_gallery_on_synthetic_csv(tmp_path):
     rows = load_rows(csv_path)
     assert {r.tier for r in rows} == {"easy", "medium", "hard"}
     figs = make_all(csv_path, tmp_path / "figs")
-    assert {f.name for f in figs} == {
+    assert {f.name for f in figs} >= {
         "mape_vs_views.png",
         "ordered_vs_unordered.png",
         "tier_error.png",

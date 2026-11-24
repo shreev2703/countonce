@@ -19,7 +19,10 @@ COLUMNS = [
     "run_key", "status", "scene_id", "split", "method", "n_views", "sample", "ordered",
     "pred", "gt", "low", "high", "runtime_s", "error",
     "git_commit", "git_dirty", "timestamp_utc", "config_json",
+    # Appended later (append-only schema): older CSVs lack these and are upgraded on resume.
+    "peak_vram_mb", "timings_json", "assoc_f1", "run_dir",
 ]  # fmt: skip
+_V1_COLUMN_COUNT = 18  # columns of the original schema; any longer prefix of COLUMNS is valid
 
 
 @dataclass(frozen=True)
@@ -49,6 +52,10 @@ class RunOutput:
     low: float | None = None
     high: float | None = None
     runtime_s: float | None = None
+    peak_vram_mb: float | None = None
+    timings: dict[str, float] | None = None  # per-stage seconds (ingest, detect, recon, ...)
+    assoc_f1: float | None = None  # pairwise same-object F1; only for scenes with identity labels
+    run_dir: str | None = None  # where the run's export (overlays, result.json) was written
 
 
 def _fmt(v: object) -> str:
@@ -66,9 +73,31 @@ def read_rows(path: str | Path = DEFAULT_CSV) -> list[dict[str, str]]:
         return []
     with p.open(newline="") as f:
         reader = csv.DictReader(f)
-        if reader.fieldnames != COLUMNS:
+        names = reader.fieldnames or []
+        if not _is_known_header(names):
             raise ValueError(f"{p} has unexpected columns {reader.fieldnames}")
-        return list(reader)
+        # Old files predate the appended columns; they read back as empty strings.
+        return [{c: (r.get(c) or "") for c in COLUMNS} for r in reader]
+
+
+def _is_known_header(names: list[str]) -> bool:
+    """Current schema or any older prefix of it (append-only evolution)."""
+    return len(names) >= _V1_COLUMN_COUNT and names == COLUMNS[: len(names)]
+
+
+def _upgrade_header(p: Path) -> None:
+    """Rewrite an old-schema CSV in place with the current header (atomic replace)."""
+    with p.open(newline="") as f:
+        names = csv.DictReader(f).fieldnames or []
+    if names == COLUMNS:
+        return
+    rows = read_rows(p)
+    tmp = p.with_suffix(p.suffix + ".tmp")
+    with tmp.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=COLUMNS)
+        w.writeheader()
+        w.writerows(rows)
+    tmp.replace(p)
 
 
 def run_jobs(
@@ -86,6 +115,8 @@ def run_jobs(
     p.parent.mkdir(parents=True, exist_ok=True)
     done = completed_keys(p)
     read_rows(p)  # validates header of an existing file
+    if p.exists() and p.stat().st_size > 0:
+        _upgrade_header(p)
     meta = run_metadata(run_config or {})
     ran = skipped = errored = 0
     write_header = not p.exists() or p.stat().st_size == 0
@@ -126,6 +157,12 @@ def run_jobs(
                 "git_dirty": _fmt(meta.get("git_dirty")),
                 "timestamp_utc": meta["timestamp_utc"],
                 "config_json": json.dumps(job.config, sort_keys=True),
+                "peak_vram_mb": _fmt(out.peak_vram_mb) if out else "",
+                "timings_json": json.dumps(out.timings, sort_keys=True)
+                if out and out.timings
+                else "",
+                "assoc_f1": _fmt(out.assoc_f1) if out else "",
+                "run_dir": _fmt(out.run_dir) if out else "",
             }
             w.writerow(row)
             f.flush()

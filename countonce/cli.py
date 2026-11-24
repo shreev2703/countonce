@@ -46,9 +46,9 @@ def _bench(args: argparse.Namespace) -> int:
         from bench.gallery import write_gallery
 
         try:
-            for f in make_all(cfg.csv, args.figures):
+            for f in make_all(cfg.csv, args.figures, cfg.ablation_base):
                 print(f)
-            write_gallery(cfg.csv, args.figures / "failure_gallery.md")
+            write_gallery(cfg.csv, args.figures / "failure_gallery.md", runs_dir=cfg.runs_dir)
         except (FileNotFoundError, ValueError) as exc:
             print(f"countonce: error: {exc}", file=sys.stderr)
             return 2
