@@ -10,6 +10,7 @@ is usually more accurate than the point-map head.
 
 from __future__ import annotations
 
+import copy
 import time
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from countonce.ingest.frames import VGGT_PATCH, VGGT_SIZE, scaled_target
 from countonce.recon import profiling
 from countonce.recon.result import Recon
 
@@ -26,6 +28,37 @@ DEFAULT_CHECKPOINT = "facebook/VGGT-1B"  # non-commercial license; see README
 def pick_autocast_dtype() -> torch.dtype:
     major, _ = torch.cuda.get_device_capability()
     return torch.bfloat16 if major >= 8 else torch.float16
+
+
+def load_images_at(image_paths: list[Path], size: int) -> torch.Tensor:
+    """Crop-mode preprocessing at a custom width, mirroring VGGT's ``load_and_preprocess_images``
+    (width -> ``size``, height rounded to the patch grid, centre crop when taller than ``size``).
+    Must agree with ``countonce.ingest.frames.backbone_grid_map(..., target=size)``.
+    """
+    from PIL import Image
+
+    tensors = []
+    for p in image_paths:
+        with Image.open(p) as im:
+            img = im.convert("RGB")
+        w, h = img.size
+        new_h = max(round(h * (size / w) / VGGT_PATCH) * VGGT_PATCH, VGGT_PATCH)
+        img = img.resize((size, new_h), Image.Resampling.BICUBIC)
+        t = torch.from_numpy(np.asarray(img, dtype=np.float32) / 255.0).permute(2, 0, 1)
+        if new_h > size:
+            top = (new_h - size) // 2
+            t = t[:, top : top + size, :]
+        tensors.append(t)
+    hh = max(t.shape[1] for t in tensors)
+    if any(t.shape[1] != hh for t in tensors):  # mixed aspect ratios: pad like VGGT's loader
+        tensors = [_pad_rows(t, hh) for t in tensors]
+    return torch.stack(tensors)
+
+
+def _pad_rows(t: torch.Tensor, height: int) -> torch.Tensor:
+    extra = height - t.shape[1]
+    top = extra // 2
+    return torch.nn.functional.pad(t, (0, 0, top, extra - top), value=1.0)
 
 
 class VGGTMethod:
@@ -41,6 +74,8 @@ class VGGTMethod:
         conf_percentile: float = 50.0,
         max_points: int = 500_000,
         seed: int = 0,
+        input_size: int = VGGT_SIZE,
+        raise_on_oom: bool = False,
     ) -> None:
         """
         Args:
@@ -54,7 +89,14 @@ class VGGTMethod:
                 build points from depth + cameras, and the head costs memory.
             conf_percentile: drop this percentage of lowest-confidence depth pixels
                 before building the point cloud.
+            input_size: width of the (crop-mode) input grid, a multiple of the 14 px patch.
+                518 is VGGT's native tier; the OOM ladder lowers it via
+                ``with_resolution_scale``.
+            raise_on_oom: re-raise ``torch.cuda.OutOfMemoryError`` instead of returning
+                ``Recon.failure("cuda_oom")``. The pipeline sets it so the OOM ladder engages.
         """
+        if input_size % VGGT_PATCH or input_size <= 0:
+            raise ValueError(f"input_size must be a positive multiple of {VGGT_PATCH}")
         if weights_dtype not in ("fp32", "bf16"):
             raise ValueError(f"weights_dtype must be 'fp32' or 'bf16', got {weights_dtype!r}")
         self.checkpoint = checkpoint
@@ -63,6 +105,8 @@ class VGGTMethod:
         self.conf_percentile = conf_percentile
         self.max_points = max_points
         self.seed = seed
+        self.input_size = input_size
+        self.raise_on_oom = raise_on_oom
         self.autocast_dtype = pick_autocast_dtype()
         self.model: torch.nn.Module | None = None
         self.load_time_s: float | None = None
@@ -76,8 +120,23 @@ class VGGTMethod:
             "use_point_head": self.use_point_head,
             "conf_percentile": self.conf_percentile,
             "max_points": self.max_points,
+            "input_size": self.input_size,  # part of the recon cache key
             "preprocess": "load_and_preprocess_images(mode='crop')",
         }
+
+    def _copy(self, **changes: Any) -> VGGTMethod:
+        """Shallow copy that shares the loaded model (no second copy of the weights)."""
+        other = copy.copy(self)
+        for k, v in changes.items():
+            setattr(other, k, v)
+        return other
+
+    def with_resolution_scale(self, scale: float) -> VGGTMethod:
+        """A view of this method at a lower input tier (``scale`` of native, patch-aligned)."""
+        return self._copy(input_size=scaled_target(scale))
+
+    def with_oom_raising(self) -> VGGTMethod:
+        return self._copy(raise_on_oom=True)
 
     def load(self) -> None:
         """Load weights onto the GPU once; reused across reconstructions."""
@@ -99,6 +158,8 @@ class VGGTMethod:
         self.model = model
 
     def load_images(self, image_paths: list[Path]) -> torch.Tensor:
+        if self.input_size != VGGT_SIZE:
+            return load_images_at(image_paths, self.input_size)
         from vggt.utils.load_fn import load_and_preprocess_images
 
         return load_and_preprocess_images([str(p) for p in image_paths], mode="crop")
@@ -126,6 +187,8 @@ class VGGTMethod:
         except torch.cuda.OutOfMemoryError:
             del images
             profiling.free_gpu_memory()
+            if self.raise_on_oom:
+                raise  # the OOM ladder owns the retry
             return Recon.failure(
                 self.name,
                 image_paths,

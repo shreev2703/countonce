@@ -64,6 +64,18 @@ def _scaled_height(width: int, height: int, target: int = VGGT_SIZE) -> int:
     return round(height * (target / width) / VGGT_PATCH) * VGGT_PATCH
 
 
+def scaled_target(scale: float, base: int = VGGT_SIZE) -> int:
+    """Input tier for a resolution ``scale``: ``base * scale`` snapped to the 14 px patch grid.
+
+    Never below one patch; ``scale >= 1`` returns ``base`` (a tier is only ever lowered).
+    """
+    if scale >= 1.0:
+        return base
+    if scale <= 0:
+        raise ValueError(f"resolution scale must be positive, got {scale}")
+    return max(int(round(base * scale / VGGT_PATCH)), 1) * VGGT_PATCH
+
+
 def vggt_grid_size(width: int, height: int, target: int = VGGT_SIZE) -> tuple[int, int]:
     """(W, H) that VGGT's load_and_preprocess_images(mode="crop") produces for an image.
 

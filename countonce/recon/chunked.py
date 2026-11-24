@@ -15,6 +15,7 @@ from typing import Any
 
 import numpy as np
 
+from countonce.oom import RungUnavailable
 from countonce.recon.align import Sim3, camera_centers, transform_extrinsics, umeyama
 from countonce.recon.base import Reconstructor
 from countonce.types import Frame, Recon
@@ -69,6 +70,13 @@ def align_chunk(merged_ext: np.ndarray, chunk_ext: np.ndarray) -> Sim3:
         raise ChunkAlignmentError(f"chunk alignment failed: {e}") from e
 
 
+def _scaled(inner: Any, scale: float) -> Any:
+    fn = getattr(inner, "with_resolution_scale", None)
+    if fn is None:
+        raise RungUnavailable("inner reconstructor has no resolution control")
+    return fn(scale)
+
+
 class ChunkedReconstructor:
     """``Reconstructor`` wrapper; passes through unchanged when frames fit in one chunk."""
 
@@ -86,6 +94,10 @@ class ChunkedReconstructor:
             "overlap": self.overlap,
             "inner": self.inner.config(),
         }
+
+    def with_resolution_scale(self, scale: float) -> ChunkedReconstructor:
+        inner = _scaled(self.inner, scale)
+        return ChunkedReconstructor(inner, self.chunk_size, self.overlap)
 
     def reconstruct(self, frames: list[Frame]) -> Recon:
         if len(frames) <= self.chunk_size:

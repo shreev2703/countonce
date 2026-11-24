@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 from countonce.confidence import k_grid, sensitivity_range, threshold_grid
@@ -20,12 +21,12 @@ from countonce.merge.base import Associator
 from countonce.merge.cluster import V1Associator
 from countonce.merge.match import V2Associator, V2Config
 from countonce.merge.sync import SyncAssociator
-from countonce.oom import Attempt, RungUnavailable, run_with_oom_ladder
+from countonce.oom import Attempt, RungUnavailable, free_cache, run_with_oom_ladder
 from countonce.provenance import run_metadata
 from countonce.recon.base import Reconstructor
 from countonce.recon.cache import CachedReconstructor, ReconCache
 from countonce.recon.chunked import ChunkedReconstructor
-from countonce.types import CountResult, Frame, Interval, ModelVersions
+from countonce.types import CountResult, Detection, Frame, Interval, ModelVersions
 from countonce.types import Recon as DenseRecon
 from countonce.warnings import assess_quality
 
@@ -64,6 +65,16 @@ def make_frames(paths: list[Path], preprocess_mode: str | None = None) -> list[F
         gm = backbone_grid_map(w, h, preprocess_mode) if preprocess_mode else None
         frames.append(Frame(id=i, path=p, width=w, height=h, sha256=_sha256(p), grid_map=gm))
     return frames
+
+
+def regrid_frames(frames: list[Frame], mode: str | None, rec: object) -> list[Frame]:
+    """Frames whose ``grid_map`` matches the reconstructor's current (lowered) input tier."""
+    target = getattr(rec, "grid_target", None)
+    if not mode or target is None:
+        return frames
+    from countonce.ingest.frames import backbone_grid_map
+
+    return [replace(f, grid_map=backbone_grid_map(f.width, f.height, mode, target)) for f in frames]
 
 
 def _sha256(path: Path) -> str:
@@ -178,37 +189,56 @@ def run(
     det = detector if detector is not None else build_detector(config)
     if config.cache_dir is not None:
         det = CachedDetector(det, DetectionCache(Path(config.cache_dir) / "detect"))
-    raw_detections = det.detect(frames, prompt)
+
+    def detect_stage(att: Attempt) -> list[Detection]:
+        if att.resolution_scale < 1.0:
+            raise RungUnavailable("detectors have no resolution control")
+        if att.chunk_size is None:
+            return det.detect(frames, prompt)
+        out: list[Detection] = []  # smaller detector batch; free memory between batches
+        for i in range(0, len(frames), att.chunk_size):
+            out.extend(det.detect(frames[i : i + att.chunk_size], prompt))
+            free_cache()
+        return out
+
+    raw_detections = run_with_oom_ladder(
+        detect_stage, stage_name="detect", n_frames=len(frames), resolution_tiers=()
+    ).value
     detections = filter_by_score(raw_detections, config.score_threshold)
     timings["detect"] = time.perf_counter() - t
 
     # Reconstruct, under the OOM degradation ladder (rung 0 = the configured run, unchanged)
     t = time.perf_counter()
-    base_rec = rec
+    with_raising = getattr(rec, "with_oom_raising", None)
+    base_rec = with_raising() if with_raising is not None else rec  # OOM must reach the ladder
     cache_dir = Path(config.cache_dir) if config.cache_dir is not None else None
 
-    def recon_stage(att: Attempt) -> tuple[DenseRecon, str | None, bool]:
+    def recon_stage(att: Attempt) -> tuple[DenseRecon, str | None, bool, list[Frame]]:
         r = base_rec
+        stage_frames = frames
         if att.resolution_scale < 1.0:
             with_res = getattr(r, "with_resolution_scale", None)
             if with_res is None:
                 raise RungUnavailable("backbone has no resolution control")
             r = with_res(att.resolution_scale)
+            stage_frames = regrid_frames(frames, getattr(rec, "preprocess_mode", None), r)
         if att.chunk_size is not None:
-            r = ChunkedReconstructor(r, att.chunk_size, config.chunk_overlap)
+            # a ladder chunk can be smaller than the configured overlap; keep overlap < chunk
+            overlap = max(2, min(config.chunk_overlap, att.chunk_size - 1))
+            r = ChunkedReconstructor(r, att.chunk_size, overlap)
         elif config.chunked_recon:
             cap = _chunk_cap(config)
             if cap is not None:
                 r = ChunkedReconstructor(r, cap, config.chunk_overlap)
         if cache_dir is not None:
             got = CachedReconstructor(r, ReconCache(cache_dir / "recon"), "0").reconstruct_cached(
-                frames
+                stage_frames
             )
-            return got.recon, got.key, got.hit
-        return r.reconstruct(frames), None, False
+            return got.recon, got.key, got.hit, stage_frames
+        return r.reconstruct(stage_frames), None, False, stage_frames
 
     ladder = run_with_oom_ladder(recon_stage, stage_name="recon", n_frames=len(frames))
-    recon, cache_key, cache_hit = ladder.value  # type: ignore[misc]
+    recon, cache_key, cache_hit, frames = ladder.value  # type: ignore[misc]
     timings["recon"] = time.perf_counter() - t
 
     # Lift + associate

@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 
+from countonce.oom import RungUnavailable
 from countonce.recon.base import Reconstructor
 from countonce.types import Frame, Recon
 
@@ -88,6 +89,13 @@ class CachedReconstructor:
         self.cache = cache
         self.version = version
         self.name = inner.name
+
+    def with_resolution_scale(self, scale: float) -> CachedReconstructor:
+        """Same cache over a lower-tier inner; the tier is in ``config()`` so keys differ."""
+        fn = getattr(self.inner, "with_resolution_scale", None)
+        if fn is None:
+            raise RungUnavailable("inner reconstructor has no resolution control")
+        return CachedReconstructor(fn(scale), self.cache, self.version)
 
     def key_for(self, frames: list[Frame]) -> str:
         return recon_cache_key(frames, self.inner.name, self.version, self.inner.config())

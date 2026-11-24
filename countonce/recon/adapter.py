@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 
 from countonce.lift import compute_scene_scale
+from countonce.oom import RungUnavailable
 from countonce.recon.base import ReconMethod
 from countonce.recon.result import Recon as SparseRecon
 from countonce.types import Frame
@@ -176,6 +177,27 @@ class MethodReconstructor:
 
     def config(self) -> dict[str, Any]:
         return self.method.config()
+
+    @property
+    def grid_target(self) -> int | None:
+        """Input-grid width the backbone currently uses (None = native/not applicable)."""
+        size = getattr(self.method, "input_size", None)
+        return int(size) if size is not None else None
+
+    def _rewrap(self, method: ReconMethod) -> MethodReconstructor:
+        return MethodReconstructor(method, self.name)
+
+    def with_resolution_scale(self, scale: float) -> MethodReconstructor:
+        """Same backbone at a lower input tier; RungUnavailable if the method cannot."""
+        fn = getattr(self.method, "with_resolution_scale", None)
+        if fn is None:
+            raise RungUnavailable(f"{self.name} has no resolution control")
+        return self._rewrap(fn(scale))
+
+    def with_oom_raising(self) -> MethodReconstructor:
+        """Same backbone, raising OOM instead of returning a failure (for the OOM ladder)."""
+        fn = getattr(self.method, "with_oom_raising", None)
+        return self if fn is None else self._rewrap(fn())
 
 
 def load_method(backbone: str, **kwargs: Any) -> MethodReconstructor:
