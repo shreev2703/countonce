@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 DetectorName = Literal["countgd", "gdino", "countgdpp"]
 BackboneName = Literal["vggt", "vggt_omega", "vggt_t3", "colmap"]
-AssocName = Literal["v1", "v2", "v3"]
+AssocName = Literal["v1", "v2", "v3", "sync"]
 
 
 class Config(BaseModel):

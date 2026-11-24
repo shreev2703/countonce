@@ -21,6 +21,7 @@ methods:
   - {name: median, kind: baseline, baseline: median}
   - {name: co_v1_vggt, kind: countonce, config: {assoc: v1, backbone: vggt}}
   - {name: co_v2_vggt, kind: countonce, config: {assoc: v2, backbone: vggt}}
+  - {name: co_sync_vggt, kind: countonce, config: {assoc: sync, backbone: vggt}}
   - {name: co_v1_colmap, kind: countonce, config: {assoc: v1, backbone: colmap}}
 
 # One-factor-at-a-time ablations around `ablation_base`, expanded into extra methods.

@@ -21,7 +21,7 @@ def _parser() -> argparse.ArgumentParser:
     r.add_argument("--config", type=Path, help="YAML Config file; flags override it")
     r.add_argument("--detector", choices=["countgd", "gdino", "countgdpp"])
     r.add_argument("--backbone", choices=["vggt", "vggt_omega", "vggt_t3", "colmap"])
-    r.add_argument("--assoc", choices=["v1", "v2", "v3"])
+    r.add_argument("--assoc", choices=["v1", "v2", "v3", "sync"])
     r.add_argument("--out", type=Path)
     r.add_argument("--fps", type=float)
 

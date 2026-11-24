@@ -16,6 +16,7 @@ from countonce.ingest.select import cap_frames, drop_near_duplicates
 from countonce.lift import compute_scene_scale, lift_detections
 from countonce.merge.cluster import V1Associator
 from countonce.merge.match import V2Associator, V2Config
+from countonce.merge.sync import SyncAssociator
 from countonce.provenance import run_metadata
 from countonce.recon.base import Reconstructor
 from countonce.recon.cache import CachedReconstructor, ReconCache
@@ -96,7 +97,10 @@ def _make_associator(config: Config, k: float):
         return V1Associator(k=k)
     base = V2Config()
     gate = base.max_reproj_norm * k / config.merge_k
-    return V2Associator(V2Config(**{**base.__dict__, "max_reproj_norm": gate}))
+    v2cfg = V2Config(**{**base.__dict__, "max_reproj_norm": gate})
+    if config.assoc == "sync":
+        return SyncAssociator(v2_config=v2cfg)
+    return V2Associator(v2cfg)
 
 
 def run(
@@ -112,7 +116,7 @@ def run(
 
     ``detector`` / ``reconstructor`` override the config-selected backends (tests, notebooks).
     """
-    if config.assoc not in ("v1", "v2"):
+    if config.assoc not in ("v1", "v2", "sync"):
         raise NotImplementedError(f"associator {config.assoc!r} is not implemented yet")
     timings: dict[str, float] = {}
     t0 = time.perf_counter()

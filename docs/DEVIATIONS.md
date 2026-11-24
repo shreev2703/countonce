@@ -125,3 +125,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - Hosted CI installs only `.[dev]`, so no torch/PIL-extras beyond core deps; mypy there was not run (only locally). Golden test `tests/test_golden.py` (marker `golden`) pins v1/v2 counts = 6 on a seeded scene.
 
 - Slicing (`bench/slices.py`): slice-vs-overall difference uses independent bootstrap resampling of slice scenes and all scenes (conservative since slice ⊂ overall); slices with < 5 scenes are reported but never flagged; occlusion and camera-baseline covariates from §9.9 are not computed (need identity labels / pose spread) — TODO.
+
+## Synchronization baseline (`assoc: sync`)
+- v2 does not expose per-pair matches (it is an incremental tracker), so `merge/sync.py` rebuilds pairwise matches with v2's own geometry (symmetric reprojection error + appearance gate, per-frame-pair Hungarian) and synchronizes those. Rounding is spectral embedding + per-view Hungarian into a growing universe (cannot-link holds by construction). v2's hallucination filter is reused; its split check is not.
+- Wired into `run()`/CLI/`configs/bench.yaml` as `co_sync_vggt`. No real-data numbers: TODO: fill from results.
