@@ -157,3 +157,16 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 - **After this batch, the autonomous backlog really is empty.** Every remaining PLAN item then needs data, weights, GPU time, new dependencies,
   accounts or your approval. Biggest unblockers, in order: Fuji-SfM plus the detector weights (real Core numbers), mockup approval plus `fastapi`/`sqlalchemy`
   (web product), and `pyarrow`+`duckdb` (Track J).
+
+## 2026-11-24: Eleventh tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state: all 82 earlier overnight tasks are checked. In the countonce `.venv`, `pytest` gives 653 passed and 3 skipped (mcp, pycolmap x2),
+  `ruff check .` and `ruff format --check .` are clean, and `mypy countonce` reports no issues (84 files). The audit found no new bugs or stubs beyond the weight-gated
+  `NotImplementedError` paths already logged (`countgdpp`, `vggt_omega`, `vggt_t3`, the CountGD forward pass).
+- **Policy change on new PyPI deps:** earlier audits treated `pyarrow`/`duckdb` and `fastapi`/`httpx` as human-gated. They are public, non-credentialed
+  installs, so this batch queues Track J, the OLAP export and the HTTP API, and each task installs its own extra into `.venv`. If an install fails (no network),
+  the task logs it here and exits. The **frontend** still waits for your mockup approval. Postgres, R2, Google sign-in and deploys still need your accounts.
+- **Still yours (unchanged):** the formatter-only `docs/PLAN.md` diff (keep or revert), whether to commit `uv.lock`, the LICENSE choice, Docker in WSL2 (to build the
+  queued worker image and run Kubric), HF account and uploads for the queued release scaffolding, GPU runs (v3 training, profiling, cold start, Triton, FP8/NVFP4),
+  gated or large weights and datasets (Fuji-SfM, CountGD/GroundingDINO/SAM, VGGT-Ω/VGG-T³/CountGD++, video datasets, C-DOG/CountVid/DG-Net), the OTLP endpoint,
+  cost rates, captures, hand counts, identity labels, interviews, the professor meeting, the pilot, the human baseline study, the demo video and the paper venue.
+- **After this batch the autonomous backlog is empty.** Everything left in PLAN.md needs data, weights, GPU or Docker time, accounts or your approval.
