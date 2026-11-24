@@ -16,6 +16,7 @@ BackboneName = Literal["vggt", "vggt_omega", "vggt_t3", "colmap"]
 AssocName = Literal["v1", "v2", "v3", "sync"]
 HallucinationMode = Literal["off", "downweight", "drop"]
 LiftRegion = Literal["mask", "box"]
+MasksMode = Literal["none", "box_fill", "sam"]
 CompileModeName = Literal["off", "default", "reduce-overhead"]
 IntervalMethodName = Literal["sensitivity", "conformal", "jackknife_plus"]
 
@@ -37,6 +38,12 @@ class Config(BaseModel):
     negative_margin: float = Field(0.0, ge=0)
     hallucination: HallucinationMode = "downweight"  # v2: one-view ghost filter
     lift_region: LiftRegion = "mask"  # "mask": use Detection.mask when present; "box": box centre
+    # Mask producer run after detection (PLAN 8.2 masks.py): "none" leaves Detection.mask unset
+    # (lifting falls back to the central box region), "box_fill" fills each box, "sam" prompts SAM 2
+    # with each box and needs ``mask_checkpoint`` (and the ``sam2`` package).
+    masks: MasksMode = "none"
+    mask_checkpoint: Path | None = None
+    mask_model_cfg: str = "sam2_hiera_s.yaml"
     # Dynamic-object residual filter (PLAN 8.3b): flag detections that do not reproject onto a
     # detection in the other views, downweight them and merge moving-object ghosts.
     motion_filter: bool = False

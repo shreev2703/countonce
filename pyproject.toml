@@ -72,5 +72,5 @@ files = ["countonce"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*"]
+module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*", "sam2.*"]
 ignore_missing_imports = true

@@ -313,3 +313,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - **Tolerances** (untuned): frozen MAE +5% relative, frozen assoc F1 -0.01 absolute, golden MAPE +0.02 / F1 -0.02; golden VRAM/latency never gate (hardware noise).
 - **Active score** = 0.5 x mean(1 - 2|p-0.5|) + 0.5 x min(interval width / count, 1); weights are arbitrary, jobs with `corrected/` are skipped.
 - **Corrections in training.** Persisted results hold no rays/camera centres, so correction groups use xyz/size/frame only (other inputs neutral) and a BCE loss on match probability; one group per optimiser step, round-robin, weight `corrections_weight`. `false_positive` pairs are ignored by the matcher. The data version gets a `+corr-<hash>` suffix. Not run on real corrections.
+
+## Mask producer (masks.py)
+- Masks are attached to all raw detections (not only those above `score_threshold`) so the sensitivity sweep over thresholds also lifts masks; cost is extra SAM prompts on low-score boxes.
+- Mask cache is separate from the detection cache (`<cache_dir>/masks/*.npz`, packed bits), keyed by frame hash, detector@version, mask model, mask version and the exact boxes.
+- Ablation row `masks: box_fill` only; `sam` is not in `configs/bench.yaml` because weights are gated.

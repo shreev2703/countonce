@@ -98,3 +98,8 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   approval); Track J Parquet/DuckDB/WebDataset/DVC (pyarrow/duckdb); OpenTelemetry (needs the API and an exporter account); Triton kernel and
   FP8/NVFP4 (interactive GPU); VGGT-Ω/VGG-T³/CountGD++ backends (gated weights); OneScene-Bench, RGBD-VideoCount and VideoCount loaders plus the
   C-DOG/CountVid/DG-Net baselines (downloads); HF Space/model/dataset releases (needs results and your accounts).
+
+## 2026-11-24: SAM weights for the mask producer (human action)
+- `Config.masks: sam` needs the `sam2` package and a SAM 2 checkpoint, e.g. `sam2_hiera_small.pt` (config `sam2_hiera_s.yaml`), downloaded
+  by you on a networked session and set as `mask_checkpoint`. Nothing was downloaded; `sam` mode raises `MaskModelUnavailable` when missing.
+  The queued task built and tested only the `box_fill` producer and a fake. The bench ablation row uses `box_fill` for that reason.

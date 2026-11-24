@@ -43,6 +43,8 @@ ablations:
   # "off" is quoted: a bare off is a YAML boolean
   hallucination: {field: hallucination, values: ["off", drop]}
   lift_region: {field: lift_region, values: [box]}
+  # box-centre vs mask lifting (9.6): base has no masks; `sam` needs mask_checkpoint, so only box_fill here
+  masks: {field: masks, values: [box_fill]}
   negative_prompts: {field: negative_prompts, values: [false]}   # natural-language negatives off (default on)
   motion_filter: {field: motion_filter, values: [true]}   # dynamic-object residual filter (8.3b)
 

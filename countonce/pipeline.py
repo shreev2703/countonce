@@ -16,6 +16,7 @@ from countonce.config import Config
 from countonce.conformal import CalibrationArtifact, interval_from_artifact, resolve_method
 from countonce.detect.base import Detector, filter_by_score
 from countonce.detect.cache import CachedDetector, DetectionCache
+from countonce.detect.masks import MaskCache, SamMaskProducer, attach_masks, build_mask_producer
 from countonce.detect.prompts import (
     ParsedPrompt,
     detect_with_negatives,
@@ -312,6 +313,16 @@ def run(
     raw_detections = run_with_oom_ladder(
         detect_stage, stage_name="detect", n_frames=len(frames), resolution_tiers=()
     ).value
+    if config.masks != "none":
+        producer = build_mask_producer(config.masks, config.mask_checkpoint)
+        if isinstance(producer, SamMaskProducer):
+            producer.model_cfg = producer.version = config.mask_model_cfg
+        if producer is not None:
+            mask_cache = MaskCache(Path(config.cache_dir) / "masks") if config.cache_dir else None
+            # all raw detections, so the sensitivity sweep over thresholds also has masks
+            raw_detections = attach_masks(
+                raw_detections, frames, producer, f"{det.name}@{det.version}", mask_cache
+            )
     detections = filter_by_score(raw_detections, config.score_threshold)
     timings["detect"] = time.perf_counter() - t
 
