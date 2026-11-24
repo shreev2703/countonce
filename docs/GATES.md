@@ -69,3 +69,16 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 - **Track F GPU measurements:** the queued optimization switches and `docs/PROFILE.md` generator are CPU-tested only. Filling the
   profile table needs an interactive RTX 5070 run with VGGT and detector weights present.
 - **Web API/DB/queue (PLAN §14.2-14.4):** still deferred until the Core benchmark has real numbers, and the frontend still waits for mockup approval.
+
+## 2026-11-24: Sixth tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state: all 47 earlier overnight tasks are checked. `pytest` passes 402 tests (1 skipped) and `ruff check .` is clean, both
+  still run from `~/vggtProject/.venv`. mypy is still not installed, so the countonce venv item stays open.
+- **Web product deps (PLAN §14.2-14.4, §14.8 idempotency/resumable uploads):** `fastapi`, `httpx`, `sqlalchemy` and a Postgres instance
+  are not available, and the frontend still waits for mockup approval. The API, idempotency keys and load test stay unqueued until you
+  approve mockups and add those deps. The correction tools are queued as a backend only.
+- **MCP server:** the `mcp` package is not installed. The queued task builds the tool function and a lazily imported server. To run it
+  for real, install the `mcp` extra and register the server in a Claude client yourself.
+- **Golden gate runner:** the queued task adds the workflow and comparison script only. Registering the laptop as a self-hosted runner
+  (a separate low-privilege user in its own WSL2 distro, restricted to this repo) is yours to do, and so is choosing the 5 real golden
+  scenes after captures exist.
+- **Track J (Parquet/DuckDB/WebDataset/DVC):** `pyarrow` and `duckdb` are still missing, so it stays unqueued (see the fourth audit).
