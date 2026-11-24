@@ -68,7 +68,7 @@ def test_unreadable_and_empty_images(tmp_path):
 def test_truncated_images(tmp_path):
     s = _scene(tmp_path)
     data = s.frames[0].read_bytes()
-    s.frames[0].write_bytes(data[: len(data) // 2])
+    s.frames[0].write_bytes(data[:-10])
     png = _img(tmp_path / "p.png", 9, fmt="PNG")
     png.write_bytes(png.read_bytes()[:-20])
     s.frames.append(png)

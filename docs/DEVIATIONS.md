@@ -484,3 +484,11 @@ One entry per decision: date, what the plan said, what was done, why.
 - `countonce bench` gained an optional positional `detector-sanity` (flags `--dataset/--root/--split/--limit/--detector/--score-threshold/--sanity-out`) rather than a new top-level command.
 - The CSV holds per-image rows plus one `summary` row per run in a single fixed schema; the bootstrap resamples images (each FSC-147 image is its own scene). Default score threshold 0.3 and no exemplars passed to the detector (`use_exemplars=False`); both are my choices.
 - Whole FSC-147 layout is assumed (`TODO: verify`); download script uses `huggingface-cli` with `FSC147_REPO` default `isentropic/FSC147` and was not run. `docs/DATASETS.md` results stay `TODO: fill from results`.
+
+## Data-quality gates for real-data loaders
+- `quarantine.jsonl` (one `{scene_id, reasons, details, dataset}` object per line) is the task-specified file; synth writes `quarantine.json`. The record shape (`scene_id` -> sorted reasons) matches `synth.validate.QuarantineReport`; the two files were not unified.
+- Header-only decode cannot see truncation, so `image_size` also checks the JPEG EOI / PNG IEND tail marker. Truncation that keeps the tail marker is not caught.
+- "GT count vs annotation" and "image count vs camera/annotation" rules fire only when a loader supplies `extra["n_gt_items"]`, `n_cameras` or `n_annotated_frames`; no loader sets them yet because the real layouts are unverified (TODO: set after first download).
+- Fuji-SfM is a single scene, so `load_fuji_sfm(validate=True)` raises `DataQualityError` (after writing the quarantine file) instead of skipping.
+- Evaluator: quarantined ids come from `--quarantine <jsonl>` (repeatable) or a `quarantined` list in the GT doc; they are dropped from GT, predictions and reference, and reported as `n_quarantined_skipped`. `frozen_problems` still lists them as unscored, deliberately.
+- Existing loader tests now write real tiny JPEGs, since fake `b"x"` frames correctly fail the gates.

@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from bench.datasets.fuji_sfm import FujiScene, align_recon_to_gt, load_fuji_sfm
+from bench.datasets.validate import DataQualityError
 from bench.gt_matching import match_detections_to_gt, project_points
 from countonce.recon.align import (
     Sim3,
@@ -181,9 +182,17 @@ def test_loader_missing_and_synthetic_layout(tmp_path):
         load_fuji_sfm(tmp_path)
     (tmp_path / "images").mkdir()
     for n in ("a", "b"):
-        (tmp_path / "images" / f"{n}.jpg").write_bytes(b"x")
+        (tmp_path / "images" / f"{n}.jpg").write_bytes(b"x")  # fake bytes: fail the gates
     (tmp_path / "masks").mkdir()
     (tmp_path / "masks" / "b.png").write_bytes(b"x")
     np.save(tmp_path / "gt_apples.npy", np.zeros((4, 3)))
+    with pytest.raises(DataQualityError):
+        load_fuji_sfm(tmp_path)
+    from PIL import Image
+
+    for i, n in enumerate(("a", "b")):
+        Image.fromarray(np.full((8, 8, 3), 40 * (i + 1), dtype=np.uint8)).save(
+            tmp_path / "images" / f"{n}.jpg"
+        )
     s = load_fuji_sfm(tmp_path)
     assert len(s.image_paths) == 2 and len(s.gt_ids) == 4 and list(s.mask_paths) == [1]
