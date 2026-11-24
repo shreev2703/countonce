@@ -9,6 +9,7 @@ Nothing here is a result: numbers only exist after a real run.
 from __future__ import annotations
 
 import csv
+import shutil
 import sys
 import time
 from collections.abc import Callable, Iterator
@@ -71,6 +72,10 @@ class ProfileRow:
     backbone: str
     detector: str
     assoc: str
+    # Append-only (repeat-job caching, PLAN 13 item 6b). Empty on ordinary profile rows.
+    cache_state: str = ""
+    recon_cache_hit: bool | None = None
+    det_cache_hit: bool | None = None
 
 
 @dataclass
@@ -87,6 +92,20 @@ class Variant:
         return cls(str(raw["name"]), Config(**{**base_run, **(raw.get("run") or {})}))
 
 
+@dataclass
+class CacheProfile:
+    """The ``cache:`` block: ``new_prompt`` (second prompt) and a scratch ``dir`` for the caches."""
+
+    new_prompt: str
+    dir: Path = Path("results/profile_cache")
+
+    @classmethod
+    def from_raw(cls, raw: dict[str, Any]) -> CacheProfile:
+        if not isinstance(raw, dict) or not raw.get("new_prompt"):
+            raise ValueError("`cache:` needs a `new_prompt`")
+        return cls(str(raw["new_prompt"]), Path(raw.get("dir", "results/profile_cache")))
+
+
 class ProfileConfig:
     """YAML: ``inputs`` (dir/files/video), ``prompt``, ``repeats``, ``warmup``, ``out_csv``,
     and an optional nested ``run:`` block of ``Config`` fields."""
@@ -101,6 +120,7 @@ class ProfileConfig:
         run: Config | None = None,
         variants: list[Variant] | None = None,
         variants_csv: Path = Path("results/profile_variants.csv"),
+        cache: CacheProfile | None = None,
     ) -> None:
         if repeats < 1 or warmup < 0:
             raise ValueError("repeats must be >= 1 and warmup >= 0")
@@ -109,6 +129,7 @@ class ProfileConfig:
         self.run = run if run is not None else Config()
         self.variants = variants or []
         self.variants_csv = Path(variants_csv)
+        self.cache = cache
         names = [v.name for v in self.variants]
         if len(set(names)) != len(names):
             raise ValueError(f"duplicate variant names: {names}")
@@ -130,6 +151,7 @@ class ProfileConfig:
             run=Config(**(raw.get("run") or {})),
             variants=[Variant.from_raw(v, base_run) for v in raw.get("variants") or []],
             variants_csv=Path(raw.get("variants_csv", "results/profile_variants.csv")),
+            cache=CacheProfile.from_raw(raw["cache"]) if raw.get("cache") else None,
         )
 
 
@@ -152,9 +174,41 @@ def write_csv(rows: list[ProfileRow], path: Path) -> Path:
                     r.backbone,
                     r.detector,
                     r.assoc,
+                    r.cache_state,
+                    _flag(r.recon_cache_hit),
+                    _flag(r.det_cache_hit),
                 ]
             )
     return path
+
+
+def _flag(x: bool | None) -> str:
+    return "" if x is None else str(int(x))
+
+
+def load_profile_csv(path: Path) -> list[ProfileRow]:
+    """Read a profile CSV; files written before the cache columns existed load with defaults."""
+    out: list[ProfileRow] = []
+    with Path(path).open(newline="") as fh:
+        for r in csv.DictReader(fh):
+            peak = r.get("peak_vram_mb") or ""
+            rh, dh = r.get("recon_cache_hit") or "", r.get("det_cache_hit") or ""
+            out.append(
+                ProfileRow(
+                    int(r["repeat"]),
+                    r["stage"],
+                    float(r["wall_s"]),
+                    float(peak) if peak else None,
+                    int(r["n_frames"]),
+                    r["backbone"],
+                    r["detector"],
+                    r["assoc"],
+                    r.get("cache_state") or "",
+                    None if rh == "" else rh == "1",
+                    None if dh == "" else dh == "1",
+                )
+            )
+    return out
 
 
 def _measure(
@@ -288,3 +342,60 @@ def run_profile_variants(
                     )
                 )
     return write_variants_csv(rows, cfg.variants_csv), rows
+
+
+CACHE_STATES = ("cold", "new_prompt", "repeat")
+
+
+def _n_cache_entries(cache_dir: Path) -> int:
+    d = cache_dir / "detect"
+    return sum(1 for p in d.rglob("*") if p.is_file()) if d.exists() else 0
+
+
+def run_profile_cache(
+    cfg: ProfileConfig,
+    run_fn: Callable[[Config, str], CountResult] | None = None,
+) -> tuple[Path, list[ProfileRow]]:
+    """Measure repeat-job savings (PLAN 13 item 6b) and write ``out_csv``.
+
+    Per repeat, with an empty cache: (1) ``cold``: the photos and ``prompt``; (2) ``new_prompt``:
+    the same photos with ``cache.new_prompt`` (recon hit, detection miss); (3) ``repeat``: the
+    first job again (both hit). ``warmup`` untimed passes run first in a separate cache dir. The
+    recon hit flag is ``CountResult.recon_cache_hit``; the detection flag is "no new entry was
+    written to the detection cache" (a miss always writes). ``run_fn`` replaces the pipeline.
+    """
+    if cfg.cache is None:
+        raise ValueError("no `cache:` block in the profile config")
+    if cfg.cache.new_prompt == cfg.prompt:
+        raise ValueError("`cache.new_prompt` must differ from `prompt`")
+    if run_fn is None:
+        from countonce.pipeline import run
+
+        inputs: Any = cfg.inputs[0] if len(cfg.inputs) == 1 else cfg.inputs
+
+        def run_fn(c: Config, prompt: str) -> CountResult:
+            return run(inputs, prompt, c, export=False)
+
+    root = cfg.cache.dir
+    prompts = {"cold": cfg.prompt, "new_prompt": cfg.cache.new_prompt, "repeat": cfg.prompt}
+    rows: list[ProfileRow] = []
+    for i in range(cfg.warmup + cfg.repeats):
+        timed = i >= cfg.warmup
+        cdir = root / ("run" if timed else "warmup")
+        shutil.rmtree(cdir, ignore_errors=True)
+        run_cfg = cfg.run.model_copy(update={"cache_dir": cdir})
+        for state in CACHE_STATES:
+            before = _n_cache_entries(cdir)
+            prof = StageProfiler()
+            with prof.stage("total"):
+                result = run_fn(run_cfg, prompts[state])
+            det_hit = _n_cache_entries(cdir) == before
+            if not timed:
+                continue
+            for r in _stage_rows(i - cfg.warmup, result, prof.stats[0].peak_vram_mb, run_cfg):
+                r.cache_state = state
+                r.recon_cache_hit = result.recon_cache_hit
+                r.det_cache_hit = det_hit
+                rows.append(r)
+    shutil.rmtree(root / "warmup", ignore_errors=True)
+    return write_csv(rows, cfg.out_csv), rows

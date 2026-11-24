@@ -27,3 +27,10 @@ variants:
     run: {preload_workers: 4, pin_memory: true}
   - name: sdpa_check
     run: {sdpa_check: true}
+
+# `countonce profile --variant cache`: per repeat, (1) cold job, (2) same photos with new_prompt
+# (recon cache hit, detection miss), (3) exact repeat of (1) (both hit). Rows go to out_csv with
+# cache_state, recon_cache_hit, det_cache_hit. `dir` is a scratch cache, cleared every repeat.
+cache:
+  new_prompt: green apple
+  dir: results/profile_cache

@@ -90,6 +90,11 @@ def _parser() -> argparse.ArgumentParser:
 
     f = sub.add_parser("profile", help="time each pipeline stage and record peak VRAM")
     f.add_argument("--config", type=Path, default=Path("configs/profile.yaml"))
+    f.add_argument(
+        "--variant",
+        choices=["cache"],
+        help="cache: cold vs new-prompt vs exact-repeat jobs (needs a `cache:` block)",
+    )
 
     y = sub.add_parser("synth", help="write synthetic geometry episodes for the matcher")
     y.add_argument("--config", type=Path, default=Path("configs/synth.yaml"))
@@ -776,13 +781,22 @@ def _bench(args: argparse.Namespace) -> int:
 
 
 def _profile(args: argparse.Namespace) -> int:
-    from countonce.profile import ProfileConfig, run_profile, run_profile_variants
+    from countonce.profile import (
+        ProfileConfig,
+        run_profile,
+        run_profile_cache,
+        run_profile_variants,
+    )
 
     try:
         pcfg = ProfileConfig.from_yaml(args.config)
-        if pcfg.variants:
+        if pcfg.variants and args.variant != "cache":
             path, vrows = run_profile_variants(pcfg)
             print(f"profile: {len(vrows)} variant rows ({len(pcfg.variants)} variants) -> {path}")
+            return 0
+        if args.variant == "cache":
+            path, rows = run_profile_cache(pcfg)
+            print(f"profile: {len(rows)} cache-state rows -> {path}")
             return 0
         path, rows = run_profile(pcfg)
     except (FileNotFoundError, ValueError) as exc:

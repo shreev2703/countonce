@@ -395,3 +395,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - The default frozen evaluator reads `<predictions>/<version>.json`; nothing here generates those predictions for a new candidate, and `bench/splits.json` is not frozen yet. Until both exist, `countonce retrain` exits 2 with a clear message (`frozen:` missing or predictions file not found). Tests inject evaluators.
 - `TrainConfig.init_checkpoint` fine-tunes from a checkpoint; its hparams (including `appearance_dim`) override `model:`.
 - Log columns are results only; `configs/retrain.yaml` carries no numbers. Real before/after values: TODO: fill from results.
+
+## Repeat-job cache profiling (PLAN 13 item 6b)
+- `countonce profile --variant cache` is selected by a flag plus a `cache:` block in the profile YAML (`new_prompt`, scratch `dir`), not as an entry under `variants:` (those write the separate variants CSV and compare `Config` overrides). Rows go to the existing `out_csv` with three appended columns.
+- Detection cache hit is inferred as "no new file written under `<cache>/detect`" because `CountResult` has no detection-hit field (adding one would change the result schema). A miss always writes, so the inference is exact for this harness. Recon hit comes from `CountResult.recon_cache_hit`.
+- Each timed repeat clears the scratch cache first; `warmup` passes run full cold/new/repeat sequences in a separate cache dir that is deleted afterwards. "GPU-time savings" in the report is detect + recon wall time (the stages that use the GPU), not a device-timer measurement. No numbers exist until the GPU run: the table shows `TODO: fill from results`.
