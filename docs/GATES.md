@@ -21,3 +21,9 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 ## Detector weights needed (2026-11-24, detector interface task)
 - CountGD: clone niki-amini-naieni/CountGD, download its checkpoint (`checkpoint_fsc147_best.pth`) and the GroundingDINO Swin-B base weights it builds on; then implement `CountGDDetector._load`/`_infer` (currently stubs) and verify the output-format `TODO` in `countonce/detect/countgd.py`.
 - GroundingDINO: `pip install groundingdino` (IDEA-Research), config `GroundingDINO_SwinT_OGC.py` and `groundingdino_swint_ogc.pth`; run `GroundingDinoDetector` once on a real frame to confirm `predict` score/box conventions.
+
+## 2026-11-24: Second tech-lead audit (human actions, not queued as overnight tasks)
+- Still open from the first audit: the countonce venv plus a first mypy run, G0/G1 interviews and the professor meeting, the G2 captures, own captures and hand counts, the Fuji-SfM download and license check, and the detector weights.
+- **Baselines 5-6 (C-DOG, CountVid) and 7 (DG-Net):** these need their repos and weights cloned and downloaded on a networked session, plus the RGBD-VideoCount/VideoCount data. They are not queued until that is done. Once it is, log failures to run in DEVIATIONS (PLAN §9.3).
+- **Labeling tool for identity labels (PLAN Phase 2):** this is useful only once real captures exist. It will be queued after the first captures land.
+- **CI:** the workflow file will be added locally. Pushing it and enabling Actions on GitHub is a human step.
