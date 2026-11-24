@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=1.26",
     "pydantic>=2.6",
     "pillow",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]
@@ -28,6 +29,9 @@ dev = [
     "pytest>=8",
     "mypy>=1.10",
 ]
+
+[project.scripts]
+countonce = "countonce.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["countonce*"]

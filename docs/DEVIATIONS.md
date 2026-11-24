@@ -58,3 +58,11 @@ One entry per decision: date, what the plan said, what was done, why.
 - Naming differences vs the plan: both real models output normalized `cxcywh` boxes plus per-token sigmoid logits (`pred_logits`/`pred_boxes` in CountGD; `(boxes, logits, phrases)` from GroundingDINO's `predict`). We score a query as max over tokens and convert to pixel xyxy. Captions are lowercased and period-terminated.
 - CountGD's output format is written from memory of the repo (`TODO: verify` on a checkout); its model build and forward pass are stubbed (`NotImplementedError`) until weights exist. GroundingDINO's adapter uses the real `load_model`/`load_image`/`predict` API but has never been run.
 - Raw floor is 0.05 (below both repos' demo thresholds, CountGD 0.23 / GroundingDINO 0.35) so threshold sweeps need no rerun. The cache stores boxes, points and scores as JSON per frame; masks and features are not cached. `countgd_pp.py`, `masks.py` not part of this task.
+
+## Config, run() and CLI (2026-11-24, overnight)
+- `run()` lives in `countonce/pipeline.py` (re-export from the package root deferred to avoid importing pydantic/PIL on `import countonce`); optional `detector=`/`reconstructor=`/`export=` keyword overrides let tests inject fakes. Signature otherwise matches PLAN 8.11.
+- `Config` accepts every PLAN name (`countgdpp`, `vggt_omega`, `vggt_t3`, `assoc v2/v3`) but only `countgd|gdino`, `vggt|colmap` and `v1` are wired; the rest raise `NotImplementedError` (CLI exit code 2).
+- `interval` is a degenerate `[count, count]` placeholder with method `sensitivity` until the confidence-range task lands; `confidence_method` stays `heuristic`.
+- Provenance (git commit/dirty, UTC time, torch/GPU, full config) is stored under `result.config`, since the strict v1 schema has no separate provenance field.
+- `pyyaml` promoted to a core dependency (Config YAML). `bench`/`synth`/`train`/`profile` subcommands are not part of this task.
+- Defaults `max_frames=32`, `score_threshold=0.3`, blur filter off: `TODO: tune on real captures`.
