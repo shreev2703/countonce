@@ -44,3 +44,11 @@ One entry per decision: date, what the plan said, what was done, why.
 
 ## RELATED_WORK (2026-11-24)
 - Written from search snippets/abstracts, not full papers; claims tagged `TODO: verify`. Added an "adjacent work" section (OpenM3D, See and Detect, etc.) beyond the six requested works because they threaten the novelty claim.
+
+## Reconstruction reconcile, cache, ply, ingest filters (overnight)
+- `Reconstructor` (frames -> `types.Recon`) added beside the path-based `ReconMethod`; `recon/adapter.py` bridges them. Kept both rather than rewriting the ported wrappers.
+- Dense `world_points` are computed by unprojecting VGGT depth with K and extrinsics (numpy), not read from the VGGT point head; `world_points_conf` reuses `depth_conf`. Unregistered views get zero confidence.
+- COLMAP results have no per-view depth, so `to_dense_recon` raises `ReconAdaptError` for them. COLMAP stays a baseline (sparse metrics only) instead of a lifting backbone.
+- Cache is a flat `<sha256>.npz` per key (input hash + backbone + version + config); `CachedReconstructor.reconstruct_cached` returns the key/hit to copy into `CountResult.recon_cache_key`/`recon_cache_hit`. Corrupt entries count as misses.
+- `scene.ply` is binary little-endian with seeded random downsampling of confident points; gray unless colors are passed.
+- Near-duplicate filter: mean abs diff of 16x16 gray thumbnails vs the last kept frame, default threshold 0.02 (`TODO: tune on real captures`).
