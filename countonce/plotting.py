@@ -126,3 +126,13 @@ def vram_vs_frames(
     ax.set_title(title, fontsize=10)
     ax.legend()
     save(fig, path)
+
+
+# --- benchmark figures (countonce addition) -------------------------------------------------
+
+_PALETTE = ["#1D9E75", "#534AB7", "#D4761C", "#2B7BB9", "#B8449A", "#8A8A2E", "#A32D2D", "#5F5E5A"]
+
+
+def color_for(name: str, index: int) -> str:
+    """Known methods keep their ported colour; others cycle a fixed palette by index."""
+    return METHOD_COLORS.get(name, _PALETTE[index % len(_PALETTE)])

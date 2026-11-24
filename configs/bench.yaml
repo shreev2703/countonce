@@ -1,0 +1,31 @@
+# Benchmark sweep (PLAN 9.5-9.6). Run: countonce bench --config configs/bench.yaml
+# No scenes are listed here: point `scenes_dir` at a folder of scene directories, each with
+# images/ and gt.json ({"count": N, "tier": "easy|medium|hard"}). Nothing here is a result.
+scenes_dir: data/scenes
+csv: results/bench.csv
+prompt_key: prompt          # gt.json key holding the text prompt (falls back to `prompt`)
+prompt: object
+split: test
+
+views: [3, 5, 10, 20, 40]   # 40 is VRAM-capped by the backbone
+random_samples: 3           # random draws per view count ...
+even_sample: true           # ... plus one evenly spaced draw
+seed: 0
+order: [ordered, shuffled]  # ordered video/arc order vs shuffled unordered photos
+
+# Method / ablation grid. `kind: baseline` uses per-image counts (sum/max/median);
+# `kind: countonce` overrides countonce.Config fields.
+methods:
+  - {name: sum, kind: baseline, baseline: sum}
+  - {name: max, kind: baseline, baseline: max}
+  - {name: median, kind: baseline, baseline: median}
+  - {name: co_v1_vggt, kind: countonce, config: {assoc: v1, backbone: vggt}}
+  - {name: co_v2_vggt, kind: countonce, config: {assoc: v2, backbone: vggt}}
+  - {name: co_v1_colmap, kind: countonce, config: {assoc: v1, backbone: colmap}}
+
+# One-factor-at-a-time ablations around `ablation_base`, expanded into extra methods.
+ablation_base: co_v2_vggt
+ablations:
+  merge_k: {field: merge_k, values: [0.25, 0.5, 1.0]}
+  detector: {field: detector, values: [countgd, gdino]}
+  backbone: {field: backbone, values: [vggt, colmap]}

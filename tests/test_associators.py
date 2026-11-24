@@ -218,9 +218,7 @@ def test_split_on_extent():
     a = _lifted("0:0", 0, [0, 0, Z], 0.0)
     b = _lifted("1:0", 1, [0, 0, Z], 0.2)
     b.xyz = np.array([0.0, 0.0, Z + 5.0])
-    merged = V2Associator(V2Config(hallucination="off", split_check=False)).associate(
-        [a, b], recon
-    )
+    merged = V2Associator(V2Config(hallucination="off", split_check=False)).associate([a, b], recon)
     split = V2Associator(V2Config(hallucination="off")).associate([a, b], recon)
     assert len(merged.instances) == 1 and len(split.instances) == 2
 
@@ -236,9 +234,7 @@ scene_args = st.fixed_dictionaries(
         "dup": st.floats(0.0, 0.5),
     }
 )
-prop = settings(
-    max_examples=40, deadline=None, suppress_health_check=[HealthCheck.too_slow]
-)
+prop = settings(max_examples=40, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 
 
 @pytest.mark.parametrize("assoc", assocs(), ids=lambda a: a.name)

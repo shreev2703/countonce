@@ -27,7 +27,43 @@ def _parser() -> argparse.ArgumentParser:
 
     e = sub.add_parser("env", help="check the Python/GPU environment")
     e.add_argument("--out", type=Path, default=Path("results/env.json"))
+
+    b = sub.add_parser("bench", help="run the benchmark sweep, or render figures from its CSV")
+    b.add_argument("--config", type=Path, default=Path("configs/bench.yaml"))
+    b.add_argument("--dry-run", action="store_true", help="print the job grid size and exit")
+    b.add_argument(
+        "--figures", type=Path, metavar="DIR", help="render figures/gallery from the CSV"
+    )
     return p
+
+
+def _bench(args: argparse.Namespace) -> int:
+    from bench.sweep import BenchConfig, build_jobs, discover_scenes, run_bench
+
+    cfg = BenchConfig.from_yaml(args.config)
+    if args.figures is not None:
+        from bench.figures import make_all
+        from bench.gallery import write_gallery
+
+        try:
+            for f in make_all(cfg.csv, args.figures):
+                print(f)
+            write_gallery(cfg.csv, args.figures / "failure_gallery.md")
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"countonce: error: {exc}", file=sys.stderr)
+            return 2
+        return 0
+    try:
+        scenes = discover_scenes(cfg.scenes_dir)
+    except FileNotFoundError as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    if args.dry_run:
+        print(f"{len(scenes)} scenes, {len(build_jobs(cfg, scenes))} jobs -> {cfg.csv}")
+        return 0
+    ran, skipped, errored = run_bench(cfg, scenes)
+    print(f"bench: ran {ran}, skipped {skipped}, errored {errored} -> {cfg.csv}")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -36,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
         from countonce import env_check
 
         return env_check.main(args.out)
+    if args.cmd == "bench":
+        return _bench(args)
 
     from countonce.pipeline import run
 
