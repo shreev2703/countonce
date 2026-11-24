@@ -17,7 +17,7 @@ SCHEMA_VERSION = "1.0"
 DETECTION_STATUSES = ("new", "duplicate", "rejected")
 LIFT_FAIL_REASONS = ("low_conf", "privacy_mask", "too_few_pixels")
 INTERVAL_METHODS = ("sensitivity", "split_conformal", "jackknife_plus")
-CONFIDENCE_METHODS = ("heuristic", "temperature_scaled", "learned")
+CONFIDENCE_METHODS = ("heuristic", "sensitivity", "temperature_scaled", "learned")
 
 
 @dataclass

@@ -75,3 +75,10 @@ One entry per decision: date, what the plan said, what was done, why.
 - **Hallucination filter** only considers instances seen in <= 1 view; "expected" = visible (in image + depth test) in >= 2 other recon views. Modes `off|downweight|drop`, default `downweight` (conf x 0.5). Split check uses member spread (> 2 sizes) and appearance (min pairwise cosine < 0.3); defaults untuned.
 - **DINOv2:** `DinoV2Extractor` (torch.hub, lazy import) is written but never run; it needs torch and downloaded weights.
 - `Config.assoc="v2"` is wired in `run()` with default `V2Config` and no extractor.
+
+## Confidence range and warnings (2026-11-24)
+- **Grid:** `k` = `merge_k` x (0.5, 0.75, 1, 1.5, 2); score threshold = `score_threshold` +/- (0.05, 0.1), clipped to [0.01, 0.99]. For v2 (no `k`), the same factors scale `V2Config.max_reproj_norm` (its analogue of merge strictness). The detector is run once; thresholds re-filter the raw detections.
+- **Percentiles and level:** low/high are the 10th/90th grid percentiles (per PLAN), widened to include the default count. `Interval.level` is therefore recorded as 0.8 (nominal grid mass), not `Config.interval_level`; that field is reserved for the conformal tier. It is a sensitivity range, not a coverage claim.
+- **`confidence_method`:** `"sensitivity"` added to `CONFIDENCE_METHODS` so `run()` can set it as the task specifies (it also names the interval method).
+- **Warning thresholds** (`WarningThresholds`, all untuned, `TODO: tune on calibration data`): <3 frames; <30% of instances in >=2 views; median depth confidence <1.5; >30% failed lifts (>=3 detections); width >= 2 and > 25% of count. Test fixture `PlaneRecon` has depth_conf 1.0, so e2e runs show `low_depth_confidence`.
+- **Noise test:** range width grows with noise only until detections over-split (count saturates), so the test compares noise 0.02 < 0.1 <= 0.2 (object size 1, spacing 4).

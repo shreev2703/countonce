@@ -126,3 +126,15 @@ def test_cli_reports_unimplemented_as_error(tmp_path, capsys):
                  "--out", str(tmp_path / "o")])  # fmt: skip
     assert code == 2
     assert "not implemented" in capsys.readouterr().err
+
+
+def test_run_reports_sensitivity_interval_and_warnings(tmp_path):
+    img_dir, script = make_scene(tmp_path)
+    cfg = Config(out_dir=tmp_path / "out", max_frames=0)
+    res = run(img_dir, "widgets", cfg, detector=FakeDetector(script), reconstructor=PlaneRecon())
+    assert res.confidence_method == "sensitivity" and res.interval.method == "sensitivity"
+    assert res.interval.low <= res.count <= res.interval.high
+    assert {"code", "message", "fix"} <= set(res.warnings[0])  # PlaneRecon depth_conf is 1.0
+    assert any(w["code"] == "low_depth_confidence" for w in res.warnings)
+    raw = json.loads((tmp_path / "out" / "result.json").read_text())
+    assert schemas.load_result(raw).warnings
