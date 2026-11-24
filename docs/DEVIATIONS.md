@@ -133,3 +133,10 @@ One entry per decision: date, what the plan said, what was done, why.
 ## Track C scaffolding (synth/geometry.py, match/sinkhorn.py)
 - `synth/` is a top-level package (as in PLAN §10.2), added to setuptools `packages.find`. The geometry generator uses a flat-array `.npz` layout and 4-d per-detection features (u, v, depth, score); appearance/camera embeddings are deferred to the model task.
 - Sinkhorn follows SuperGlue marginals (real rows/cols = 1, dustbin row = N, dustbin col = M). Tests skip if torch is missing.
+
+## Backbone-grid pixel mapping (ingest/frames.py, lift.py, merge/match.py)
+- The task said to fill `Frame.pixel_map`, but that field already means grid -> original for overlays (and `Frame` is native-size in `run()`, so the two directions would collide). Added a separate `Frame.grid_map: GridMap` (original -> backbone grid, exact per-axis scale + crop/pad offset, with `to_grid`/`to_original`/`at_size`). `pixel_map` is unchanged; `grid_pixel_map` is now derived from the same exact map (the old one assumed a uniform scale, ignoring the rounding of height to the 14 px patch grid).
+- `backbone_grid_map(w, h, mode)` mirrors `vggt.utils.load_fn.load_and_preprocess_images` (facebookresearch/vggt) for `crop` and `pad`. Not verified against the installed vggt package (not importable here); only the arithmetic is mirrored.
+- Backbone spec: `preprocess_mode` attribute on the method (`VGGTMethod = "crop"`), exposed by `MethodReconstructor`; `run()` reads it before wrapping with chunked/cache. Backbones without it (COLMAP, test fakes) get no `grid_map` and keep the plain rescale.
+- `lift` clips boxes to the real-pixel region of the grid (not padding), and returns `fail_reason="outside_recon"` for boxes/points wholly outside it. v2/sync reproject through `_Views.to_frame` (inverse map). Partially cropped boxes are clipped, not dropped.
+- Frame sizes in a recon that differ from the grid (e.g. downscaled) are handled by `GridMap.at_size`.

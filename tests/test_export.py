@@ -146,7 +146,8 @@ def test_overlay_draws_in_original_coordinates_on_non_square_image(tmp_path):
     gw, gh = vggt_grid_size(1000, 400)
     assert (gw, gh) == (518, 210) and Image.open(grid_path).size == (gw, gh)
     assert (pm.orig_width, pm.orig_height) == (1000, 400)
-    assert pm.sx == pytest.approx(1000 / 518) and pm.sy == pytest.approx(pm.sx) and pm.oy == 0
+    # height is rounded to the 14 px patch grid (207.2 -> 210), so sy is not exactly sx
+    assert pm.sx == pytest.approx(1000 / 518) and pm.sy == pytest.approx(400 / 210) and pm.oy == 0
     frame = Frame(0, grid_path, gw, gh, "h", pixel_map=pm, original_path=orig)
     det = Detection("0:0", 0, 0.9, box_xyxy=np.array([100.0, 50.0, 200.0, 150.0]))
     res = make_result()

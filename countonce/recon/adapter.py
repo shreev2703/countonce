@@ -167,6 +167,9 @@ class MethodReconstructor:
     def __init__(self, method: ReconMethod, backbone: str | None = None) -> None:
         self.method = method
         self.name = backbone or method.name
+        # Backbone-declared input preprocessing ("crop" | "pad" | None = native resolution).
+        # The pipeline uses it to fill Frame.grid_map.
+        self.preprocess_mode: str | None = getattr(method, "preprocess_mode", None)
 
     def reconstruct(self, frames: list[Frame]) -> DenseRecon:
         return to_dense_recon(self.method.reconstruct([f.path for f in frames]), self.name)

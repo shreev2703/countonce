@@ -15,7 +15,7 @@ import numpy as np
 SCHEMA_VERSION = "1.0"
 
 DETECTION_STATUSES = ("new", "duplicate", "rejected")
-LIFT_FAIL_REASONS = ("low_conf", "privacy_mask", "too_few_pixels")
+LIFT_FAIL_REASONS = ("low_conf", "privacy_mask", "too_few_pixels", "outside_recon")
 INTERVAL_METHODS = ("sensitivity", "split_conformal", "jackknife_plus")
 CONFIDENCE_METHODS = ("heuristic", "sensitivity", "temperature_scaled", "learned")
 
@@ -39,6 +39,34 @@ class PixelMap:
         return x * self.sx + self.ox, y * self.sy + self.oy
 
 
+@dataclass(frozen=True)
+class GridMap:
+    """Exact affine map from a frame's original pixels onto the backbone's input grid.
+
+    ``u = x * sx + ox``, ``v = y * sy + oy``; the grid is ``grid_width x grid_height`` pixels.
+    Pixels mapping outside the grid were cropped away (or are padding) and the backbone
+    never saw them. Invertible, so original -> grid -> original is exact.
+    """
+
+    sx: float
+    sy: float
+    ox: float
+    oy: float
+    grid_width: int
+    grid_height: int
+
+    def to_grid(self, x: float, y: float) -> tuple[float, float]:
+        return x * self.sx + self.ox, y * self.sy + self.oy
+
+    def to_original(self, u: float, v: float) -> tuple[float, float]:
+        return (u - self.ox) / self.sx, (v - self.oy) / self.sy
+
+    def at_size(self, width: int, height: int) -> GridMap:
+        """The same map expressed for a recon whose maps are ``width x height``."""
+        fx, fy = width / self.grid_width, height / self.grid_height
+        return GridMap(self.sx * fx, self.sy * fy, self.ox * fx, self.oy * fy, width, height)
+
+
 @dataclass
 class Frame:
     id: int
@@ -49,6 +77,8 @@ class Frame:
     privacy_mask: np.ndarray | None = None  # HxW bool, blurred faces/plates
     blur_score: float = 0.0
     pixel_map: PixelMap | None = None  # working pixels -> original pixels (set by resize_to_grid)
+    # original pixels -> backbone input grid (exact scale + crop/pad offset); None = scale only
+    grid_map: GridMap | None = None
     original_path: Path | None = None  # the un-resized image that ``pixel_map`` maps onto
 
     def __post_init__(self) -> None:

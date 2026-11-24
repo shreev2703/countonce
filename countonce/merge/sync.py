@@ -106,7 +106,7 @@ class SyncAssociator:
         errs = []
         for src, dst in ((a, b), (b, a)):
             view = geo.view(dst.det.frame_id)
-            sx, sy = geo.scale(dst.det.frame_id)
+            sx, sy, _, _ = geo.affine(dst.det.frame_id)
             vis, uv, z = geo.project(src.xyz, _size(src), view, cfg.depth_tol)
             if not vis:
                 return 0.0
@@ -116,7 +116,7 @@ class SyncAssociator:
                     (geo.recon.intrinsics[view, 0, 0] + geo.recon.intrinsics[view, 1, 1]) / 2
                 )
                 scale = _size(src) * focal / max(z, 1e-9) / ((sx + sy) / 2)
-            err = float(np.linalg.norm(uv / np.array([sx, sy]) - center))
+            err = float(np.linalg.norm(geo.to_frame(dst.det.frame_id, uv) - center))
             errs.append(err / max(scale, 1.0))
         rn = float(np.mean(errs))
         if rn > gate:

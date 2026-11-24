@@ -17,6 +17,7 @@ from typing import Literal
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
+from countonce.lift import frame_affine
 from countonce.merge.appearance import FeatureExtractor, cosine_sim
 from countonce.merge.base import ClusterResult
 from countonce.types import Detection, Frame, Instance, LiftedDetection, MatchEvidence, Recon
@@ -59,9 +60,14 @@ class _Views:
             raise ValueError(f"frame {frame_id} has no recon view")
         return v
 
-    def scale(self, frame_id: int) -> tuple[float, float]:
-        fr = self.frames.get(frame_id)
-        return (self.w / fr.width, self.h / fr.height) if fr is not None else (1.0, 1.0)
+    def affine(self, frame_id: int) -> tuple[float, float, float, float]:
+        """(sx, sy, ox, oy): frame pixels -> recon pixels, exact when the frame has a grid_map."""
+        return frame_affine(self.frames.get(frame_id), self.h, self.w)
+
+    def to_frame(self, frame_id: int, uv: np.ndarray) -> np.ndarray:
+        """Recon pixels -> frame pixels (inverse of `affine`)."""
+        sx, sy, ox, oy = self.affine(frame_id)
+        return (uv - np.array([ox, oy])) / np.array([sx, sy])
 
     def project(self, xyz: np.ndarray, size: float, view: int, depth_tol: float):
         """Return (visible, uv_in_depth_grid, z). Visible = inside image and passes depth test."""
@@ -182,7 +188,7 @@ class V2Associator:
     def _match_frame(self, fid, dets, tracks, geo: _Views, feats, res: ClusterResult) -> None:
         cfg = self.config
         view = geo.view(fid)
-        sx, sy = geo.scale(fid)
+        sx, sy, _, _ = geo.affine(fid)
         focal = float((geo.recon.intrinsics[view, 0, 0] + geo.recon.intrinsics[view, 1, 1]) / 2)
         n_t, n_d = len(tracks), len(dets)
         cost = np.full((n_t, n_d), _BIG)
@@ -191,7 +197,7 @@ class V2Associator:
             vis, uv, z = geo.project(tr.xyz, tr.size, view, cfg.depth_tol)
             if not vis:
                 continue
-            uv_f = uv / np.array([sx, sy])
+            uv_f = geo.to_frame(fid, uv)
             for di, ld in enumerate(dets):
                 center, scale = _det_center_scale(ld.det)
                 if scale is None:

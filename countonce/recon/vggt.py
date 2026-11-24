@@ -29,6 +29,8 @@ def pick_autocast_dtype() -> torch.dtype:
 
 
 class VGGTMethod:
+    preprocess_mode = "crop"  # matches load_images below
+
     name = "vggt"
 
     def __init__(

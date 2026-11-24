@@ -46,14 +46,19 @@ def collect_paths(inputs: list[Path] | Path, out_dir: Path, fps: float) -> list[
     return paths
 
 
-def make_frames(paths: list[Path]) -> list[Frame]:
+def make_frames(paths: list[Path], preprocess_mode: str | None = None) -> list[Frame]:
+    """Frames at native size. With a backbone ``preprocess_mode`` ("crop"/"pad") each frame also
+    gets the exact `GridMap` onto that backbone's input grid (PLAN 8.1)."""
     from PIL import Image
+
+    from countonce.ingest.frames import backbone_grid_map
 
     frames = []
     for i, p in enumerate(paths):
         with Image.open(p) as im:
             w, h = im.size
-        frames.append(Frame(id=i, path=p, width=w, height=h, sha256=_sha256(p)))
+        gm = backbone_grid_map(w, h, preprocess_mode) if preprocess_mode else None
+        frames.append(Frame(id=i, path=p, width=w, height=h, sha256=_sha256(p), grid_map=gm))
     return frames
 
 
@@ -149,7 +154,8 @@ def run(
         paths = cap_frames(paths, config.max_frames)
     if not paths:
         raise ValueError("no frames left after filtering")
-    frames = make_frames(paths)
+    rec = reconstructor if reconstructor is not None else build_reconstructor(config)
+    frames = make_frames(paths, getattr(rec, "preprocess_mode", None))
     timings["ingest"] = time.perf_counter() - t0
 
     # Detect
@@ -163,7 +169,6 @@ def run(
 
     # Reconstruct
     t = time.perf_counter()
-    rec = reconstructor if reconstructor is not None else build_reconstructor(config)
     if config.chunked_recon:
         cap = _chunk_cap(config)
         if cap is not None:

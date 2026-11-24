@@ -16,7 +16,7 @@ import numpy as np
 from PIL import Image
 from scipy.ndimage import laplace
 
-from countonce.types import PixelMap
+from countonce.types import GridMap, PixelMap
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg"}
 
@@ -103,18 +103,42 @@ def drop_blurry(paths: list[Path], threshold: float) -> tuple[list[Path], dict[s
     return [p for p in paths if scores[p.name] >= threshold], scores
 
 
-def grid_pixel_map(width: int, height: int) -> PixelMap:
-    """Map from a frame's `vggt_grid_size` pixels back to the original (width, height) image.
+def backbone_grid_map(
+    width: int, height: int, mode: str = "crop", target: int = VGGT_SIZE
+) -> GridMap:
+    """Exact map from an original image onto VGGT's input grid.
 
-    Mirrors `resize_to_grid`: a uniform scale of `VGGT_SIZE / width`, then a vertical centre crop
-    of `top` scaled pixels for tall frames. So `sx = sy = width / VGGT_SIZE`, `ox = 0`, and `oy`
-    is the cropped-off `top` expressed in original pixels.
+    Mirrors `vggt.utils.load_fn.load_and_preprocess_images` (facebookresearch/vggt):
+      crop: width -> `target`, height -> round(h * target / w / 14) * 14, then a vertical
+            centre crop of `(new_h - target) // 2` rows when new_h > target.
+      pad:  the longer side -> `target`, the other rounded to a multiple of 14, then centred
+            in a `target x target` canvas with `(target - new) // 2` rows/cols of padding.
+    The two axes get slightly different scales because of the rounding to the patch grid.
     """
-    new_h = _scaled_height(width, height)
-    _, h = vggt_grid_size(width, height)
-    top = (new_h - h) // 2
-    inv = width / VGGT_SIZE
-    return PixelMap(sx=inv, sy=inv, ox=0.0, oy=top * inv, orig_width=width, orig_height=height)
+    if mode == "crop":
+        new_w, new_h = target, max(_scaled_height(width, height, target), VGGT_PATCH)
+        top = (new_h - target) // 2 if new_h > target else 0
+        return GridMap(new_w / width, new_h / height, 0.0, -float(top), new_w, min(new_h, target))
+    if mode == "pad":
+        if width >= height:
+            new_w, new_h = target, max(_scaled_height(width, height, target), VGGT_PATCH)
+        else:
+            new_h = target
+            new_w = max(round(width * (target / height) / VGGT_PATCH) * VGGT_PATCH, VGGT_PATCH)
+        pad_top, pad_left = (target - new_h) // 2, (target - new_w) // 2
+        return GridMap(
+            new_w / width, new_h / height, float(pad_left), float(pad_top), target, target
+        )
+    raise ValueError(f"unknown preprocessing mode {mode!r} (expected 'crop' or 'pad')")
+
+
+def grid_pixel_map(width: int, height: int) -> PixelMap:
+    """Map from a frame's `vggt_grid_size` pixels back to the original (width, height) image."""
+    gm = backbone_grid_map(width, height, "crop")
+    return PixelMap(
+        sx=1 / gm.sx, sy=1 / gm.sy, ox=-gm.ox / gm.sx, oy=-gm.oy / gm.sy,
+        orig_width=width, orig_height=height,
+    )  # fmt: skip
 
 
 def resize_to_grid(paths: list[Path], out_dir: Path) -> list[Path]:
