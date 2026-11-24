@@ -42,3 +42,16 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   until the Core benchmark has real numbers.
 - **Real-data numbers:** every queued task is tested only on synthetic or tmp fixtures. Results tables and figures stay
   `TODO: fill from results` until the Fuji-SfM download, the detector weights and your own captures exist.
+
+## 2026-11-24: Fourth tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state: all 26 earlier overnight tasks are checked. `pytest` passes 229 tests and `ruff check .` is clean, both still run from
+  `~/vggtProject/.venv`. mypy is still not installed in any environment, so the countonce venv item stays open.
+- **Track J dependencies (PLAN §16B.1):** `pyarrow`, `duckdb`, `webdataset` and `dvc` are not installed anywhere, so the
+  Parquet feature store, DuckDB catalog, WebDataset shards and DVC versioning are not queued yet (their tests would only skip).
+  Needed: add them to the countonce venv, `dvc init`, and choose a remote (local disk or R2 credentials).
+- **v3 checkpoint:** no matcher has been trained. A real training run on the RTX 5070 (a 1,000+ episode synth set) is needed before
+  `co_v3_vggt` produces benchmark rows. Run it interactively so the GPU, time budget and results can be watched.
+- **VLM baseline:** the harness is queued with paid calls disabled by default. Real runs still need API keys, a spending cap, and
+  your approval of the prompts and the scene subset (see the third audit).
+- **Kubric/BlenderProc rendering:** still human-gated. The renderer-agnostic recipe and validation gates are queued. The renderers
+  are not.
