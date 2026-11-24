@@ -103,6 +103,23 @@ def _make_associator(config: Config, k: float):
     return V2Associator(v2cfg)
 
 
+def lift_kwargs(config: Config, recon: DenseRecon) -> dict[str, float | int]:
+    """Lift thresholds from the config; sparse (COLMAP) input gets a lower pixel floor."""
+    sparse = recon.backbone == "colmap"
+    kw: dict[str, float | int] = {}
+    min_px = config.lift_min_pixels
+    if min_px is None and sparse:
+        min_px = 3
+    pct = config.lift_conf_percentile
+    if pct is None and sparse:
+        pct = 0.0
+    if min_px is not None:
+        kw["min_pixels"] = min_px
+    if pct is not None:
+        kw["conf_percentile"] = pct
+    return kw
+
+
 def run(
     inputs: list[Path] | Path,
     prompt: str,
@@ -164,7 +181,8 @@ def run(
 
     # Lift + associate
     t = time.perf_counter()
-    lifted = lift_detections(detections, recon, {f.id: f for f in frames})
+    lift_kw = lift_kwargs(config, recon)
+    lifted = lift_detections(detections, recon, {f.id: f for f in frames}, **lift_kw)
     frame_map = {f.id: f for f in frames}
     clustered = _make_associator(config, config.merge_k).associate(lifted, recon, frame_map)
     timings["associate"] = time.perf_counter() - t
@@ -176,7 +194,7 @@ def run(
     def count_at(k: float, thr: float) -> int:
         if thr not in lift_by_thr:
             kept = filter_by_score(raw_detections, thr)
-            lift_by_thr[thr] = lift_detections(kept, recon, frame_map)
+            lift_by_thr[thr] = lift_detections(kept, recon, frame_map, **lift_kw)
         assoc = _make_associator(config, k)
         return len(assoc.associate(lift_by_thr[thr], recon, frame_map).instances)
 

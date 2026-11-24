@@ -30,6 +30,11 @@ class Recon:
 
     points: np.ndarray | None = None  # (M, 3) world coordinates
     colors: np.ndarray | None = None  # (M, 3) uint8 RGB
+    # Optional per-point quality (COLMAP): mean reprojection error (px), track length, and
+    # the registered-view indices that observe each point. Used by the sparse-to-dense path.
+    points_error: np.ndarray | None = None  # (M,)
+    points_track_len: np.ndarray | None = None  # (M,)
+    points_views: list[np.ndarray] | None = None  # M arrays of view indices
     depth: np.ndarray | None = None  # (N, H, W), VGGT only
     depth_conf: np.ndarray | None = None  # (N, H, W), VGGT only
 

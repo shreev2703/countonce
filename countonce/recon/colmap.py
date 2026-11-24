@@ -303,9 +303,18 @@ class ColmapMethod:
         # every point in the cloud.
         points = np.empty((model.num_points3D(), 3), dtype=np.float32)
         colors = np.empty((model.num_points3D(), 3), dtype=np.uint8)
+        errors = np.empty(len(points), dtype=np.float32)
+        track_len = np.empty(len(points), dtype=np.int32)
+        views: list[np.ndarray] = []
+        image_index = {iid: index_of.get(im.name, -1) for iid, im in model.images.items()}
         for i, point in enumerate(model.points3D.values()):
             points[i] = point.xyz
             colors[i] = point.color
+            errors[i] = point.error
+            elems = point.track.elements
+            track_len[i] = len(elems)
+            seen = {image_index.get(e.image_id, -1) for e in elems}
+            views.append(np.array(sorted(v for v in seen if v >= 0), dtype=np.int64))
 
         return Recon(
             method=self.name,
@@ -316,6 +325,9 @@ class ColmapMethod:
             registered=registered,
             points=points,
             colors=colors,
+            points_error=errors,
+            points_track_len=track_len,
+            points_views=views,
             # depth and depth_conf stay None: COLMAP sparse produces neither.
         )
 

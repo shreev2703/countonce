@@ -2,7 +2,9 @@
 
 Region: mask, else central 50% of the box, else a small disk around the point.
 ``xyz`` is the per-axis median of confident, unmasked ``world_points``; ``size``
-is 2D extent x median depth / focal length.
+is 2D extent x median depth / focal length. Sparse reconstructions (COLMAP) have zero
+confidence at most pixels, so the median runs over whatever confident pixels fall in the
+region; use a lower ``min_pixels`` and ``conf_percentile=0`` for them.
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ def compute_scene_scale(recon: Recon, conf_percentile: float = 50.0) -> float:
     thr = np.percentile(conf, conf_percentile)
     dists = []
     for i in range(recon.n_views):
-        sel = (conf[i] >= thr) & np.isfinite(recon.world_points[i]).all(-1)
+        sel = (conf[i] >= thr) & (conf[i] > 0) & np.isfinite(recon.world_points[i]).all(-1)
         if sel.any():
             dists.append(np.linalg.norm(recon.world_points[i][sel] - centers[i], axis=1))
     if not dists:

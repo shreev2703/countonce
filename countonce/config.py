@@ -34,6 +34,10 @@ class Config(BaseModel):
     # Detect / lift / associate
     score_threshold: float = Field(0.3, ge=0, le=1)
     merge_k: float = Field(0.5, gt=0)  # v1 distance threshold, in object sizes
+    # Lift rules; None = dense defaults (5 pixels, 30th percentile) or, for the sparse COLMAP
+    # backbone, 3 pixels and no percentile cut.
+    lift_min_pixels: int | None = Field(None, ge=1)
+    lift_conf_percentile: float | None = Field(None, ge=0, le=100)
     interval_level: float = Field(0.9, gt=0, lt=1)
 
     # Backend options passed to the real detector / reconstructor (paths, device, ...)
