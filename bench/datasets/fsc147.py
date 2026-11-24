@@ -79,7 +79,12 @@ def _read_layout(root: Path) -> tuple[list[FscImage], dict[str, list[str]]]:
 
 
 def load_fsc147(
-    root: str | Path, split: str | None = None, limit: int | None = None
+    root: str | Path,
+    split: str | None = None,
+    limit: int | None = None,
+    *,
+    validate: bool = True,
+    quarantine_path: str | Path | None = None,
 ) -> list[FscImage]:
     """Load a downloaded FSC-147 directory; optionally one split and the first ``limit`` images
     (sorted by name for determinism)."""
@@ -91,5 +96,9 @@ def load_fsc147(
     items, _ = _read_layout(root)
     if split is not None:
         items = [i for i in items if i.split == split]
+    if validate:
+        from bench.datasets.validate import filter_scenes
+
+        items, _ = filter_scenes("fsc147", items, quarantine_path)
     items.sort(key=lambda i: i.name)
     return items[:limit] if limit is not None else items

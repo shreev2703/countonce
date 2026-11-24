@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 from scipy import stats as sps
 
 Statistic = Callable[[np.ndarray], float]
@@ -33,7 +35,10 @@ class PairedResult:
     n: int
 
 
-def _clean(x: Sequence[float]) -> np.ndarray:
+Values = Sequence[float] | npt.NDArray[Any]  # per-scene numbers: list or ndarray
+
+
+def _clean(x: Values) -> np.ndarray:
     a = np.asarray(x, dtype=float)
     return a[~np.isnan(a)]
 
@@ -48,7 +53,7 @@ def _boot_stats(
 
 
 def bootstrap_ci(
-    values: Sequence[float],
+    values: Values,
     statistic: Statistic = np.mean,
     n_boot: int = 10_000,
     level: float = 0.95,
@@ -66,8 +71,8 @@ def bootstrap_ci(
 
 
 def paired_bootstrap(
-    a: Sequence[float],
-    b: Sequence[float],
+    a: Values,
+    b: Values,
     n_boot: int = 10_000,
     level: float = 0.95,
     seed: int = 0,
@@ -92,7 +97,7 @@ def paired_bootstrap(
     return float(d.mean()), float(lo), float(hi), float(min(1.0, p))
 
 
-def wilcoxon_p(a: Sequence[float], b: Sequence[float]) -> float:
+def wilcoxon_p(a: Values, b: Values) -> float:
     """Two-sided Wilcoxon signed-rank p-value; 1.0 when every difference is zero."""
     d = np.asarray(a, dtype=float) - np.asarray(b, dtype=float)
     d = d[~np.isnan(d)]
@@ -102,8 +107,8 @@ def wilcoxon_p(a: Sequence[float], b: Sequence[float]) -> float:
 
 
 def paired_compare(
-    a: Sequence[float],
-    b: Sequence[float],
+    a: Values,
+    b: Values,
     n_boot: int = 10_000,
     level: float = 0.95,
     seed: int = 0,

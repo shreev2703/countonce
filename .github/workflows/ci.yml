@@ -20,7 +20,7 @@ jobs:
       - name: Format check
         run: ruff format --check .
       - name: Type check
-        run: mypy countonce
+        run: mypy
       - name: Test
         run: pytest -m "not slow and not gpu"
       - name: Golden gate (CPU synthetic geometry)
@@ -48,7 +48,7 @@ jobs:
       - name: Install
         run: pip install -e .[dev,test,data,api]
       - name: Type check
-        run: mypy countonce
+        run: mypy
       - name: Test (report skips)
         run: pytest -m "not slow and not gpu" -rs | tee pytest-full-cpu.log
       - name: Fail on unexpected skips

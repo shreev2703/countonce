@@ -58,12 +58,18 @@ def load_videocount(
     max_frames: int | None = 20,
     stride: int | None = None,
     frames_dir: str | Path | None = None,
+    validate: bool = True,
+    quarantine_path: str | Path | None = None,
 ) -> list[BenchScene]:
     """Load a downloaded VideoCount directory, subsampling each video's frames."""
     root = Path(root)
     if not root.is_dir():
         raise FileNotFoundError(f"{root} not found; run scripts/download_videocount.sh first")
     scenes = _read_layout(root, Path(frames_dir) if frames_dir else None)
+    if validate:  # before subsampling, so count/frame mismatches see every frame
+        from bench.datasets.validate import filter_scenes
+
+        scenes, _ = filter_scenes("videocount", scenes, quarantine_path)
     for s in scenes:
         s.frames = subsample_frames(s.frames, max_frames, stride)
     return scenes

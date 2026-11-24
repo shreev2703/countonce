@@ -305,12 +305,12 @@ def score_study(
         g = [gt[s] for s in common]
         m_err = metrics.abs_errors([method_pred[s] for s in common], g)
         h_err = np.array([np.mean(per_scene_err[s]) for s in common])
-        res = stats.paired_compare(h_err, m_err, n_boot=n_boot, seed=seed)
+        paired = stats.paired_compare(h_err, m_err, n_boot=n_boot, seed=seed)
         out["vs_method"] = {
             "note": "diff = human abs err - method abs err; diff > 0 means the method is better",
             "method_mae": _summ(stats.bootstrap_ci(m_err, n_boot=n_boot, seed=seed)),
             "scenes": common,
-            **res.__dict__,
+            **paired.__dict__,
         }
         if method_seconds:
             tcommon = [s for s in common if s in method_seconds]

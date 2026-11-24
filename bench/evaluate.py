@@ -19,6 +19,7 @@ import argparse
 import json
 import math
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from bench import metrics, splits, stats
+from bench.datasets.validate import load_quarantine
 
 SCHEMA_PATH = Path(__file__).with_name("schemas") / "predictions.schema.json"
 GT_DIR = Path(__file__).with_name("gt")
@@ -111,7 +113,7 @@ def load_gt(gt: str | Path) -> dict[str, Any]:
                 raise TypeError(f"{sid}: count must be a number")
     except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as e:
         raise PredictionFormatError(f"{p}: malformed GT file ({e!r})") from e
-    return {"split": split, "scenes": scenes}
+    return {"split": split, "scenes": scenes, "quarantined": list(doc.get("quarantined", []))}
 
 
 def frozen_problems(
@@ -139,13 +141,22 @@ def evaluate(
     n_boot: int = 10_000,
     seed: int = 0,
     splits_path: str | Path = splits.DEFAULT_PATH,
+    quarantine: Iterable[str] | None = None,
 ) -> dict[str, Any]:
-    """Score ``preds`` against ``gt``. Every GT scene must be predicted (no silent skips)."""
+    """Score ``preds`` against ``gt``. Every GT scene must be predicted (no silent skips), except
+    scenes quarantined by the data-quality gates (``quarantine`` ids plus the GT doc's
+    ``quarantined`` list): those are dropped from GT and predictions and counted in the report
+    (``n_quarantined_skipped``, ``quarantined_skipped``)."""
     if preds.split != gt["split"]:
         raise PredictionFormatError(
             f"predictions are for split {preds.split!r} but GT is split {gt['split']!r}"
         )
-    by_id = {s.scene_id: s for s in preds.scenes}
+    skip = set(quarantine or ()) | set(gt.get("quarantined", ()))
+    skipped = sorted(skip & set(gt["scenes"]))
+    gt = {**gt, "scenes": {k: v for k, v in gt["scenes"].items() if k not in skip}}
+    if not gt["scenes"]:
+        raise PredictionFormatError("every GT scene is quarantined; nothing to score")
+    by_id = {s.scene_id: s for s in preds.scenes if s.scene_id not in skip}
     unknown = sorted(set(by_id) - set(gt["scenes"]))
     missing = sorted(set(gt["scenes"]) - set(by_id))
     if unknown:
@@ -162,6 +173,8 @@ def evaluate(
         "kind": preds.kind,
         "split": preds.split,
         "n_scenes": len(ids),
+        "n_quarantined_skipped": len(skipped),
+        "quarantined_skipped": skipped,
         "mae": stats.bootstrap_ci(list(abs_err), n_boot=n_boot, seed=seed).__dict__,
         "mape": metrics.mape(p, g),
         "within_10pct": metrics.within_rate(p, g, 0.10),
@@ -187,7 +200,7 @@ def evaluate(
         out["assoc_f1"] = stats.bootstrap_ci(f1s, n_boot=n_boot, seed=seed).__dict__
         out["n_assoc_scenes"] = len(f1s)
     if reference is not None:
-        ref = {s.scene_id: s.count for s in reference.scenes}
+        ref = {s.scene_id: s.count for s in reference.scenes if s.scene_id not in skip}
         if set(ref) != set(ids):
             raise PredictionFormatError("reference method must cover exactly the same scenes")
         ref_err = metrics.abs_errors([ref[i] for i in ids], g)
@@ -213,6 +226,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--predictions", required=True)
     ap.add_argument("--gt", required=True, help="split name (bench/gt/<split>.json) or GT file")
     ap.add_argument("--reference", help="reference method's predictions for a paired test")
+    ap.add_argument(
+        "--quarantine", action="append", default=[], help="quarantine.jsonl; its scenes are skipped"
+    )
     ap.add_argument("--out", help="write the result JSON here")
     ap.add_argument("--n-boot", type=int, default=10_000)
     ap.add_argument("--write-schema", action="store_true", help="refresh the published schema")
@@ -225,6 +241,7 @@ def main(argv: list[str] | None = None) -> int:
             load_gt(a.gt),
             load_predictions(a.reference) if a.reference else None,
             n_boot=a.n_boot,
+            quarantine=set().union(*(load_quarantine(q) for q in a.quarantine)),
         )
     except PredictionFormatError as e:
         print(f"error: {e}", file=sys.stderr)

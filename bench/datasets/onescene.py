@@ -43,13 +43,22 @@ def _read_layout(root: Path) -> list[BenchScene]:
 
 
 def load_onescene(
-    root: str | Path, *, max_frames: int | None = None, stride: int | None = None
+    root: str | Path,
+    *,
+    max_frames: int | None = None,
+    stride: int | None = None,
+    validate: bool = True,
+    quarantine_path: str | Path | None = None,
 ) -> list[BenchScene]:
     """Load a downloaded OneScene-Bench directory (no subsampling unless asked)."""
     root = Path(root)
     if not root.is_dir():
         raise FileNotFoundError(f"{root} not found; run scripts/download_onescene.sh first")
     scenes = _read_layout(root)
+    if validate:  # before subsampling, so count/frame mismatches see every frame
+        from bench.datasets.validate import filter_scenes
+
+        scenes, _ = filter_scenes("onescene", scenes, quarantine_path)
     for s in scenes:
         s.frames = subsample_frames(s.frames, max_frames, stride)
     return scenes

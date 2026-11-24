@@ -10,11 +10,13 @@ mkdir -p "$LOG_DIR"
 ACCOUNTS=("$HOME/.claude" "$HOME/.claude-acc2")
 ACC_IDX=0
 CONSECUTIVE_LIMITS=0
+LIMIT_ROUNDS=0       # full account rotations in a row that all hit a limit (backoff exponent)
 MAX_TURNS=40
 TASK_TIMEOUT="25m"
 MAX_CYCLES=5          # Up to 5 self-planned batches (~30-40 tasks max overnight)
 CYCLE=0
 
+source "$REPO_DIR/scripts/lib/backoff.sh"
 cd "$REPO_DIR"
 git checkout -B "overnight/$(date +%Y%m%d)"
 
@@ -34,22 +36,30 @@ run_claude() {
     return $?
 }
 
+# Returns 0 (after waiting) when the run hit a provider limit, 1 when it did not.
+# Rotates accounts on every limit; once every account has been limited back to back, waits with
+# exponential backoff (or the provider's own retry/reset hint) instead of a fixed sleep.
 handle_rate_limit() {
-    local logfile="$1"
-    if grep -qiE "rate limit|usage limit|overloaded|429|quota" "$logfile"; then
+    local logfile="$1" kind hint wait
+    kind=$(classify_limit "$logfile")
+    if [[ "$kind" != "none" ]]; then
         CONSECUTIVE_LIMITS=$((CONSECUTIVE_LIMITS + 1))
         ACC_IDX=$(( (ACC_IDX + 1) % ${#ACCOUNTS[@]} ))
         if [[ $CONSECUTIVE_LIMITS -ge ${#ACCOUNTS[@]} ]]; then
-            echo "[BOTH LIMITED] Sleeping 15m..." | tee -a "$LOG_DIR/orchestrator.log"
+            LIMIT_ROUNDS=$((LIMIT_ROUNDS + 1))
+            hint=$(retry_after_secs "$logfile")
+            wait=$(backoff_seconds "$kind" "$LIMIT_ROUNDS" "$hint")
+            echo "[ALL ACCOUNTS LIMITED: $kind] round $LIMIT_ROUNDS, waiting ${wait}s${hint:+ (provider hint ${hint}s)}..." | tee -a "$LOG_DIR/orchestrator.log"
             CONSECUTIVE_LIMITS=0
-            sleep 900
+            sleep "$wait"
         else
-            echo "[RATE LIMIT] Switching to Account $((ACC_IDX + 1))..." | tee -a "$LOG_DIR/orchestrator.log"
+            echo "[LIMIT: $kind] Switching to Account $((ACC_IDX + 1))..." | tee -a "$LOG_DIR/orchestrator.log"
             sleep 15
         fi
         return 0
     fi
     CONSECUTIVE_LIMITS=0
+    LIMIT_ROUNDS=0
     return 1
 }
 

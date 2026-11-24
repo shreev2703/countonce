@@ -41,14 +41,20 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument(
         "action",
         nargs="?",
-        choices=["detector-sanity"],
-        help="detector-sanity: per-image count error of one detector on FSC-147",
+        choices=["detector-sanity", "validate"],
+        help="detector-sanity: per-image count error of one detector on FSC-147; "
+        "validate: data-quality gates for a real-data loader (--dataset)",
     )
-    b.add_argument("--dataset", default="fsc147", help="detector-sanity dataset (fsc147)")
+    b.add_argument(
+        "--dataset",
+        default="fsc147",
+        help="dataset name (fsc147 for detector-sanity; any loader for validate)",
+    )
     b.add_argument("--root", type=Path, help="detector-sanity dataset root (default data/<name>)")
     b.add_argument("--split", default="val", help="detector-sanity split")
     b.add_argument("--limit", type=int, help="detector-sanity: first N images")
     b.add_argument("--detector", default="color_blob", help="detector-sanity detector name")
+    b.add_argument("--quarantine-out", type=Path, help="validate: quarantine.jsonl path")
     b.add_argument("--score-threshold", type=float, default=0.3)
     b.add_argument("--sanity-out", type=Path, default=Path("results/detector_sanity.csv"))
     b.add_argument("--config", type=Path, default=Path("configs/bench.yaml"))
@@ -1032,7 +1038,28 @@ def _detector_sanity(args: argparse.Namespace) -> int:
     return 0
 
 
+def _bench_validate(args: argparse.Namespace) -> int:
+    from bench.datasets.validate import validate_dataset
+
+    root = args.root or Path("data") / args.dataset
+    out = args.quarantine_out or Path("results/quarantine") / args.dataset / "quarantine.jsonl"
+    try:
+        q = validate_dataset(args.dataset, root, out)
+    except (FileNotFoundError, ValueError, KeyError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    print(
+        f"validate {args.dataset}: {q.n_scenes} scenes, {len(q.quarantined)} quarantined -> {out}"
+    )
+    for reason, n in q.counts_by_reason.items():
+        if n:
+            print(f"  {reason}: {n}")
+    return 1 if q.quarantined else 0
+
+
 def _bench(args: argparse.Namespace) -> int:
+    if args.action == "validate":
+        return _bench_validate(args)
     if args.action == "detector-sanity":
         return _detector_sanity(args)
     if args.synth_assoc is not None:

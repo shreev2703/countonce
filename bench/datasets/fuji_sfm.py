@@ -72,12 +72,22 @@ def _read_layout(root: Path) -> FujiScene:
     return scene
 
 
-def load_fuji_sfm(root: str | Path) -> FujiScene:
-    """Load a downloaded Fuji-SfM directory (see ``scripts/download_fuji_sfm.sh``)."""
+def load_fuji_sfm(
+    root: str | Path, *, validate: bool = True, quarantine_path: str | Path | None = None
+) -> FujiScene:
+    """Load a downloaded Fuji-SfM directory (see ``scripts/download_fuji_sfm.sh``). With
+    ``validate`` a scene failing the data-quality gates is quarantined and ``DataQualityError``
+    is raised (a single scene, so there is nothing to skip to)."""
     root = Path(root)
     if not root.is_dir():
         raise FileNotFoundError(f"{root} not found; run scripts/download_fuji_sfm.sh first")
-    return _read_layout(root)
+    scene = _read_layout(root)
+    if validate:
+        from bench.datasets.validate import DataQualityError, filter_scenes, validate_scene
+
+        if not filter_scenes("fuji_sfm", [scene], quarantine_path)[0]:
+            raise DataQualityError(validate_scene(scene))
+    return scene
 
 
 def align_recon_to_gt(

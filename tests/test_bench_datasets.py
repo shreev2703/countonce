@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 import yaml
+from PIL import Image
 
 from bench.datasets import load_dataset
 from bench.datasets.common import subsample_frames, to_gt_doc, to_sweep_scenes
@@ -18,9 +20,13 @@ CFG = Path(__file__).parents[1] / "configs" / "bench.yaml"
 
 
 def _frames(d: Path, n: int) -> None:
+    """Real, mutually distinct tiny JPEGs so the default data-quality gates pass."""
     d.mkdir(parents=True)
     for i in range(n):
-        (d / f"{i:04d}.jpg").write_bytes(b"x")
+        arr = np.random.default_rng(abs(hash((str(d), i))) % 2**32).integers(
+            0, 255, (8, 8, 3), dtype=np.uint8
+        )
+        Image.fromarray(arr).save(d / f"{i:04d}.jpg")
 
 
 def _rgbd(root: Path) -> Path:

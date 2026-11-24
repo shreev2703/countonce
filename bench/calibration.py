@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -116,11 +117,11 @@ def build_calibration_set(
 
 
 def scenes_from_rows(
-    rows: Sequence, domain: str = "real", method: str | None = None
+    rows: Sequence[Any], domain: str = "real", method: str | None = None
 ) -> list[CalibrationScene]:
     """Scene-level calibration records from ``bench.figures.Row`` objects (rows with a range,
     averaged over a scene's samples). No k grid, so only ``tuned="scale"`` is available."""
-    by: dict[str, list] = {}
+    by: dict[str, list[Any]] = {}
     for r in rows:
         if r.low is None or r.high is None or (method and r.method != method):
             continue
