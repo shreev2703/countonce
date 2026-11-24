@@ -301,3 +301,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - `.venv/bin/mypy countonce` now exits 0 (65 source files). Stubs: `scipy-stubs` added to the `dev` extra (`types-PyYAML` was already there). `ignore_missing_imports` overrides extended to `cv2`, `mcp`, `anthropic`, `openai`, `google` (optional runtime deps, not installed in dev); the last three go beyond the task's list because `bench/vlm/client.py` imports them lazily.
 - `LadderResult` made `Generic[T]` so `run_with_oom_ladder` returns a typed value; this removed the `has-type` and `object` errors in `pipeline.py` and two `type: ignore`s. No behaviour change, so no new regression test (none of the errors was a real bug).
 - Remaining targeted ignores: `nn.Module` base classes in `match/model.py` (torch imported lazily), Pillow `ImageFile` vs `Image` in `ingest/sanitize.py`, scipy `maximum_flow` taking `csr_matrix` in `match/instances.py`.
+
+## Human baseline harness (bench/human_baseline.py)
+- Pooled human MAE/within-10% average per-participant errors per scene (not the error of the mean count), then bootstrap over scenes. Per-participant CIs bootstrap that participant's scenes.
+- Time ratio = mean human seconds / median (p50) CountOnce runtime over the shared scenes; the CI resamples scenes jointly for both. CountOnce runtime is per-scene mean of `runtime_s` in `bench.csv`.
+- Scene manifest JSON (images + GT count) is the harness input; GT is never written into sheets. No real study data exists; tests use synthetic CSVs only.
