@@ -91,7 +91,24 @@ def _parser() -> argparse.ArgumentParser:
     x.add_argument("det_a")
     x.add_argument("det_b")
     x.add_argument("--json", action="store_true", help="print the explanation as JSON")
+
+    r = sub.add_parser("report", help="write a self-contained report.html for a finished run")
+    r.add_argument("out_dir", type=Path, help="directory holding result.json")
+    r.add_argument("--pdf", action="store_true", help="also write report.pdf (needs weasyprint)")
     return p
+
+
+def _report(args: argparse.Namespace) -> int:
+    from countonce.export.report import write_report
+
+    try:
+        paths = write_report(args.out_dir, pdf=args.pdf)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    for p in paths:
+        print(f"report: wrote {p}")
+    return 0
 
 
 def _explain(args: argparse.Namespace) -> int:
@@ -272,6 +289,8 @@ def main(argv: list[str] | None = None) -> int:
         return _drift(args)
     if args.cmd == "explain":
         return _explain(args)
+    if args.cmd == "report":
+        return _report(args)
 
     from countonce.pipeline import run
 

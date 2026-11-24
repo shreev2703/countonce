@@ -251,3 +251,6 @@ One entry per decision: date, what the plan said, what was done, why.
 - Reprojection error each way is recomputed from the stored cameras (a's 3D point into b's view vs b's box centre), so any pair can be explained, not only logged ones. For 1.0 documents it is reported as unavailable and the 3D distance falls back to logged evidence if any.
 - Feature vectors are stored only with the new `Config.store_features` (default off, embeddings are large); otherwise the appearance cosine is reported as unavailable. Detection ids carry the frame, which equals the recon view in the pipeline.
 - `match_prob` is the associator's logged probability; v1 logs a heuristic, only `assoc: v3` logs a learned one (the associator name is in the output).
+
+## One-click report
+- "Top-N overlays" are ranked by file size (proxy for annotation density, ties by name), default N=6; no per-overlay score is stored. PDF output is skipped with a message when `weasyprint` is not installed (not added as a dependency).
