@@ -222,3 +222,93 @@ def interval_includes_zero_rate(
     low: Sequence[float], high: Sequence[float], pred: Sequence[float], gt: Sequence[float]
 ) -> float:
     return zero_count_metrics(pred, gt, low, high)["interval_includes_zero_rate"]
+
+
+# ---------------------------------------------------------------- count-first metrics (§9.4)
+# Headline metrics are count errors. Association F1 (`pairwise_prf`) only explains *why* a
+# count is wrong and must never be the lead number.
+
+
+def signed_errors(pred: Sequence[float], gt: Sequence[float]) -> np.ndarray:
+    """Per-scene ``pred - gt``: positive = over-count, negative = under-count."""
+    p, g = _arrays(pred, gt)
+    return np.asarray(p - g)
+
+
+def signed_bias(pred: Sequence[float], gt: Sequence[float]) -> float:
+    """Mean signed count error (over- vs under-counting); 0 means the errors cancel on average."""
+    return float(signed_errors(pred, gt).mean())
+
+
+def count_summary(
+    pred: Sequence[float],
+    gt: Sequence[float],
+    low: Sequence[float] | None = None,
+    high: Sequence[float] | None = None,
+) -> dict[str, float]:
+    """The count-first headline block, in report order: MAE, signed bias, MAPE, within-10%,
+    zero-scene false count (+ false-positive rate) and, with intervals, coverage."""
+    zero = zero_count_metrics(pred, gt)
+    out = {
+        "mae": mae(pred, gt),
+        "signed_bias": signed_bias(pred, gt),
+        "mape": mape(pred, gt),
+        "within_10pct": within_rate(pred, gt, 0.10),
+        "n_zero": zero["n_zero"],
+        "zero_scene_false_count": zero["mean_false_count"],
+        "zero_scene_false_positive_rate": zero["false_positive_rate"],
+    }
+    if low is not None and high is not None:
+        out["interval_coverage"] = interval_coverage(low, high, gt)
+    return out
+
+
+DECOMPOSITION_KEYS = ("missed", "duplicates", "false_positives", "wrong_merges")
+
+
+def count_decomposition(
+    clusters: Sequence[Hashable],
+    gt_ids: Sequence[Hashable | None],
+    gt_universe: Sequence[Hashable],
+) -> dict[str, int]:
+    """Exact split of one scene's count error into its causes::
+
+        missed + duplicates + false_positives - wrong_merges == predicted - true
+
+    ``clusters[i]`` is the predicted instance of detection ``i``; ``gt_ids[i]`` the true object
+    it shows (``None`` = not a target). ``gt_universe`` lists every true object. ``predicted`` is
+    the number of clusters and ``true`` the universe size. Each cluster is assigned its majority
+    GT id (ties: smallest ``repr``), then:
+
+    * ``false_positives``: clusters containing no target detection at all;
+    * ``duplicates``: extra clusters whose majority is an object another cluster already covers
+      (one object counted twice);
+    * ``missed``: true objects with no detection anywhere;
+    * ``wrong_merges``: true objects that were detected but are the majority of no cluster, i.e.
+      absorbed into another object's cluster (two objects counted once).
+    """
+    if len(clusters) != len(gt_ids):
+        raise ValueError("clusters and gt_ids must have equal length")
+    universe = set(gt_universe)
+    stray = {g for g in gt_ids if g is not None} - universe
+    if stray:
+        raise ValueError(f"gt_ids not in gt_universe: {sorted(map(repr, stray))}")
+    members: dict[Hashable, Counter[Hashable]] = {c: Counter() for c in clusters}
+    for c, g in zip(clusters, gt_ids, strict=True):
+        if g is not None:
+            members[c][g] += 1
+    false_pos = sum(1 for cnt in members.values() if not cnt)
+    maj = _cluster_majorities([(c, g) for c, cnt in members.items() for g in cnt.elements()])
+    covered = set(maj.values())
+    detected = {g for g in gt_ids if g is not None}
+    return {
+        "missed": len(universe - detected),
+        "duplicates": len(maj) - len(covered),
+        "false_positives": false_pos,
+        "wrong_merges": len(detected - covered),
+    }
+
+
+def decomposition_error(d: dict[str, int]) -> int:
+    """``predicted - true`` implied by a decomposition (duplicates + FP - missed - merges)."""
+    return d["duplicates"] + d["false_positives"] - d["missed"] - d["wrong_merges"]

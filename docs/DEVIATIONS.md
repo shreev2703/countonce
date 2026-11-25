@@ -716,3 +716,9 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
   (`tests/test_tiny_scene_real_gpu.py`, GPU marked). This is a threshold chosen on the tiny
   fixture, not evidence about accuracy elsewhere; the Fuji grid still picks the defaults. The
   5-view real path stays open (needs better geometry on this scene, not a merge-radius change).
+
+## M3: count-first metrics
+- **Sign convention:** PLAN §9.4 writes `missed + duplicates + FP − wrong merges = predicted − true`. Missed objects lower the count, so the exact identity is `duplicates + false_positives − missed − wrong_merges = predicted − true`. `bench.metrics.count_decomposition` returns the four non-negative magnitudes and `decomposition_error` applies the signs; the figure stacks over-counts up and under-counts down.
+- **Wrong merge vs missed:** a true object with detections that is the majority of no cluster counts as a wrong merge; one with no detection at all counts as missed.
+- **Decomposition scope:** `bench.evaluate` computes it only for scenes with identity labels (`instances`, optional `objects`) whose object count equals GT `count`; it is a mean over those scenes. Cluster count, not the submitted `count`, is what it explains.
+- `assoc_f1` stays in the result but is labelled explanatory and listed after every count metric. Fuji report gained a signed-bias column; the old `bench.csv` needs no change (bias is computed from pred - gt).

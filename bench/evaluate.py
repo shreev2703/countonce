@@ -168,6 +168,7 @@ def evaluate(
     p = [by_id[i].count for i in ids]
     g = [float(gt["scenes"][i]["count"]) for i in ids]
     abs_err = metrics.abs_errors(p, g)
+    # Count metrics lead the report; association F1 comes last and only explains the errors.
     out: dict[str, Any] = {
         "method": preds.method,
         "kind": preds.kind,
@@ -176,8 +177,12 @@ def evaluate(
         "n_quarantined_skipped": len(skipped),
         "quarantined_skipped": skipped,
         "mae": stats.bootstrap_ci(list(abs_err), n_boot=n_boot, seed=seed).__dict__,
+        "signed_bias": stats.bootstrap_ci(
+            list(metrics.signed_errors(p, g)), n_boot=n_boot, seed=seed
+        ).__dict__,
         "mape": metrics.mape(p, g),
         "within_10pct": metrics.within_rate(p, g, 0.10),
+        "zero_scene": _zero_block(p, g),
         "frozen_problems": frozen_problems(preds.split, set(ids), splits_path),
     }
     iv = [i for i in ids if by_id[i].interval is not None]
@@ -189,14 +194,26 @@ def evaluate(
         )
         out["n_interval_scenes"] = len(iv)
     f1s = []
+    decomp: list[dict[str, int]] = []
     for i in ids:
         a, gi = by_id[i].assignments, gt["scenes"][i].get("instances")
         if a is None or not gi:
             continue
         dets = sorted(set(a) & set(gi))
+        universe = gt["scenes"][i].get("objects") or sorted(set(gi.values()))
+        if dets and len(universe) == int(gt["scenes"][i]["count"]):
+            decomp.append(
+                metrics.count_decomposition([a[d] for d in dets], [gi[d] for d in dets], universe)
+            )
         if len(dets) >= 2:
             f1s.append(metrics.pairwise_prf([a[d] for d in dets], [gi[d] for d in dets])[2])
+    if decomp:
+        out["decomposition"] = {
+            k: float(np.mean([d[k] for d in decomp])) for k in metrics.DECOMPOSITION_KEYS
+        }
+        out["n_decomposition_scenes"] = len(decomp)
     if f1s:
+        out["assoc_f1_explanatory"] = "diagnoses why counts are wrong; not a headline metric"
         out["assoc_f1"] = stats.bootstrap_ci(f1s, n_boot=n_boot, seed=seed).__dict__
         out["n_assoc_scenes"] = len(f1s)
     if reference is not None:
@@ -207,6 +224,15 @@ def evaluate(
         res = stats.paired_compare(list(abs_err), list(ref_err), n_boot=n_boot, seed=seed)
         out["vs_reference"] = {"reference": reference.method, **res.__dict__}
     return out
+
+
+def _zero_block(p: list[float], g: list[float]) -> dict[str, float]:
+    z = metrics.zero_count_metrics(p, g)
+    return {
+        "n_zero": z["n_zero"],
+        "false_count": z["mean_false_count"],
+        "false_positive_rate": z["false_positive_rate"],
+    }
 
 
 def _json_safe(o: Any) -> Any:

@@ -386,6 +386,58 @@ def fig_error_vs_spread(rows: Sequence[Row], out: Path) -> Path | None:
     return out
 
 
+def signed_error(r: Row) -> float:
+    return r.pred - r.gt
+
+
+def fig_signed_bias(rows: Sequence[Row], out: Path) -> Path:
+    """Signed count bias per method (above 0 = over-counts), mean over scenes with 95% CI."""
+    apply_style()
+    fig, ax = plt.subplots(figsize=(6.5, 4))
+    ms = _methods(rows)
+    for i, m in enumerate(ms):
+        p = point([r for r in rows if r.method == m], signed_error)
+        if p:
+            _errbar(ax, i, p, fmt="o", capsize=3, color=color_for(m, i))
+    ax.axhline(0, color="0.4", lw=0.8)
+    ax.set_xticks(range(len(ms)), ms, rotation=30, ha="right")
+    ax.set_ylabel("signed count error (pred - true), mean over scenes")
+    save(fig, out)
+    return out
+
+
+def fig_count_decomposition(results: Sequence[Mapping[str, object]], out: Path) -> Path | None:
+    """Stacked bar per method of the count-error decomposition (PLAN §9.4).
+
+    ``results`` are :func:`bench.evaluate.evaluate` outputs. Over-counts (duplicates, false
+    positives) stack upward, under-counts (missed, wrong merges) downward, so the net height is
+    the mean signed error. Methods without identity labels are skipped; None if none remain.
+    """
+    items = [r for r in results if isinstance(r.get("decomposition"), dict)]
+    if not items:
+        return None
+    apply_style()
+    fig, ax = plt.subplots(figsize=(6.5, 4))
+    up = ("duplicates", "false_positives")
+    pos = np.zeros(len(items))
+    neg = np.zeros(len(items))
+    xs = np.arange(len(items))
+    for i, k in enumerate(("duplicates", "false_positives", "missed", "wrong_merges")):
+        v = np.array([float(r["decomposition"][k]) for r in items])  # type: ignore[index]
+        if k in up:
+            ax.bar(xs, v, bottom=pos, label=k.replace("_", " "), color=color_for(k, i))
+            pos = pos + v
+        else:
+            ax.bar(xs, -v, bottom=neg, label=k.replace("_", " "), color=color_for(k, i))
+            neg = neg - v
+    ax.axhline(0, color="0.4", lw=0.8)
+    ax.set_xticks(xs, [str(r["method"]) for r in items], rotation=30, ha="right")
+    ax.set_ylabel("objects per scene (up = over-count, down = under-count)")
+    ax.legend(fontsize=7)
+    save(fig, out)
+    return out
+
+
 def make_all(csv_path: str | Path, out_dir: str | Path, base: str | None = None) -> list[Path]:
     rows = load_rows(csv_path)
     if not rows:
@@ -400,6 +452,7 @@ def make_all(csv_path: str | Path, out_dir: str | Path, base: str | None = None)
         fig_runtime_vs_views(rows, out / "runtime_vs_views.png"),
         fig_ablation(rows, out / "ablation.png", base),
         fig_error_vs_spread(rows, out / "error_vs_spread.png"),
+        fig_signed_bias(rows, out / "signed_bias.png"),
     ]
     return [p for p in paths if p is not None]
 

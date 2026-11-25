@@ -30,7 +30,7 @@ TEST_TREES = tuple(f"Tree{i:02d}" for i in range(1, 9))
 SIDES = ("east", "west")
 PROTOCOL = "fuji_core_v1"
 N_BOOT = 1000
-METRICS = ("mae", "mape", "assoc_f1", "duplicate_rate", "miss_rate")
+METRICS = ("mae", "signed_bias", "mape", "assoc_f1", "duplicate_rate", "miss_rate")
 PIPELINE = ("countonce_v1", "countonce_v2")
 BEGIN, END = "<!-- fuji-core:begin -->", "<!-- fuji-core:end -->"
 
@@ -63,6 +63,8 @@ def _metric(r: dict[str, str], metric: str) -> float:
     pred, gt = _num(r["pred"]), _num(r["gt"])
     if metric == "mae":
         return abs(pred - gt)
+    if metric == "signed_bias":
+        return pred - gt
     if metric == "mape":
         return float("nan") if gt == 0 else 100.0 * abs(pred - gt) / gt
     return _num(r[metric])
@@ -145,12 +147,14 @@ def cell_or_todo(report: dict[str, Any], key: str, fmt: str = "{:.2f}") -> str:
 
 
 def markdown_table(report: dict[str, Any]) -> str:
-    head = "| Method | k | MAE (apples) | MAPE (%) | assoc F1 | duplicate rate | miss rate |"
-    lines = [head, "|---|---|---|---|---|---|---|"]
+    head = "| Method | k | MAE (apples) | signed bias (apples) | MAPE (%) |"
+    head += " assoc F1 (explains errors) | duplicate rate | miss rate |"
+    lines = [head, "|---|---|---|---|---|---|---|---|"]
     for m in METHODS:
         for k in KS:
             c = [
                 cell_or_todo(report, f"{m}|{k}|mae"),
+                cell_or_todo(report, f"{m}|{k}|signed_bias", "{:+.2f}"),
                 cell_or_todo(report, f"{m}|{k}|mape", "{:.1f}"),
             ]
             for metric in ("assoc_f1", "duplicate_rate", "miss_rate"):
