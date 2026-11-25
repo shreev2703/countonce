@@ -5,3 +5,6 @@
 # looking at test-split numbers.
 score_threshold: 0.2   # detector box threshold applied to raw detections
 merge_k: 0.3           # v1 association distance (x object size); v2 gate scales with it
+# Re-confirmed 2026-11-25 on Tree09-11 under protocol fuji_core_v2 (after the M0 scoring fixes):
+# the same cell (0.2, 0.3) won again; evidence results/fuji_tune2_*.csv. Values unchanged, so the
+# file hash is unchanged apart from this comment. Note 0.2 is the lowest value in the grid.

@@ -378,12 +378,26 @@ def config_hash(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:12]
 
 
+PROTOCOL = "fuji_core_v2"
+
+
+def _row_protocol(r: dict[str, Any]) -> str | None:
+    try:
+        return json.loads(r.get("config_json") or "{}").get("protocol")
+    except ValueError:
+        return None
+
+
 def done_slices(csv_path: Path, split: str) -> set[tuple[str, str, int, str]]:
-    """(tree, side, k, method) of every finished (status ok) row of ``split`` in the CSV."""
+    """(tree, side, k, method) of every finished (status ok) row of ``split`` in the CSV.
+
+    Only rows of the current protocol count, so rows from an older scoring protocol are
+    never reused as finished work."""
     return {
         (r["scene_id"], r["sample"], int(r["n_views"]), r["method"])
         for r in read_rows(csv_path)
         if r["status"] == "ok" and r["split"] == split and r["n_views"]
+        and _row_protocol(r) == PROTOCOL
     }
 
 

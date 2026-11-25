@@ -146,7 +146,7 @@ One entry per decision: date, what the plan said, what was done, why.
 
 ## 2026-11-24: Core figure set and failure gallery
 - **CSV schema is append-only:** `peak_vram_mb`, `timings_json`, `assoc_f1` and `run_dir` were appended to `bench.runner.COLUMNS`. `read_rows` accepts the original 18-column header (or any prefix of the current one) and fills missing columns with `""`; `run_jobs` rewrites an old file once with the new header (atomic replace) before appending. Test: `tests/test_bench_core_figures.py`.
-- **`assoc_f1` is filled for the Fuji Core cells that have complete rows** (the k=20 v1 and v2 cells, 0.954 and 0.955; see `docs/RESULTS_FUJI.md`). It stays blank for the own-capture `gt.json` scenes, which carry no identity labels, and for Fuji cells where not all 16 tree-sides have a defined F1 (`TODO: fill from results`).
+- **`assoc_f1` is filled for the Fuji Core cells that have complete rows** (the miss-rate cells at k=20 only; see `docs/RESULTS_FUJI.md`). It stays blank for the own-capture `gt.json` scenes, which carry no identity labels, and for Fuji cells where not all 16 tree-sides have a defined F1 (`TODO: fill from results`).
 - **Figures 4, 6, 7** (`fig_assoc_f1`, `fig_runtime_vs_views`, `fig_ablation`) skip silently in `make_all` when their data is absent. Ablation deltas pair on per-scene mean percent error (ordered runs) against the `ablation_base` method; the base is inferred from the `base+field=value` names unless passed (`countonce bench --figures` passes `ablation_base`).
 - **Failure gallery:** each sampled run gets a contact sheet (max 12 evenly subsampled overlay frames) in `<figures>/gallery/`, embedded in its Markdown row; runs are located by the CSV `run_dir`, else `runs_dir/<run_key>`. Rows without overlays say "no overlay". Baselines have no overlays or VRAM.
 
@@ -605,7 +605,7 @@ One entry per decision: date, what the plan said, what was done, why.
 
 ## Fuji Core report, step 3 (overnight 2026-11-24)
 - **No Fuji rows exist:** `results/bench.csv` is absent because step 2 never ran (no frozen `configs/fuji_core.yaml`, see `docs/GATES.md`). `bench/fuji_report.py` therefore filled **zero** cells: README block (`<!-- fuji-core:begin -->`), `docs/RESULTS_FUJI.md` and `paper/tables/fuji_core.tex` (git-ignored, like the other paper tables) are all `TODO: fill from results`. The failure analysis says plainly that there are no runs to analyse.
-- **Cell rule:** a cell is filled only if all 8 test trees x 2 sides have an ok row with a defined metric; per-tree value is the mean over its sides; CI is a 1,000-sample percentile bootstrap over trees (`bench.stats`); paired tests (v2 vs v1, sum, max, median, on MAE) need the same complete set. `write_cell` raises `MissingBackingRow` otherwise (`tests/test_fuji_report.py`). Only rows tagged `protocol: fuji_core_v1` in `config_json` with `split == test` count.
+- **Cell rule:** a cell is filled only if all 8 test trees x 2 sides have an ok row with a defined metric; per-tree value is the mean over its sides; CI is a 1,000-sample percentile bootstrap over trees (`bench.stats`); paired tests (v2 vs v1, sum, max, median, on MAE) need the same complete set. `write_cell` raises `MissingBackingRow` otherwise (`tests/test_fuji_report.py`). Only rows tagged `protocol: fuji_core_v2` in `config_json` with `split == test` count.
 - **"assoc_f1 is not filled" TODO (above) stays:** no Fuji cell is filled yet, so there is nothing to remove it for. Re-running `python -m bench.fuji_report` after step 2 fills the cells that have complete rows.
 - **Figures not generated:** `bench.figures.make_all` raises on an empty CSV, so no Core figures exist. Run `python -m bench.figures` after step 2.
 - Foliage occlusion is not recorded per row by the runner, so the analysis can only point to miss rate.
@@ -743,3 +743,9 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **Lift failures** never reach an associator, so they are left out of the error decomposition (an object seen only through failed lifts counts as missed) and are reported as `n_lift_failed`.
 - **Observed (not claims about real data):** on the tiny scene, default v1 over-counts even with oracle detections and geometry (front-surface lifting puts one sphere's views about 0.2 apart; tuned k=0.75 gives 5), and the perturbed geometry is the dominant error source. On the synthetic fixture the injected false positives are the main error for v1 under real detections.
 - **Not done here:** Fuji-SfM and own captures need a loader that fills a `SceneBundle` (GT trees from `bench.fuji_core`, dataset cameras as oracle); that is the M8 task. No GPU run was made.
+
+## M8: Fuji-SfM Core run and G3 (2026-11-25)
+
+- Resumed the `fuji_core_v2` test sweep with the frozen `configs/fuji_core.yaml`: 320 rows, 0 failed. A second writer started by mistake appended 2 duplicate rows; both were removed (identical preds). Report, figures and README table regenerated from `results/bench.csv`; the hand-written reading lives in `docs/RESULTS_FUJI_ANALYSIS.md` and is appended by `bench.fuji_report`.
+- Failure-source experiment on Fuji (`scripts/run_failure_sources_fuji.py`, k=10): Fuji has no depth or own poses, so oracle geometry is not available; only oracle-detections and full conditions ran. Assumed apple radius 4 cm for oracle boxes (not measured). Predictions there are not ROI-filtered, so MAE is not comparable with the Core table.
+- Not done: baselines beyond Sum/Max/Median (sync, COLMAP), sweep axes other than k, v3 on Fuji (G4 evidence), own captures.

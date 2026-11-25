@@ -387,14 +387,18 @@ def test_skip_ignores_other_split_host_and_errors(tmp_path):
     from bench.runner import RunOutput, run_jobs
 
     csv_path = tmp_path / "bench.csv"
-    run_jobs(iter(_fake_jobs("val")[:3]), lambda j: RunOutput(pred=0.0, gt=0.0), csv_path, {})
+    proto = {"protocol": fc.PROTOCOL}
+    run_jobs(iter(_fake_jobs("val")[:3]), lambda j: RunOutput(pred=0.0, gt=0.0), csv_path, proto)
 
     def boom(job):
         raise RuntimeError("x")
 
-    run_jobs(iter(_fake_jobs("test")[:2]), boom, csv_path, {})
+    run_jobs(iter(_fake_jobs("test")[:2]), boom, csv_path, proto)
     assert fc.done_slices(csv_path, "test") == set()  # error rows are retried
     assert len(fc.done_slices(csv_path, "val")) == 3
+    old = tmp_path / "old.csv"  # rows of an older scoring protocol are not finished work
+    run_jobs(iter(_fake_jobs("val")[:3]), lambda j: RunOutput(pred=0.0, gt=0.0), old, {})
+    assert fc.done_slices(old, "val") == set()
     other_host = fc.make_job("Tree01", "val", "east", 3, "countonce_v1", {"host": "other"})
     assert list(fc.pending_jobs(iter([other_host]), csv_path)) == []
 

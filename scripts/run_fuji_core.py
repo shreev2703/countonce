@@ -156,7 +156,7 @@ def cmd_bench(args: argparse.Namespace) -> None:
         "prompt": PROMPT, "score_threshold": args.score_threshold, "merge_k": base.merge_k,
         "downscale": fc.DOWNSCALE, "stride": STRIDE, "roi_margin_m": fc.ROI_MARGIN_M,
         "gt_tol_occ_m": fc.GT_TOL_OCC_M, "gt_max_depth_m": fc.GT_MAX_DEPTH_M,
-        "match_px": fc.MATCH_PX, "chunk_size": base.chunk_size, "protocol": "fuji_core_v1",
+        "match_px": fc.MATCH_PX, "chunk_size": base.chunk_size, "protocol": fc.PROTOCOL,
         "frozen_config": str(args.config), "frozen_config_hash": cfg_hash,
         "frozen_values": frozen, **fc.host_info(),
     }  # fmt: skip

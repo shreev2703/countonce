@@ -20,6 +20,7 @@ from typing import Any
 
 import numpy as np
 
+from bench import fuji_core
 from bench.runner import read_rows
 from bench.stats import bootstrap_ci, paired_compare
 
@@ -28,7 +29,7 @@ METHODS = ("countonce_v1", "countonce_v2", "sum", "max", "median")
 KS = (3, 5, 10, 20)
 TEST_TREES = tuple(f"Tree{i:02d}" for i in range(1, 9))
 SIDES = ("east", "west")
-PROTOCOL = "fuji_core_v1"
+PROTOCOL = fuji_core.PROTOCOL
 N_BOOT = 1000
 METRICS = ("mae", "signed_bias", "mape", "assoc_f1", "duplicate_rate", "miss_rate")
 PIPELINE = ("countonce_v1", "countonce_v2")
@@ -265,6 +266,9 @@ def build(csv_path: Path, root: Path) -> dict[str, Any]:
         + fa
         + "\n"
     )
+    extra = root / "docs/RESULTS_FUJI_ANALYSIS.md"  # hand-written reading of the numbers above
+    if extra.exists():
+        md += "\n" + extra.read_text()
     (root / "docs").mkdir(exist_ok=True)
     (root / "docs/RESULTS_FUJI.md").write_text(md)
     readme = root / "README.md"
