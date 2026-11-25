@@ -537,3 +537,9 @@ One entry per decision: date, what the plan said, what was done, why.
 - `full-cpu` now installs `.[dev,test,data,api,db,dvc]` and runs a `postgres:16` service (health-checked, `COUNTONCE_PG_URL=postgresql://postgres:postgres@localhost:5432/countonce_test`). The skip allow-list is unchanged.
 - `tests/test_ci_workflow.py` keeps a hand-maintained module -> extra map; a new `importorskip` module not in the map fails the test on purpose.
 - pgserver (embedded Postgres, unix socket) ran the 49 contract + schema cases once with no failures, so no `PostgresJobStore` changes were needed. It was uninstalled afterwards.
+
+## VLM count parser hardening (`bench/vlm/parse.py`)
+- Dropped before parsing: numbers followed by `%`/`percent`, whole lines starting with `confidence`/`certainty`/`probability`, and image indices (`image 3`, `photo 2`, `view 4`, `images 1-3`).
+- **Range rule:** `a-b` / `a to b` (a < b, comma thousands allowed) is read as the midpoint rounded half up, so "about 40-45" -> 43. Chosen over first/last value because it minimises worst-case error for a hedged estimate. An explicit `ANSWER:`/`total` marker with a range gets the same treatment.
+- **Zero phrases** (`none`, `zero`, `no <noun>`, `not any`, `aren't any`) give `0` with `method="zero_phrase"` only after every numeric path fails, only when the reply is not a refusal, and only when no number word appears in the text (so "Three apples. None are red." stays 3). `zero` was removed from the number-word path.
+- Known limits: "photo 1 and 8" keeps 8 (only `-` joins image indices); a confidence line that also holds the count is dropped.
