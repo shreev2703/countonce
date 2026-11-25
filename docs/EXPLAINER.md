@@ -209,9 +209,11 @@ track. Association depends only on geometry, so shuffled photos give the same an
 move, since the static-scene assumption fails there and 2D motion is a strong cue.
 
 **2. How is this different from CountVid and DG-Net?**
-Those target counting in video with temporal tracking. CountOnce targets a static scene from a few
-photos and makes the geometric association explicit and inspectable (`MatchEvidence` per pair).
-The related-work comparison is in `docs/RELATED_WORK.md`, written from abstracts with `TODO: verify` claims.
+Both count in video by tracking: CountVid propagates SAM 2.1 masks; DG-Net adds depth (sensor, or
+estimated in some of its results) to detection and to the matching cost. CountOnce targets a static
+scene from a few unordered photos, associates through estimated camera geometry, and keeps the
+evidence inspectable (`MatchEvidence` per pair). Whether that counts better is a hypothesis: neither
+system has been run here. See `docs/RELATED_WORK.md`.
 
 **3. Why can't same-photo detections merge?**
 One physical object projects to one region of an image, so two separate detections in a single photo

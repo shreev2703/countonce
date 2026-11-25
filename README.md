@@ -178,7 +178,8 @@ This repo ships download scripts, not datasets or model weights. Verify each lic
 | VGGT (Wang et al., CVPR 2025) | Reconstruction backbone | Original checkpoint is non-commercial; a commercial variant exists by application |
 | VGGT-Ω, VGG-T³ | Optional backbones (not wired) | Research only / `TODO: verify` |
 | CountGD (Amini-Naieni et al.) | Open-vocabulary counting detector | MIT |
-| CountGD++, CountVid, GroundingDINO, DINOv2 | Detector / video baselines / appearance features | `TODO: verify` each (see `docs/MODEL_SURVEY.md`) |
+| CountVid, DG-Net | Video baselines (not run yet) | MIT (repository code; weights and datasets keep their own) |
+| CountGD++, GroundingDINO, DINOv2 | Detector / appearance features | `TODO: verify` each (see `docs/MODEL_SURVEY.md`) |
 | Fuji-SfM | Benchmark scenes | CC BY-NC-SA 4.0 (research/education only): no redistribution of its images or derived GT, no HF dataset upload |
 | WGISD, MinneApple, AppleGrowthVision, FSC-147 | Other candidate datasets | See `docs/DATASETS.md` |
 | Kubric | Planned synthetic data | Open source; asset licenses to be checked |
@@ -188,7 +189,7 @@ Reconstruction wrapper, memory guard, frame extraction, COLMAP wrapper and plott
 ported from the author's VGGT benchmark repo (`TODO: fill from results` — add its URL once
 public). The project's own license: `TODO: choose a license before release`.
 
-Related work and open novelty questions: [docs/RELATED_WORK.md](docs/RELATED_WORK.md).
+Related work and the hypothesis under test: [docs/RELATED_WORK.md](docs/RELATED_WORK.md).
 
 <!-- fuji-core:begin -->
 ### Fuji-SfM Core (test trees 01-08)

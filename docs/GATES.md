@@ -336,3 +336,7 @@ so `scripts/render_mockups.py` skips; open the HTML files directly or install pl
 - **Recommendation: G3 not met (mixed).** On the 8 frozen test trees (320 rows, protocol `fuji_core_v2`), v1/v2 beat Sum in most slices at k=10 and 20 but not at k=3/5, and beat Max in most slices only at k=20 (v2 vs Max paired MAE diff -51.9, CI [-81.7, -20.3]); Max has the lowest MAE at k=10 (31.1 vs v2 40.1). Table and per-slice counts: `docs/RESULTS_FUJI_ANALYSIS.md`.
 - Failure sources (k=10, no oracle geometry available on Fuji): the detector (about 121 false positives and 52 misses per window) is the largest error, then duplicates from association (34-37 per window even with perfect detections).
 - Fallback per PLAN §21: publish the honest mixed result; the final decision and any redirect (detector first, then association) is the owner's. Does not decide G4.
+
+## 2026-11-25: OneScene-Bench images not published (found during M10; does not block M10)
+- `github.com/swathisuhas/OneScene-Bench` holds parquet annotations whose image fields are relative paths with no bytes (checked first rows of three files), and the repo tree has no image files.
+- Needed before the Strong-tier OneScene evaluation: get the images from the authors, or rebuild them from DL3DV-10K under its terms (yours: it needs accepting terms or contacting the authors). `bench/datasets/onescene.py` also needs rewriting for the parquet layout.

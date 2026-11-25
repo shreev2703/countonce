@@ -760,3 +760,9 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - `huggingface_hub.*` added to mypy `ignore_missing_imports`; `warn_unused_ignores` off for the two HF model modules.
 - **Node job:** `web/` does not exist yet (M12). The `web` job detects `web/package.json` and is a no-op without it. It expects a committed `package-lock.json` and runs `npm ci`, lint/typecheck/test if present, then build. M12 may need to add Playwright browser install.
 - **Verification is a dry run, not `act`** (no Docker here): the `run:` commands in fresh Python 3.11 venvs on a copy of the tracked files, with embedded Postgres (`pgserver`) in place of the `postgres:16` service. The GitHub Actions themselves and the `web` job did not execute. `golden-gpu.yml` (self-hosted) was not run.
+
+## 2026-11-25: M10 related-work rewrite
+- `docs/RELATED_WORK.md` is organised around the §2.4 hypothesis. The C1-C5 coverage matrix and the "claim survives" verdict were removed: they rested on negative claims about unread papers.
+- Only CountVid, DG-Net and OneScene-Bench were read in full (the task's scope). Other works are tagged abstract/search/repo level and described only by what they state.
+- §2.4 does not define the two sides of "geometry-aware vs simpler geometric matching"; read as v2/sync/v3 vs v1/C-DOG.
+- Also updated where the full read contradicted them: PLAN §2.3 rows and §2.4 note, MODEL_SURVEY (DG-Net accepts estimated depth; venue), DATASETS (OneScene-Bench release has no images; loader layout assumption is wrong), EXPLAINER Q2, README license table, `paper/refs.bib`. The OneScene loader code was not changed (no images to test against).

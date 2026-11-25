@@ -47,9 +47,9 @@ Related: [[PLAN]] §24, [[DEVIATIONS]].
 
 ### DG-Net (Depth-Guided Video Object Counting, repo `streamer-AP/DG-Net`)
 - Extends CountVid with depth; trained and evaluated on RGBD-VideoCount (HF dataset). Tested on RTX 5090, CUDA 12.8, Python 3.10.
-- Needs depth input, so it is only comparable on RGB-D data; needs `countgd_box.pth` to train, `DG-Net.pth` for inference.
+- Takes a depth map per frame: sensor depth, or estimated depth (paper Table 2 † rows). So an RGB-only comparison is possible by estimating depth; needs `countgd_box.pth` to train, `DG-Net.pth` for inference.
 - Output: JSON with global metrics, per-entry predicted counts + GT, frame-wise boxes; `scripts/demo.py` renders GIFs.
-- Note: a web search suggested an ACM MM 2026 acceptance; unverified. Do not confuse with unrelated "DG-Net" papers.
+- Accepted at ACM Multimedia 2026 (arXiv comment and repo README, checked 2026-11-25). Do not confuse with unrelated "DG-Net" papers.
 
 ### C-DOG (arXiv 2507.14095)
 - Training-free, feature-free multi-view association via epipolar-distance graphs, delta-neighbour-overlap clustering, IQR filtering.
