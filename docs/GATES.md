@@ -88,7 +88,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   `~/vggtProject/.venv`. A countonce `.venv` now exists (uv, **Python 3.12.3**, dev extra only). In it, 5 test modules fail to collect
   (matplotlib/torch missing) and `mypy countonce` reports 65 errors. Both are queued as fixes. Human items: decide whether the venv should be
   3.11 to match CI (`setup-python 3.11`), then `uv pip install -e .[dev,recon,mcp]` (torch for `sm_120` needs the CUDA 12.8+ wheel index).
-- **SAM/SAM2 weights** for the queued mask producer: download a checkpoint (e.g. `sam2_hiera_small.pt`) on a networked session and set its path
+- **SAM/SAM2 weights** (RESOLVED 2026-11-24 through Hugging Face: `facebook/sam2.1-hiera-small`, public, ungated, Apache-2.0, used by `Sam2HfMaskProducer`; only the `sam2`-package path still needs a manual checkpoint): download a checkpoint (e.g. `sam2_hiera_small.pt`) on a networked session and set its path
   in config. The queued task builds and tests only the box-fill/fake producer.
 - **Human baseline study (PLAN §9.3 item 10):** the queued task builds the count sheets and the scoring harness only. Recruiting 3–5
   participants, running the timed sessions, and collecting the CSV need you, and they need real captures with hand counts first.
@@ -239,3 +239,6 @@ so `scripts/render_mockups.py` skips; open the HTML files directly or install pl
   Fuji-SfM is NC-SA); Docker (Kubric, the worker image); CountGD/CountGD++/VGGT-Ω/VGG-T³ weights; the video datasets and C-DOG/CountVid/DG-Net baselines (CountVid is a Core baseline,
   so it is the biggest remaining Core gap); frontier-VLM API spend; interviews, the professor meeting, the pilot, the human baseline study, the demo video and the paper venue; and
   whether to commit `uv.lock` and the orchestrator scripts.
+
+## 2026-11-24: SAM weights resolved through Hugging Face
+- `Config.masks: sam` without `mask_checkpoint` now uses `Sam2HfMaskProducer` (`facebook/sam2.1-hiera-small`, public, ungated, Apache-2.0), downloaded from the HF Hub on first use. No manual download is needed; the earlier "SAM weights" human action above is closed. Setting `mask_checkpoint` still selects the `sam2`-package adapter.

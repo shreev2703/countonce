@@ -1,5 +1,7 @@
 """Mask producers, cache and mask lifting (PLAN 8.2 masks.py, 9.6)."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 from PIL import Image
@@ -10,9 +12,12 @@ from countonce.detect.masks import (
     MaskCache,
     MaskModelUnavailable,
     MaskProducer,
+    Sam2HfMaskProducer,
     SamMaskProducer,
     attach_masks,
+    box_to_mask,
     build_mask_producer,
+    mask_cache_key,
 )
 from countonce.lift import lift_detections
 from countonce.pipeline import run
@@ -134,8 +139,77 @@ def test_pipeline_masks_switch(tmp_path):
     assert "n" not in seen
 
 
-def test_sam_mode_without_checkpoint_fails_clearly(tmp_path):
+def test_sam_mode_without_checkpoint_uses_hf_and_fails_clearly_without_transformers(
+    tmp_path, monkeypatch
+):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "transformers", None)  # makes the import raise ImportError
     img_dir, script = make_scene(tmp_path)
     cfg = Config(out_dir=tmp_path / "o", max_frames=0, masks="sam")
-    with pytest.raises(MaskModelUnavailable):
+    assert isinstance(build_mask_producer("sam"), Sam2HfMaskProducer)
+    assert isinstance(build_mask_producer("sam", "x.pt"), SamMaskProducer)
+    with pytest.raises(MaskModelUnavailable, match="transformers"):
         run(img_dir, "widgets", cfg, detector=FakeDetector(script), reconstructor=PlaneRecon())
+
+
+class _FakeProcessor:
+    """Mimics Sam2Processor: returns fixed candidate masks, 3 per box, with set IoU scores."""
+
+    def __init__(self, h, w):
+        self.h, self.w = h, w
+        self.seen = None
+
+    def __call__(self, images, input_boxes, return_tensors):
+        import torch
+
+        self.seen = input_boxes
+        return _Inputs({"original_sizes": torch.tensor([[self.h, self.w]])})
+
+    def post_process_masks(self, masks, sizes, binarize=True):
+        return [masks[0]]
+
+
+class _Inputs(dict):
+    def to(self, device):
+        return self
+
+
+class _FakeModel:
+    def __init__(self, h, w, n):
+        import torch
+
+        full = torch.ones(1, n, 3, h, w, dtype=torch.bool)  # spills outside every box
+        self.out = type(
+            "O",
+            (),
+            {
+                "pred_masks": full,
+                # candidate 1 has the best score for each box
+                "iou_scores": torch.tensor([[[0.1, 0.9, 0.2]] * n]),
+            },
+        )()
+        self.calls = 0
+
+    def __call__(self, **kw):
+        self.calls += 1
+        assert kw["multimask_output"] is True
+        return self.out
+
+
+def test_sam2_hf_batches_boxes_clips_to_box_and_keys_on_revision():
+    pytest.importorskip("torch")
+    h, w = 20, 30
+    boxes = [(2, 3, 10, 12), (15, 5, 25, 15)]
+    proc, model = _FakeProcessor(h, w), _FakeModel(h, w, 2)
+    prod = Sam2HfMaskProducer(revision="abc123", device="cpu", model=model, processor=proc)
+    ms = prod.masks(np.zeros((h, w, 3), np.uint8), boxes)
+    assert model.calls == 1 and len(proc.seen[0]) == 2  # one batched call per frame
+    for m, b in zip(ms, boxes, strict=True):
+        assert m.dtype == bool and m.shape == (h, w)
+        assert np.array_equal(m, box_to_mask(b, h, w))  # clipped to its box
+    assert prod.version == "hf:facebook/sam2.1-hiera-small@abc123"
+    assert prod.masks(np.zeros((h, w, 3), np.uint8), []) == []
+    f = Frame(id=0, path=Path("x"), width=w, height=h, sha256="s")
+    other = Sam2HfMaskProducer(revision="def456", device="cpu", model=model, processor=proc)
+    assert mask_cache_key(f, "d", prod, boxes) != mask_cache_key(f, "d", other, boxes)

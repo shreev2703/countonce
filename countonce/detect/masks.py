@@ -2,7 +2,8 @@
 
 ``lift.py`` uses ``Detection.mask`` when ``Config.lift_region == "mask"``; this module fills it.
 ``BoxFillMaskProducer`` is deterministic and dependency-free (every pixel in the box). The SAM
-adapter imports ``sam2`` lazily and needs a checkpoint path from config; nothing is downloaded.
+adapter imports ``sam2`` lazily and needs a checkpoint path from config; without one, ``sam``
+mode uses SAM 2.1 through Hugging Face ``transformers`` (``Sam2HfMaskProducer``).
 Masks are cached per frame, keyed by frame hash, detector, mask model, version and the boxes.
 """
 
@@ -15,7 +16,7 @@ import tempfile
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 
@@ -30,7 +31,9 @@ class MaskModelUnavailable(CountOnceError):
 @runtime_checkable
 class MaskProducer(Protocol):
     name: str
-    version: str
+
+    @property
+    def version(self) -> str: ...
 
     def masks(self, image: np.ndarray, boxes: Sequence[Sequence[float]]) -> list[np.ndarray]:
         """One HxW bool mask per xyxy pixel box, in order."""
@@ -99,12 +102,90 @@ class SamMaskProducer:
         return out
 
 
+class Sam2HfMaskProducer:
+    """SAM 2.1 box-prompted masks through Hugging Face ``transformers`` (Apache-2.0, ungated).
+
+    One batched box prompt per frame; of the three candidate masks per box the one with the best
+    predicted IoU is kept, then clipped to its box. ``transformers`` and torch are imported lazily.
+    """
+
+    name = "sam2_hf"
+
+    def __init__(
+        self,
+        model_id: str = "facebook/sam2.1-hiera-small",
+        revision: str | None = None,
+        device: str = "cuda",
+        model: object | None = None,
+        processor: object | None = None,
+    ) -> None:
+        self.model_id = model_id
+        self.revision = revision
+        self.device = device
+        self._model = model
+        self._processor = processor
+
+    @property
+    def version(self) -> str:
+        rev = self.revision
+        if rev is None:
+            from countonce.detect.groundingdino import cached_revision
+
+            rev = cached_revision(self.model_id)
+        return f"hf:{self.model_id}@{rev or 'unresolved'}"
+
+    def _load(self) -> tuple[object, object]:
+        if self._model is not None and self._processor is not None:
+            return self._model, self._processor
+        try:
+            import torch
+            from transformers import Sam2Model, Sam2Processor
+        except ImportError as e:
+            raise MaskModelUnavailable(
+                "SAM 2.1 via Hugging Face needs 'transformers' (>=4.56) and torch; "
+                "install them, or set Config.mask_checkpoint to use the 'sam2' package"
+            ) from e
+        if self.device.startswith("cuda") and not torch.cuda.is_available():
+            self.device = "cpu"
+        kw: dict[str, Any] = {} if self.revision is None else {"revision": self.revision}
+        self._processor = Sam2Processor.from_pretrained(self.model_id, **kw)
+        self._model = Sam2Model.from_pretrained(self.model_id, **kw).to(self.device).eval()  # type: ignore[arg-type]
+        return self._model, self._processor
+
+    def masks(self, image: np.ndarray, boxes: Sequence[Sequence[float]]) -> list[np.ndarray]:
+        if not len(boxes):
+            return []
+        model, processor = self._load()
+        import torch
+
+        h, w = image.shape[:2]
+        inputs = processor(  # type: ignore[operator]
+            images=image,
+            input_boxes=[[[float(v) for v in b] for b in boxes]],
+            return_tensors="pt",
+        ).to(self.device)
+        with torch.inference_mode():
+            out = model(**inputs, multimask_output=True)  # type: ignore[operator]
+        # (1, n_boxes, 3, H, W) bool masks at the original size; scores (1, n_boxes, 3)
+        post = processor.post_process_masks(  # type: ignore[attr-defined]
+            out.pred_masks.cpu(), inputs["original_sizes"].cpu(), binarize=True
+        )[0]
+        best = out.iou_scores.float().cpu()[0].argmax(dim=-1)
+        res: list[np.ndarray] = []
+        for i, b in enumerate(boxes):
+            m = post[i, int(best[i])].numpy().astype(bool)
+            res.append(m & box_to_mask(b, h, w))
+        return res
+
+
 def build_mask_producer(mode: str, checkpoint: Path | str | None = None) -> MaskProducer | None:
     if mode == "none":
         return None
     if mode == "box_fill":
         return BoxFillMaskProducer()
     if mode == "sam":
+        if checkpoint is None:
+            return Sam2HfMaskProducer()
         return SamMaskProducer(checkpoint)
     raise ValueError(f"unknown masks mode {mode!r}")
 
