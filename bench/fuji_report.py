@@ -77,7 +77,8 @@ def tree_values(
     sides: Sequence[str] = SIDES,
 ) -> dict[str, float] | None:
     """Per-tree value (mean over its sides), or None unless all (tree, side) slices have ok rows
-    and the metric is defined for each of them."""
+    and the metric is defined for each of them. MAPE is the exception: slices with GT = 0 are
+    skipped (trees with no GT apple on any side drop out), never counted as 0 or NaN."""
     per: dict[tuple[str, str], float] = {}
     for r in rows:
         if r["status"] == "ok" and r["method"] == method and r["n_views"] == str(k):
@@ -85,10 +86,17 @@ def tree_values(
     out: dict[str, float] = {}
     for t in trees:
         vals = [per.get((t, s), float("nan")) for s in sides]
-        if any(np.isnan(v) for v in vals):
+        if metric == "mape":
+            # GT = 0 makes MAPE undefined: skip that slice, but a missing row still blocks the cell
+            if any((t, s) not in per for s in sides):
+                return None
+            vals = [v for v in vals if not np.isnan(v)]
+            if not vals:
+                continue  # every side of this tree has GT = 0
+        elif any(np.isnan(v) for v in vals):
             return None
         out[t] = float(np.mean(vals))
-    return out
+    return out if out else None
 
 
 def compute(rows: Sequence[dict[str, str]]) -> dict[str, Any]:

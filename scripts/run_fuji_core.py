@@ -176,7 +176,7 @@ def cmd_bench(args: argparse.Namespace) -> None:
             if recon.n_views != k:
                 raise RuntimeError(f"recon has {recon.n_views} views, expected {k}")
             sim = align_chunk(gt_ext, recon.extrinsics)
-            ev = fc.evaluate_window(res, recon, sim, scene.gt_ids, scene.gt_xyz, box)
+            ev = fc.evaluate_window(res, recon, sim, scene.gt_ids, scene.gt_xyz, box, gt_ext)
             runs[assoc] = (ev, res)
         c_gt = camera_centers(gt_ext)
         c_al = camera_centers(transform_extrinsics(recon.extrinsics, sim))

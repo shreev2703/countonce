@@ -173,10 +173,70 @@ def in_roi(xyz: np.ndarray, box: tuple[np.ndarray, np.ndarray]) -> np.ndarray:
 
 
 def window_for_tree(cam_y: np.ndarray, side_len: int, tree_y: float, k: int) -> tuple[int, int]:
-    """[start, stop) of ``k`` contiguous side-local frames centred on the camera nearest a tree."""
+    """[start, stop) of ``k`` contiguous side-local frames centred on the camera nearest a tree.
+
+    ``cam_y`` has one entry per side frame. The window always has exactly ``k`` frames inside
+    ``[0, side_len)``; a side shorter than ``k`` raises instead of returning a negative start.
+    """
+    cam_y = np.asarray(cam_y, float)
+    if k < 1:
+        raise ValueError(f"window size must be >= 1, got {k}")
+    if side_len < k:
+        raise ValueError(f"side has {side_len} frames, fewer than the window size {k}")
+    if len(cam_y) != side_len:
+        raise ValueError(f"cam_y has {len(cam_y)} entries for a side of {side_len} frames")
+    if not np.all(np.isfinite(cam_y)):
+        raise ValueError("cam_y contains non-finite values")
     c = int(np.argmin(np.abs(cam_y - tree_y)))
     start = min(max(c - k // 2, 0), side_len - k)
     return start, start + k
+
+
+class AlignmentError(RuntimeError):
+    """The window's reconstruction does not fit its overview pseudo-poses."""
+
+
+MAX_CAM_RMS_FRAC = 0.5  # camera RMS misfit above this share of the window's camera span fails
+
+
+def scaled_depth(depth: np.ndarray, sim: Sim3) -> np.ndarray:
+    """Depth maps in GT-frame metres. ``transform_extrinsics`` expresses camera coordinates in
+    destination units (``s * x_c``), so reconstruction-frame depth must be multiplied by ``s``
+    to be comparable with the ``z`` that ``project_points`` returns for GT apples."""
+    return np.asarray(depth, float) * sim.s
+
+
+def check_alignment(
+    gt_ext: np.ndarray, recon_ext: np.ndarray, sim: Sim3, max_frac: float = MAX_CAM_RMS_FRAC
+) -> dict[str, float]:
+    """Camera-centre misfit of the aligned window against the overview pseudo-poses.
+
+    Returns ``cam_rms_m`` and ``cam_span_m``; raises ``AlignmentError`` when the misfit is a large
+    share of the span (a window that fails this has a meaningless scale, so its depth test and GT
+    would be wrong) or when the scale is not finite and positive."""
+    if not np.isfinite(sim.s) or sim.s <= 0:
+        raise AlignmentError(f"non-positive alignment scale {sim.s}")
+    c_gt = camera_centers(gt_ext)
+    c_al = camera_centers(transform_extrinsics(recon_ext, sim))
+    rms = float(np.sqrt(((c_gt - c_al) ** 2).sum(1).mean()))
+    span = float(np.linalg.norm(np.ptp(c_gt, axis=0)))
+    if span > 0 and rms > max_frac * span:
+        raise AlignmentError(f"camera misfit {rms:.3f} m is >{max_frac:.0%} of span {span:.3f} m")
+    return {"cam_rms_m": rms, "cam_span_m": span}
+
+
+def _frame_gt(
+    gt_xyz: np.ndarray, intr: np.ndarray, ext: np.ndarray, hw: tuple[int, int], max_depth: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(indices, uv, z) of GT apples in front of the camera, within ``max_depth`` and the image."""
+    from bench.gt_matching import project_points
+
+    h, w = hw
+    uv, z = project_points(gt_xyz, intr, ext)
+    ok = np.isfinite(z) & (z > 0) & (z < max_depth)
+    ok &= (uv[:, 0] >= 0) & (uv[:, 0] <= w - 1) & (uv[:, 1] >= 0) & (uv[:, 1] <= h - 1)
+    idx = np.flatnonzero(ok)
+    return idx, uv, z
 
 
 def visible_gt(
@@ -187,18 +247,22 @@ def visible_gt(
     tol: float = GT_TOL_OCC_M,
     max_depth: float = GT_MAX_DEPTH_M,
 ) -> list[np.ndarray]:
-    """Per view: indices of GT apples in frame, in front of the reconstructed surface (metres)."""
-    from bench.gt_matching import project_points
+    """Per view: indices of GT apples in frame, in front of the reconstructed surface (metres).
 
+    ``depth_gt`` must already be in GT metres (``scaled_depth``). The depth map is read at the
+    nearest pixel (not truncated), including the last row and column. A pixel with no valid depth
+    (NaN, inf or <= 0) carries no occlusion evidence, so the apple stays visible there.
+    """
+    gt_xyz = np.asarray(gt_xyz, float).reshape(-1, 3)
     out = []
+    h, w = depth_gt.shape[1:]
     for v in range(len(intr)):
-        h, w = depth_gt.shape[1:]
-        uv, z = project_points(gt_xyz, intr[v], ext_gt[v])
-        ok = (z > 0) & (z < max_depth) & (uv[:, 0] >= 0) & (uv[:, 0] < w - 1)
-        ok &= (uv[:, 1] >= 0) & (uv[:, 1] < h - 1)
-        idx = np.flatnonzero(ok)
-        surf = depth_gt[v, uv[idx, 1].astype(int), uv[idx, 0].astype(int)]
-        out.append(idx[z[idx] <= surf + tol])
+        idx, uv, z = _frame_gt(gt_xyz, intr[v], ext_gt[v], (h, w), max_depth)
+        px = np.clip(np.rint(uv[idx, 0]).astype(int), 0, w - 1)
+        py = np.clip(np.rint(uv[idx, 1]).astype(int), 0, h - 1)
+        surf = depth_gt[v, py, px]
+        valid = np.isfinite(surf) & (surf > 0)
+        out.append(idx[~valid | (z[idx] <= surf + tol)])
     return out
 
 
@@ -209,10 +273,16 @@ def evaluate_window(
     gt_ids: list[str],
     gt_xyz: np.ndarray,
     box: tuple[np.ndarray, np.ndarray],
+    gt_ext: np.ndarray | None = None,
 ) -> dict[str, Any]:
-    """Count, GT, association metrics and per-image baselines of one run, in the GT frame."""
+    """Count, GT, association metrics and per-image baselines of one run, in the GT frame.
+
+    ``gt_ext`` (the window's overview pseudo-poses), when given, is checked against the aligned
+    cameras (``check_alignment``) and the misfit is recorded in the result.
+    """
+    align = check_alignment(gt_ext, recon.extrinsics, sim) if gt_ext is not None else {}
     ext_gt = transform_extrinsics(recon.extrinsics, sim)
-    depth_gt = recon.depth * sim.s
+    depth_gt = scaled_depth(recon.depth, sim)
     vis = visible_gt(gt_xyz, recon.intrinsics, ext_gt, depth_gt)
     visible_set = sorted({int(i) for v in vis for i in v})
     h, w = recon.depth.shape[1:]
@@ -234,22 +304,28 @@ def evaluate_window(
                 continue
             dets.append(Detection(id=m, frame_id=r.view, score=1.0, point_xy=np.array(r.uv)))
             cluster_of[m] = inst.id
+    # Identity labels: match each detection to the nearest GT apple *in frame* (visible or not),
+    # then keep the label only if that apple is in the visible set. A detection on an occluded
+    # apple is therefore unlabeled instead of being stolen by a different, visible neighbour.
     labels: dict[str, str | None] = {}
     for v in range(len(vis)):
         dv = [d for d in dets if d.frame_id == v]
         if not dv:
             continue
-        sel = vis[v]
+        inframe, _, _ = _frame_gt(gt_xyz, recon.intrinsics[v], ext_gt[v], (h, w), GT_MAX_DEPTH_M)
+        visible_v = {int(i) for i in vis[v]}
+        got = match_detections_to_gt(
+            dv,
+            [gt_ids[i] for i in inframe],
+            gt_xyz[inframe],
+            {v: recon.intrinsics[v]},
+            {v: ext_gt[v]},
+            {v: (w, h)},
+            threshold_px=MATCH_PX,
+        )
+        pos = {gt_ids[i]: int(i) for i in inframe}
         labels.update(
-            match_detections_to_gt(
-                dv,
-                [gt_ids[i] for i in sel],
-                gt_xyz[sel],
-                {v: recon.intrinsics[v]},
-                {v: ext_gt[v]},
-                {v: (w, h)},
-                threshold_px=MATCH_PX,
-            )
+            {k: (g if g is not None and pos[g] in visible_v else None) for k, g in got.items()}
         )
     clusters = [cluster_of[d.id] for d in dets]
     gts = [labels.get(d.id) for d in dets]
@@ -266,7 +342,18 @@ def evaluate_window(
         ]
         per_image.append(int(in_roi(np.array(xyz), box).sum()) if xyz else 0)
 
+    # Interval: the pipeline's covers every instance, ours counts only those in the ROI, so shift
+    # both ends by the number of out-of-ROI instances and keep low <= pred <= high.
+    low = high = None
+    iv = getattr(result, "interval", None)
+    if iv is not None:
+        out_of_roi = int(result.count) - pred
+        low = float(max(min(iv.low - out_of_roi, pred), 0))
+        high = float(max(iv.high - out_of_roi, pred))
     return {
+        **align,
+        "low": low,
+        "high": high,
         "pred": pred,
         "gt": len(visible_set),
         "raw_count": int(result.count),
@@ -334,6 +421,8 @@ def run_output(ev: dict[str, Any], method: str, res: Any, runtime_s: float) -> R
     return RunOutput(
         pred=pred,
         gt=float(ev["gt"]),
+        low=ev.get("low") if is_pipe else None,
+        high=ev.get("high") if is_pipe else None,
         runtime_s=runtime_s,
         peak_vram_mb=float(res.peak_vram_mb),
         timings={k: float(v) for k, v in res.timings.items()},
