@@ -95,7 +95,7 @@ One entry per decision: date, what the plan said, what was done, why.
 
 ## 2026-11-24: Fuji-SfM loader, Sim(3), GT matching
 - **Sim(3) location:** `countonce/recon/align.py` (`umeyama`, `Sim3`, `camera_centers`, `align_by_camera_centers`, `transform_extrinsics`) so chunk stitching (§8.3) and the benchmark share it. Convention `dst = s R src + t`.
-- **Loader layout is a guess:** all file names live in `bench/datasets/fuji_sfm.py::_read_layout`; format TODOs from DATASETS.md are in the module docstring. Never run against real data.
+- **Loader layout (superseded, see "Fuji-SfM loader verified" below):** all file names live in `bench/datasets/fuji_sfm.py::_read_layout`.
 - **Matching** (`bench/gt_matching.py`): nearest projected GT within a pixel threshold (default 20, `TODO: tune`); no occlusion test (no GT depth), so a detection on an occluded apple may take a hidden GT's id; many-to-one allowed within a frame (a within-frame duplicate). Detection reference = point, else box centre.
 - **Download script** `scripts/download_fuji_sfm.sh` lists files via the Zenodo API, verifies md5, requires an empty target dir. Not run.
 
@@ -570,3 +570,11 @@ One entry per decision: date, what the plan said, what was done, why.
 - Pages share `style.css` and a ~20-line `theme.js` (light/dark/auto toggle, localStorage); no framework or build step. Status colours (green/blue/gray) are kept beyond the single accent because §17 requires them, and always carry a text label plus a distinct outline style.
 - `playwright` is not installed, so no PNG screenshots were generated; `scripts/render_mockups.py` skips with a message. Nothing was added to dependencies.
 - Photo placeholders are local SVGs, and the share link uses `example.invalid`. All numbers are labelled placeholders.
+
+## Fuji-SfM loader verified against the real download
+- `_read_layout` rewritten for the real layout (see `docs/DATASETS.md`); every `TODO: verify` in the module and the Fuji-SfM entry is closed. Loads 1,455 apples, 582 images in about 0.25 s; `validate_scene` reports no errors (about 14 s for the header and tail checks of 582 JPEGs).
+- **Surprises:** (1) No camera poses and no frame-to-tree mapping, so per-tree evaluation must select GT by tree and use the east/west sequences as a whole (or recover poses and crop by GT proximity). (2) `1-Mask-set` images are crops of 12 raw frames, not the SfM frames, so `FujiScene.mask_paths` (keyed by SfM index) stays empty; the crops live in `mask_images` / `mask_annotations`. (3) Apple files have no id besides a per-tree counter, so ids are `TreeNN/NNNNNN`. (4) An apple's GT is a small point set (~0.10 m box, 5 cm grid), not a single point; the centroid is the position and the range is `gt_extent`. (5) Counts per tree are the file counts (e.g. Tree01 = 147); the README's "11 trees, 1,455 apples" holds.
+- **GT frame:** kept in the shifted frame (saved = global + T), exposed as `gt_shift`, to preserve float precision.
+- **Split:** the dataset's `test_set` (Tree01-08, 1,022 apples) is the frozen real test split; `training_set` (Tree09-11, 433) is `val`. Written to `bench/splits_fuji_sfm.json` (a separate file, so the synthetic `bench/splits.json`, which is not frozen yet, is unaffected and consumers that treat its existence as "frozen" do not change behaviour). Only per-tree GT hashes are stored. With only 3 dev trees, thresholds chosen on `val` are noisy.
+- **License:** CC BY-NC-SA 4.0 recorded in DATASETS.md and the README; the old "conflicting licenses" note is retired. No HF upload of images or derived GT.
+- **Tests:** `tests/test_fuji_sfm_real.py` skips with reason "Fuji-SfM data absent" (allow-listed as `fuji-sfm data` in `scripts/check_skips.py`). The two fixture tests that built the old guessed layout now build the real one.

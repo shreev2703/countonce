@@ -164,8 +164,11 @@ def test_loader_validate_default_quarantines(tmp_path):
 
 def test_fuji_loader_raises_and_fsc_loader_drops(tmp_path):
     root = tmp_path / "fuji"
-    _img(root / "images" / "a.jpg", 1)
-    np.save(root / "gt_apples.npy", np.full((2, 3), np.nan))
+    _img(root / "2-SfM-set" / "raw_images_east_side" / "a.JPG", 1)
+    (root / "2-SfM-set" / "raw_images_west_side").mkdir()
+    gt = root / "3-3D_data" / "GroundTruth-3D_apples_locations" / "test_set"
+    gt.mkdir(parents=True)
+    np.savetxt(gt / "Tree01-annotations_000000.txt", np.full((2, 3), np.nan))
     with pytest.raises(V.DataQualityError):
         load_fuji_sfm(root, quarantine_path=tmp_path / "fq.jsonl")
     assert (tmp_path / "fq.jsonl").exists()

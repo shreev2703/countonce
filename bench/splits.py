@@ -100,3 +100,53 @@ def split_of(scene_id: str, path: str | Path = DEFAULT_PATH) -> str | None:
         if scene_id in scenes:
             return name
     return None
+
+
+# --- Fuji-SfM real split (PLAN §9.1) -------------------------------------------------------------
+
+FUJI_SPLITS_PATH = Path(__file__).with_name("splits_fuji_sfm.json")
+# The dataset's own split: ``test_set`` trees are the frozen real test split; the ``training_set``
+# trees are the dev ("val") split where thresholds may be chosen. Nothing is ranked by hash.
+FUJI_SPLIT_DIRS = {"training_set": "val", "test_set": "test"}
+
+
+def fuji_tree_hashes(root: str | Path) -> dict[str, tuple[str, str]]:
+    """Tree id -> (our split name, sha256 over that tree's GT files: names and bytes).
+
+    Only the small per-apple GT files are hashed (no image-to-tree mapping ships, and hashing the
+    images would add nothing). The hash pins the GT, so a changed or re-exported download is caught.
+    """
+    from bench.datasets.fuji_sfm import _GT_DIR, resolve_root
+
+    base = resolve_root(Path(root)) / _GT_DIR
+    per_tree: dict[str, tuple[str, hashlib._Hash]] = {}
+    for sub, name in FUJI_SPLIT_DIRS.items():
+        for f in sorted((base / sub).glob("Tree*-annotations_*.txt")):
+            tree = f.name.split("-", 1)[0]
+            _, h = per_tree.setdefault(tree, (name, hashlib.sha256()))
+            h.update(f.name.encode() + b"\0" + f.read_bytes() + b"\0")
+    if not per_tree:
+        raise FileNotFoundError(f"no Fuji-SfM GT files under {base}")
+    return {t: (name, h.hexdigest()) for t, (name, h) in sorted(per_tree.items())}
+
+
+def write_fuji_splits(
+    root: str | Path, path: str | Path = FUJI_SPLITS_PATH, overwrite: bool = False
+) -> dict[str, dict[str, str]]:
+    """Freeze the Fuji-SfM tree split (scene id ``fuji_sfm:TreeNN``). Same file format as
+    ``write_splits``, so ``verify_splits`` / ``load_splits`` / ``split_of`` work on it."""
+    p = Path(path)
+    if p.exists() and not overwrite:
+        raise FileExistsError(f"{p} is frozen; pass overwrite=True only before any tuning")
+    splits: dict[str, dict[str, str]] = {"val": {}, "test": {}}
+    for tree, (name, digest) in fuji_tree_hashes(root).items():
+        splits[name][f"fuji_sfm:{tree}"] = digest
+    doc = {"version": SPLITS_VERSION, "source": "dataset test_set/training_set", "splits": splits}
+    p.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n")
+    return splits
+
+
+def verify_fuji_splits(root: str | Path, path: str | Path = FUJI_SPLITS_PATH) -> list[str]:
+    """Problems between the frozen file and the GT on disk (empty list = intact)."""
+    now = {f"fuji_sfm:{t}": d for t, (_, d) in fuji_tree_hashes(root).items()}
+    return verify_splits(now, path)

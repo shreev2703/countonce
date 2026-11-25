@@ -1,0 +1,21 @@
+{
+  "source": "dataset test_set/training_set",
+  "splits": {
+    "test": {
+      "fuji_sfm:Tree01": "452e56bf2121cf57d9c4d310bfe5177e801457e2075f92fb1c3d24403703fcfc",
+      "fuji_sfm:Tree02": "dcf118d8a884e84c5de3cc55cdfa5ba8e12e07ede3221ffd58e172992d6dc653",
+      "fuji_sfm:Tree03": "1ce02e581080fdcbbf0a8b8de28e601cfa5f012c50f7da976414b2f4de3de1c1",
+      "fuji_sfm:Tree04": "3a12ddc4a15b73004954e88f07f5b29942f4345d1f1ed37349896ffd9e4685e2",
+      "fuji_sfm:Tree05": "2055485b24529dbfde78c994098508d50fa05e00b69401d75067622d9ce8a499",
+      "fuji_sfm:Tree06": "ff10b59702f78b7ff5231694944290b896a01b644f26e4767adc4827bf760ca4",
+      "fuji_sfm:Tree07": "5195da401e8e2d31e56ddf9872bf9b8f0c62ac5c7df6e8fefd9ebb13b29c7ca4",
+      "fuji_sfm:Tree08": "d59c0031d778f0f834a9a2adcb847e6606fbebb07a4029eb627085b9dc07f386"
+    },
+    "val": {
+      "fuji_sfm:Tree09": "2edee47fa44ab5c8ce3f2d1e0a557dbacc3ca1b95f3824ac7ed8e2e6760ac88a",
+      "fuji_sfm:Tree10": "dc0e8850089b7efd6fbad91b22c3cf3fcd05b80771d51b1178e68c5c0d2a68b3",
+      "fuji_sfm:Tree11": "3b4fc0753948632134332497455120d1705395eab73c6f9601b1449311b428e6"
+    }
+  },
+  "version": 1
+}

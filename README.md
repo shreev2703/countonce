@@ -127,7 +127,7 @@ Flags: `--detector {countgd,gdino,countgdpp}`, `--backbone {vggt,vggt_omega,vggt
 `--assoc {v1,v2,v3,sync}`, `--config file.yaml` (flags override the file). Not every choice has an
 implementation yet; unimplemented ones exit with an error.
 
-Download the Fuji-SfM dataset (about 6.9 GB; read its license first, treat as research-only):
+Download the Fuji-SfM dataset (about 6.9 GB). It is CC BY-NC-SA 4.0: research and education only, no commercial use. Do not redistribute its images or any GT derived from them, and do not upload them to a Hugging Face dataset. The loader reads `data/fuji_sfm` (gitignored):
 
 ```bash
 scripts/download_fuji_sfm.sh data/raw/fuji_sfm
@@ -176,7 +176,7 @@ This repo ships download scripts, not datasets or model weights. Verify each lic
 | VGGT-Ω, VGG-T³ | Optional backbones (not wired) | Research only / `TODO: verify` |
 | CountGD (Amini-Naieni et al.) | Open-vocabulary counting detector | MIT |
 | CountGD++, CountVid, GroundingDINO, DINOv2 | Detector / video baselines / appearance features | `TODO: verify` each (see `docs/MODEL_SURVEY.md`) |
-| Fuji-SfM | Benchmark scenes | Conflicting statements; treated as non-commercial research only |
+| Fuji-SfM | Benchmark scenes | CC BY-NC-SA 4.0 (research/education only): no redistribution of its images or derived GT, no HF dataset upload |
 | WGISD, MinneApple, AppleGrowthVision, FSC-147 | Other candidate datasets | See `docs/DATASETS.md` |
 | Kubric | Planned synthetic data | Open source; asset licenses to be checked |
 | Pachauri et al., NeurIPS 2013 | Spectral permutation synchronization (`countonce/merge/sync.py`) | Paper |

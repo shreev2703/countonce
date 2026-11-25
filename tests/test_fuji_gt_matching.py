@@ -180,19 +180,27 @@ def test_loader_missing_and_synthetic_layout(tmp_path):
         load_fuji_sfm(tmp_path / "nope")
     with pytest.raises(FileNotFoundError):
         load_fuji_sfm(tmp_path)
-    (tmp_path / "images").mkdir()
-    for n in ("a", "b"):
-        (tmp_path / "images" / f"{n}.jpg").write_bytes(b"x")  # fake bytes: fail the gates
-    (tmp_path / "masks").mkdir()
-    (tmp_path / "masks" / "b.png").write_bytes(b"x")
-    np.save(tmp_path / "gt_apples.npy", np.zeros((4, 3)))
+    sfm = tmp_path / "2-SfM-set"
+    for side in ("east", "west"):
+        (sfm / f"raw_images_{side}_side").mkdir(parents=True)
+    for side, n in (("east", "a"), ("west", "b")):
+        (sfm / f"raw_images_{side}_side" / f"{n}.JPG").write_bytes(b"x")  # fake: fail the gates
+    gt = tmp_path / "3-3D_data" / "GroundTruth-3D_apples_locations" / "test_set"
+    gt.mkdir(parents=True)
+    for k in range(4):
+        pts = np.array([[1.0, 2.0, 3.0], [1.1, 2.0, 3.0]]) + k
+        np.savetxt(gt / f"Tree01-annotations_{k:06d}.txt", pts)
     with pytest.raises(DataQualityError):
         load_fuji_sfm(tmp_path)
     from PIL import Image
 
-    for i, n in enumerate(("a", "b")):
+    for i, (side, n) in enumerate((("east", "a"), ("west", "b"))):
         Image.fromarray(np.full((8, 8, 3), 40 * (i + 1), dtype=np.uint8)).save(
-            tmp_path / "images" / f"{n}.jpg"
+            sfm / f"raw_images_{side}_side" / f"{n}.JPG"
         )
     s = load_fuji_sfm(tmp_path)
-    assert len(s.image_paths) == 2 and len(s.gt_ids) == 4 and list(s.mask_paths) == [1]
+    assert len(s.image_paths) == 2 and len(s.gt_ids) == 4
+    assert s.side_indices == {"east": [0], "west": [1]}
+    assert s.gt_ids[0] == "Tree01/000000" and s.trees == {"test": ["Tree01"]}
+    np.testing.assert_allclose(s.gt_xyz[0], [1.05, 2.0, 3.0])
+    np.testing.assert_allclose(s.gt_extent[0], [0.1, 0.0, 0.0], atol=1e-12)

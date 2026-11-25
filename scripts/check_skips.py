@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 
-ALLOWED = ("pycolmap", "mcp", "cuda", "gpu", "countonce_pg_url")
+ALLOWED = ("pycolmap", "mcp", "cuda", "gpu", "countonce_pg_url", "fuji-sfm data")
 _LINE = re.compile(r"^SKIPPED \[(\d+)\] (\S+): (.*)$")
 
 

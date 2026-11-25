@@ -9,7 +9,7 @@ sources are listed as conflicts; resolve against the primary record before any r
 
 | Dataset | Role | Available | License (best evidence) | Size | Tier |
 |---|---|---|---|---|---|
-| Fuji-SfM | Exact dup/miss measurement; matcher fine-tuning | Zenodo, DOI 10.5281/zenodo.3712808 | **Conflict**: CC BY 4.0 (MaRDI, recercat) vs CC BY-NC-SA 4.0 (Roboflow) vs "research/education only" (Lleida) | ~6.4-6.9 GB | Core |
+| Fuji-SfM | Exact dup/miss measurement; matcher fine-tuning | Zenodo, DOI 10.5281/zenodo.3712808 | **CC BY-NC-SA 4.0** (`LICENSE.txt` and `readme.txt` in the download; research/education only, no commercial use) | ~6.4-6.9 GB | Core |
 | RGBD-VideoCount | RGB-D video counting eval | Hugging Face `aerospace123/RGBD-VideoCount` | CC BY 4.0 (HF card) | 2,032 frames, 77,638 boxes; GB `TODO: verify` | Strong |
 | VideoCount | Video counting eval (CountVid benchmark) | github.com/niki-amini-naieni/CountVid | `TODO: verify` (repo is MIT; source-video licenses TAO/MOT20 apply) | `TODO: verify` | Strong |
 | OneScene-Bench | Multi-view evidence integration (VLM) eval | arXiv 2610.38926; release `TODO: verify` | `TODO: verify` | `TODO: verify` | Strong |
@@ -21,16 +21,32 @@ sources are listed as conflicts; resolve against the primary record before any r
 ## Per-dataset notes
 
 ### Fuji-SfM
-- **What:** SfM image sequence of 11 Fuji apple trees (582 images), 3D point cloud of the scanned scene with
+- **What:** SfM image sequence of 11 Fuji apple trees (582 images), a 3D point cloud of the scanned scene with
   1,455 apple positions as ground truth in global coordinates, and 2D instance masks for 288 images (per PLAN §9.1).
-- **Where:** Zenodo DOI 10.5281/zenodo.3712808 (a sibling record 3712807 also exists, `TODO: verify` which part it holds);
-  Lleida GRAP page `grap.udl.cat/en/publications/fuji-sfm-dataset/`.
-- **Format:** images + masks + point cloud + apple-position GT; exact file layout and camera/pose convention `TODO: verify after download`.
-  Needed for the GT-projection matching in PLAN §9.1 (cameras either shipped or recovered by COLMAP/VGGT + Sim(3) alignment).
+- **Where:** Zenodo DOI 10.5281/zenodo.3712808; Lleida GRAP page `grap.udl.cat/en/publications/fuji-sfm-dataset/`.
+  (Verified from the download: record 3712808 holds the whole dataset, a single ~6.9 GB `Fuji-SfM_dataset.rar`.)
+- **Layout (verified against the real download, `bench/datasets/fuji_sfm.py`):**
+  - `2-SfM-set/raw_images_{east,west}_side/*.JPG`: 291 + 291 frames, 5184x3456. **No camera poses ship**; recover them
+    with COLMAP/VGGT and align with Sim(3) (`align_recon_to_gt`). No file maps frames to trees.
+  - `3-3D_data/GroundTruth-3D_apples_locations/{training_set,test_set}/TreeNN-annotations_NNNNNN.txt`: one file per apple,
+    whitespace-separated xyz rows (its fruit points, on a 5 cm grid). The loader takes the centroid as the apple position and the
+    per-axis range as its extent (mean 0.100 m). `NNNNNN` restarts at 0 per tree, so an apple id is `TreeNN/NNNNNN`.
+  - `3-3D_data/Fuji_apple_trees_point_cloud.txt` (515 MB scene cloud, not read by the loader).
+  - `1-Mask-set/`: 288 image crops (`*.jpg` + per-image `*.csv`) with `training_set_masks.json` / `validation_set_masks.json`; the 12
+    full frames they were cut from are in `raw_images/`. They are **not** the SfM frames, so the masks do not align with the 582 images.
+- **GT units and frame:** metres, in the global UTM-like frame shifted by T=[-336300, -4623400, 0] (saved = global + T, `3-3D_data/readme.txt`).
+  The loader keeps the saved (shifted) frame, which keeps float precision, and exposes `gt_shift`.
+- **Per-tree grouping:** yes, from the file name. Dataset `test_set` = Tree01-08 (147/105/135/137/92/133/122/151 = 1,022 apples);
+  `training_set` = Tree09-11 (143/128/162 = 433). Total 1,455.
+- **Frozen real split:** the dataset's own split. `test_set` trees are `test`, `training_set` trees are `val` (the dev split for any
+  threshold), pinned by a sha256 over each tree's GT files in `bench/splits_fuji_sfm.json` (`bench.splits.write_fuji_splits`, `verify_fuji_splits`).
+  Only hashes are committed, not data.
 - **Size:** ~6.9 GB (Zenodo) / 6.43 GB (Lleida).
-- **License:** conflicting (see table). Treat as **non-commercial research use** and do not redistribute the data until `LICENSE.txt` in the
-  Zenodo record is read. Cite Data in Brief (10.1016/j.dib.2020.105591) and Comput. Electron. Agric. (10.1016/j.compag.2019.105165).
-- **Decision:** Core benchmark dataset; download script only, no data committed. Public CountOnce-Bench release must not include it unless the license allows.
+- **License: CC BY-NC-SA 4.0** (read from `LICENSE.txt`; research and education only, no commercial use, share-alike). The earlier
+  CC BY 4.0 statements on aggregator pages are superseded. Consequences: do **not** redistribute the images or any GT derived from them,
+  do not upload them (or derived GT) to a Hugging Face dataset, and do not ship them in CountOnce-Bench; keep `data/fuji_sfm` gitignored.
+  Cite Data in Brief (10.1016/j.dib.2020.105591) and Comput. Electron. Agric. (10.1016/j.compag.2019.105165).
+- **Decision:** Core benchmark dataset; download script only, no data committed.
 
 ### RGBD-VideoCount
 - **What:** RGB-D video counting from "Depth-Guided Video Object Counting in Crowded Scenes" (arXiv 2608.06236); Intel RealSense D455;
@@ -94,7 +110,7 @@ sources are listed as conflicts; resolve against the primary record before any r
 1. **Only Fuji-SfM and own captures provide cross-view identity GT**; the rest are single-view or video counting references. PLAN §3.1 Core therefore stays Fuji-SfM + own captures.
 2. **Download scripts only.** No dataset bytes are committed or redistributed; each license is resolved before CountOnce-Bench release.
 3. **License policy:** any conflicting or unverified license is treated as non-commercial, research-only until `TODO: verify` items are closed.
-4. **Open items for the first download session:** Fuji-SfM `LICENSE.txt` and file layout; RGBD-VideoCount size/layout; VideoCount and OneScene-Bench terms; FSC-147 official terms; AppleGrowthVision original license.
+4. **Open items for the first download session:** (Fuji-SfM is closed: license and layout verified); RGBD-VideoCount size/layout; VideoCount and OneScene-Bench terms; FSC-147 official terms; AppleGrowthVision original license.
 
 ## Sources
 - Fuji-SfM: https://zenodo.org/record/3712808 , https://grap.udl.cat/en/publications/fuji-sfm-dataset/ , https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7184157/
