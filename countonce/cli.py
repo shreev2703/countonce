@@ -27,7 +27,9 @@ def _parser() -> argparse.ArgumentParser:
     src.add_argument("--video", type=Path, help="video file")
     r.add_argument("--prompt", required=True)
     r.add_argument("--config", type=Path, help="YAML Config file; flags override it")
-    r.add_argument("--detector", choices=["countgd", "gdino", "countgdpp", "color_blob"])
+    r.add_argument(
+        "--detector", choices=["countgd", "gdino", "groundingdino", "countgdpp", "color_blob"]
+    )
     r.add_argument("--backbone", choices=["vggt", "vggt_omega", "vggt_t3", "colmap", "fixture"])
     r.add_argument("--assoc", choices=["v1", "v2", "v3", "sync"])
     r.add_argument("--v3-checkpoint", type=Path, help="matcher checkpoint for --assoc v3")

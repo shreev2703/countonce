@@ -137,7 +137,7 @@ def _sha256(path: Path) -> str:
 
 
 def build_detector(config: Config) -> Detector:
-    if config.detector == "gdino":
+    if config.detector in ("gdino", "groundingdino"):
         from countonce.detect.groundingdino import GroundingDinoDetector
 
         return GroundingDinoDetector(**config.detector_options)

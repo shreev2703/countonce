@@ -25,6 +25,10 @@ recon = [
     "pyyaml",
     "pycolmap",
 ]
+hf = [
+    "transformers>=4.45",
+    "safetensors",
+]
 mcp = [
     "mcp>=1.0",
 ]

@@ -20,7 +20,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 
 ## Detector weights needed (2026-11-24, detector interface task)
 - CountGD: clone niki-amini-naieni/CountGD, download its checkpoint (`checkpoint_fsc147_best.pth`) and the GroundingDINO Swin-B base weights it builds on; then implement `CountGDDetector._load`/`_infer` (currently stubs) and verify the output-format `TODO` in `countonce/detect/countgd.py`.
-- GroundingDINO: `pip install groundingdino` (IDEA-Research), config `GroundingDINO_SwinT_OGC.py` and `groundingdino_swint_ogc.pth`; run `GroundingDinoDetector` once on a real frame to confirm `predict` score/box conventions.
+- GroundingDINO (**resolved 2026-11-24 for the HF backend**: `grounding-dino-tiny` runs for real, see `docs/DEVIATIONS.md`; only the optional original-package path below is still unverified): `pip install groundingdino` (IDEA-Research), config `GroundingDINO_SwinT_OGC.py` and `groundingdino_swint_ogc.pth`; run `GroundingDinoDetector` once on a real frame to confirm `predict` score/box conventions.
 
 ## 2026-11-24: Second tech-lead audit (human actions, not queued as overnight tasks)
 - Still open from the first audit: the countonce venv plus a first mypy run, G0/G1 interviews and the professor meeting, the G2 captures, own captures and hand counts, the Fuji-SfM download and license check, and the detector weights.

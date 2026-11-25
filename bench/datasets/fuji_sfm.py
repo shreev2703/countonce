@@ -30,6 +30,7 @@ from pathlib import Path
 
 import numpy as np
 
+from bench.datasets.crop_common import CropImage
 from countonce.recon.align import Sim3, align_by_camera_centers, transform_extrinsics
 
 GT_SHIFT = (-336300.0, -4623400.0, 0.0)  # T from 3-3D_data/readme.txt (saved = global + T)
@@ -166,3 +167,55 @@ def align_recon_to_gt(
     sim = align_by_camera_centers(np.asarray(recon_extrinsics)[rows], gt_ext)
     moved = transform_extrinsics(recon_extrinsics, sim)
     return sim, {f: moved[i] for i, f in enumerate(frame_ids)}
+
+
+def load_fuji_mask_set(
+    root: str | Path, split: str = "val", limit: int | None = None
+) -> list[CropImage]:
+    """Mask-set crops as single-image detector-sanity inputs (prompt "apple").
+
+    Counts are the VIA polygon regions of ``<split>_set_masks.json`` (one region per apple
+    instance); boxes are the polygon bounds. Images with no region are skipped (nothing to
+    compare against). Sorted by file name, so ``limit`` takes a deterministic prefix.
+    """
+    import json
+
+    from bench.datasets.crop_common import box_centres
+
+    scene = _read_layout(Path(root))
+    ann = scene.mask_annotations.get(split)
+    if ann is None:
+        raise FileNotFoundError(f"no mask annotations for split {split!r} under {scene.root}")
+    by_name = {p.name: p for p in scene.mask_images}
+    out: list[CropImage] = []
+    for rec in sorted(json.loads(ann.read_text()).values(), key=lambda r: r["filename"]):
+        regions = list(rec.get("regions", {}).values())
+        path = by_name.get(rec["filename"])
+        if not regions or path is None:
+            continue
+        boxes = np.array(
+            [
+                [
+                    min(s["all_points_x"]),
+                    min(s["all_points_y"]),
+                    max(s["all_points_x"]),
+                    max(s["all_points_y"]),
+                ]
+                for s in (r["shape_attributes"] for r in regions)
+            ],
+            dtype=np.float64,
+        )
+        out.append(
+            CropImage(
+                name=path.name,
+                path=path,
+                class_name="apple",
+                points_xy=box_centres(boxes),
+                boxes_xyxy=boxes,
+                split=split,
+                dataset="fuji_mask",
+            )
+        )
+        if limit is not None and len(out) >= limit:
+            break
+    return out

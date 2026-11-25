@@ -104,4 +104,4 @@ def test_real_adapters_import_lazily_and_gate_on_weights():
     from countonce.detect.groundingdino import GroundingDinoDetector
 
     with pytest.raises(ModelUnavailableError):
-        GroundingDinoDetector()._load()
+        GroundingDinoDetector(backend="groundingdino")._load()  # package path needs files

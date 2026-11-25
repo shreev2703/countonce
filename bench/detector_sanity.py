@@ -173,7 +173,7 @@ def build_detector(name: str) -> Detector:
     return _build(Config(detector=name))
 
 
-SANITY_DATASETS = ("fsc147", "wgisd", "minneapple", "applegrowthvision")
+SANITY_DATASETS = ("fsc147", "wgisd", "minneapple", "applegrowthvision", "fuji_mask")
 
 
 def load_images(
@@ -199,6 +199,10 @@ def load_images(
         from bench.datasets.applegrowthvision import load_applegrowthvision_images
 
         return load_applegrowthvision_images(root, split, limit, validate=validate)
+    if dataset == "fuji_mask":  # Fuji-SfM mask set: polygon-instance counts of "apple"
+        from bench.datasets.fuji_sfm import load_fuji_mask_set
+
+        return load_fuji_mask_set(root, split or "val", limit)
     raise ValueError(f"unknown sanity dataset {dataset!r}; expected one of {SANITY_DATASETS}")
 
 
