@@ -647,3 +647,9 @@ One entry per decision: date, what the plan said, what was done, why.
 - bf16 weights cut peak VRAM from 7298 MB to 3833 MB at about the same time; SDPA check has no
   measurable cost. Differences of about 5% between variants are inside the repeat-to-repeat noise
   (baseline totals 16.3 to 22.3 s).
+
+## Confidence stage speed-up (2026-11-25)
+- Measured on a 10-frame cached Fuji window: confidence stage 2.50 s to 1.05 s (median of 3), total
+  3.58 s to 2.06 s, identical count 42 and interval (14, 120). The 97-frame overview case was not
+  re-run, so its 25.0 s is unchanged as a recorded number. Details in `docs/PROFILE.md`.
+- `pipeline.make_count_at_reference` keeps the original sweep for the equivalence tests only.

@@ -167,6 +167,34 @@ Measured one epoch of the 800-episode set (plus the 100-episode val pass), `time
 | before (per-pair loop) | 703.4 | `runs/match_v3_capped/log.jsonl`, epoch 1 `wall_s` |
 | after (padded batch) | 85.4 | one-epoch run of `configs/match_v3_capped.yaml` with `epochs: 1` |
 
+## Confidence stage speed (`countonce/pipeline.py`)
+
+Measured with `scripts/profile_confidence.py` on the first 10 frames of `runs/fuji_core/img`
+(GroundingDINO-tiny "apple" + VGGT-1B, v1 association, recon and detection caches hit), 3 repeats,
+`.venv-gpu`, CPU for the stage itself. Same result before and after: count 42, interval (14, 120).
+
+Before (cProfile of one run, 3.73 s total): `count_at` 25 calls took 2.61 s; `lift_detections`
+was called 5 times (once per distinct threshold) for 369 `lift_detection` calls, 2.78 s
+cumulative, dominated by `numpy` `.all()`/`reduce` in `_region_mask` and the finite checks. The
+sweep re-lifted every detection at each threshold and re-associated the default cell.
+
+After: each detection is lifted at most once (cache keyed by frame and detection id, seeded with the
+default-threshold list), counts are memoised per `(k, threshold)`, and the default cell reuses the
+pipeline's own count.
+
+| stage (s) | before, repeats 0-2 | after, repeats 0-2 |
+|---|---|---|
+| confidence | 2.608, 2.473, 2.498 | 1.036, 1.049, 1.063 |
+| total | 3.734, 3.478, 3.579 | 2.002, 2.060, 2.087 |
+
+That is about 2.4x faster for the stage (median 2.50 s to 1.05 s). The remaining time is the 24
+association runs plus lifting the detections that only exist at lower thresholds; further
+reuse of pairwise distances across `k` inside `cluster_detections` was not attempted.
+`tests/test_confidence_sweep_equiv.py` checks identical `CountResult` ranges on the tiny scene
+and a seeded synthetic scene (v1 and v2), and every grid cell against the original sweep.
+The earlier 25.0 s figure on the east overview (`runs/fuji_core/overview_east.log`) was a
+97-frame run and was not re-measured.
+
 <!-- profile-variants:start -->
 ## Optimization variants
 

@@ -47,7 +47,14 @@ from countonce.recon.base import Reconstructor
 from countonce.recon.cache import CachedReconstructor, ReconCache
 from countonce.recon.chunked import ChunkedReconstructor
 from countonce.storage.factory import cache_kwargs
-from countonce.types import CountResult, Detection, Frame, Interval, ModelVersions
+from countonce.types import (
+    CountResult,
+    Detection,
+    Frame,
+    Interval,
+    LiftedDetection,
+    ModelVersions,
+)
 from countonce.types import Recon as DenseRecon
 from countonce.warnings import assess_quality, negatives_ignored_warning, zero_count_warning
 
@@ -217,6 +224,71 @@ def _make_base_associator(config: Config, k: float) -> Associator:
     if config.assoc == "sync":
         return SyncAssociator(v2_config=v2cfg)
     return V2Associator(v2cfg)
+
+
+def make_count_at(
+    config: Config,
+    raw_detections: list[Detection],
+    lifted: list[LiftedDetection],
+    default_count: int,
+    recon: DenseRecon,
+    frame_map: dict[int, Frame],
+    lift_kw: LiftKwargs,
+) -> Callable[[float, float], int]:
+    """``count_at(k, threshold)`` for the sensitivity sweep, without repeated work.
+
+    Lifting a detection does not depend on the score threshold, so each detection is lifted at most
+    once (the default-threshold ``lifted`` list seeds the cache) and every threshold just selects
+    from it. Counts are memoised per ``(k, threshold)`` and the default cell is the count the
+    pipeline already computed, so the sweep never re-associates it. Results equal
+    ``make_count_at_reference`` exactly (``tests/test_confidence_sweep_equiv.py``).
+    """
+    lift_cache: dict[tuple[int, str], LiftedDetection] = {
+        (ld.det.frame_id, ld.det.id): ld for ld in lifted
+    }
+    by_thr: dict[float, list[LiftedDetection]] = {config.score_threshold: lifted}
+    counts: dict[tuple[float, float], int] = {
+        (float(config.merge_k), float(config.score_threshold)): default_count
+    }
+
+    def lifted_at(thr: float) -> list[LiftedDetection]:
+        if thr not in by_thr:
+            kept = apply_lift_region(filter_by_score(raw_detections, thr), config.lift_region)[0]
+            missing = [d for d in kept if (d.frame_id, d.id) not in lift_cache]
+            for ld in lift_detections(missing, recon, frame_map, **lift_kw):
+                lift_cache[(ld.det.frame_id, ld.det.id)] = ld
+            by_thr[thr] = [lift_cache[(d.frame_id, d.id)] for d in kept]
+        return by_thr[thr]
+
+    def count_at(k: float, thr: float) -> int:
+        key = (float(k), float(thr))
+        if key not in counts:
+            assoc = _make_associator(config, k)
+            counts[key] = len(assoc.associate(lifted_at(thr), recon, frame_map).instances)
+        return counts[key]
+
+    return count_at
+
+
+def make_count_at_reference(
+    config: Config,
+    raw_detections: list[Detection],
+    lifted: list[LiftedDetection],
+    recon: DenseRecon,
+    frame_map: dict[int, Frame],
+    lift_kw: LiftKwargs,
+) -> Callable[[float, float], int]:
+    """The original sweep: re-lifts per threshold and re-associates every cell (for tests)."""
+    lift_by_thr = {config.score_threshold: lifted}
+
+    def count_at(k: float, thr: float) -> int:
+        if thr not in lift_by_thr:
+            kept = apply_lift_region(filter_by_score(raw_detections, thr), config.lift_region)[0]
+            lift_by_thr[thr] = lift_detections(kept, recon, frame_map, **lift_kw)
+        assoc = _make_associator(config, k)
+        return len(assoc.associate(lift_by_thr[thr], recon, frame_map).instances)
+
+    return count_at
 
 
 def lift_kwargs(config: Config, recon: DenseRecon) -> LiftKwargs:
@@ -438,14 +510,9 @@ def _run(
 
     # Sensitivity range: re-count over a grid of merge strictness and detector threshold.
     t = time.perf_counter()
-    lift_by_thr = {config.score_threshold: lifted}
-
-    def count_at(k: float, thr: float) -> int:
-        if thr not in lift_by_thr:
-            kept = apply_lift_region(filter_by_score(raw_detections, thr), config.lift_region)[0]
-            lift_by_thr[thr] = lift_detections(kept, recon, frame_map, **lift_kw)
-        assoc = _make_associator(config, k)
-        return len(assoc.associate(lift_by_thr[thr], recon, frame_map).instances)
+    count_at = make_count_at(
+        config, raw_detections, lifted, len(clustered.instances), recon, frame_map, lift_kw
+    )
 
     sens = sensitivity_range(
         count_at,
