@@ -79,9 +79,10 @@ def test_upgrade_head_then_downgrade_base_on_sqlite(tmp_path: Path) -> None:
     assert set(Base.metadata.tables) <= set(inspect(engine).get_table_names())
 
 
-def test_single_initial_revision() -> None:
-    versions = list((migrate.MIGRATIONS_DIR / "versions").glob("*.py"))
-    assert len(versions) == 1
+def test_revisions_form_one_linear_chain() -> None:
+    versions = sorted((migrate.MIGRATIONS_DIR / "versions").glob("0*.py"))
+    assert [v.name[:4] for v in versions] == ["0001", "0002"]
+    assert 'down_revision: str | None = "0001"' in versions[1].read_text()
 
 
 def test_pg_store_translates_placeholders() -> None:

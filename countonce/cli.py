@@ -312,6 +312,8 @@ def _parser() -> argparse.ArgumentParser:
     sa.add_argument("--port", type=int, default=8000)
     sa.add_argument("--rate-limit", type=int, help="job submits per minute per user")
     sa.add_argument("--request-rate-limit", type=int, help="requests per minute per user")
+    sa.add_argument("--tracing", choices=["none", "jsonl", "otlp"], default="none")
+    sa.add_argument("--trace-dir", type=Path, default=Path("runs/traces"))
     sa.add_argument("--write-docs", type=Path, help="write the OpenAPI spec as Markdown and exit")
 
     lt = sub.add_parser("loadtest", help="queue load test with fake workers (sqlite job store)")
@@ -536,6 +538,8 @@ def _serve_api(args: argparse.Namespace) -> int:
             "countonce: error: serve-api needs the api extra: pip install .[api]", file=sys.stderr
         )
         return 2
+    from countonce.monitor.tracing import TracingConfig
+
     try:
         app = open_app(
             args.db,
@@ -545,6 +549,7 @@ def _serve_api(args: argparse.Namespace) -> int:
             store_kind=args.store,
             pg_url=args.pg_url,
             blobs=_worker_blobs(args),
+            tracing_cfg=TracingConfig(args.tracing, args.trace_dir),
         )
     except (ValueError, ImportError) as exc:
         print(f"countonce: error: {exc}", file=sys.stderr)

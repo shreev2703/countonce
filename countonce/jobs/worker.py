@@ -115,7 +115,9 @@ class Worker:
         if job is None:
             return False
         # the job id is only known after the claim, so the trace opens backdated to its start
-        with tracing.trace(job["id"], self.tracing_cfg, "job", start_perf=t_claim):
+        # continue the submitting request's trace; no (or a malformed) context starts a fresh one
+        parent = tracing.parse_traceparent(job.get("trace_context"))
+        with tracing.trace(job["id"], self.tracing_cfg, "job", start_perf=t_claim, parent=parent):
             tracing.record_span("claim", t_claim, time.perf_counter(), worker=self.worker_id)
             self._process(job)
         return True

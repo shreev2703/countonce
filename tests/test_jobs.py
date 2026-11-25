@@ -52,3 +52,21 @@ def test_store_flag_rejects_unknown_kind(tmp_path: Path) -> None:
 
     with pytest.raises(SystemExit):
         main(["worker", "--db", str(tmp_path / "q.db"), "--store", "mysql"])
+
+
+def test_sqlite_store_adds_trace_context_to_an_old_database(tmp_path: Path) -> None:
+    import sqlite3
+
+    from countonce.jobs.store import SqliteJobStore
+
+    db = tmp_path / "old.db"
+    SqliteJobStore(db)
+    with sqlite3.connect(db) as conn:  # recreate the pre-trace_context schema
+        conn.execute("ALTER TABLE jobs DROP COLUMN trace_context")
+    conn.close()
+    store = SqliteJobStore(db)  # opening it migrates in place, keeping rows
+    jid, _ = store.submit(
+        "u", "apple", ["a.jpg"], trace_context="00-" + "a" * 32 + "-" + "b" * 16 + "-01"
+    )
+    assert store.get(jid)["trace_context"].startswith("00-aaaa")
+    SqliteJobStore(db)  # idempotent

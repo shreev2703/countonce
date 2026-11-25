@@ -543,3 +543,10 @@ One entry per decision: date, what the plan said, what was done, why.
 - **Range rule:** `a-b` / `a to b` (a < b, comma thousands allowed) is read as the midpoint rounded half up, so "about 40-45" -> 43. Chosen over first/last value because it minimises worst-case error for a hedged estimate. An explicit `ANSWER:`/`total` marker with a range gets the same treatment.
 - **Zero phrases** (`none`, `zero`, `no <noun>`, `not any`, `aren't any`) give `0` with `method="zero_phrase"` only after every numeric path fails, only when the reply is not a refusal, and only when no number word appears in the text (so "Three apples. None are red." stays 3). `zero` was removed from the number-word path.
 - Known limits: "photo 1 and 8" keeps 8 (only `-` joins image indices); a confidence line that also holds the count is dropped.
+
+## Trace propagation API -> worker (overnight)
+- Added a `memory` tracing exporter (`tracing.MEMORY`) as the in-memory exporter for tests; no OTel SDK needed.
+- The request trace is exported under its own id (`req-<hex>.jsonl` with `jsonl`), so `countonce trace show <job_id>` shows the worker half only; both halves share one `trace_id`.
+- The middleware is opt-in (`create_app(tracing_cfg=...)`, `serve-api --tracing`). With tracing off there is no span, no `traceparent` header and no stored context.
+- `submit` stores the context on `queue_draft`; `trace_context` is carried through retries. A malformed stored context starts a fresh trace.
+- SQLite upgrades old DBs in place with `ALTER TABLE`; Postgres uses Alembic `0002` (not run against a real Postgres here; the contract cases skip without `COUNTONCE_PG_URL`).

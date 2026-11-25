@@ -72,6 +72,7 @@ SCHEMA = [
         finished_at DOUBLE PRECISION,
         heartbeat_at DOUBLE PRECISION,
         next_attempt_at DOUBLE PRECISION NOT NULL DEFAULT 0,
+        trace_context TEXT,
         UNIQUE (user_id, idempotency_key)
     )""",
     "CREATE INDEX IF NOT EXISTS jobs_queue_idx ON jobs (status, next_attempt_at, created_at)",
@@ -163,8 +164,9 @@ RETURNING *"""
 CLAIM_SQL = build_claim_sql(CLAIM_LOCK)
 
 _INSERT_JOB = """INSERT INTO jobs (id, user_id, prompt, negative_prompts, options_json,
-    idempotency_key, input_hash, model_routing_id, site_id, captured_at, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    idempotency_key, input_hash, model_routing_id, site_id, captured_at, created_at,
+    trace_context)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (user_id, idempotency_key) DO NOTHING"""
 
 _FAIL_STALE = """UPDATE jobs SET status = 'failed', error_code = 'ERR_WORKER_TIMEOUT',
@@ -287,6 +289,10 @@ class SqliteJobStore:
         with self._tx() as conn:
             for stmt in SCHEMA:
                 conn.execute(stmt)
+            # additive migration for databases created before ``trace_context`` existed
+            cols = {r["name"] for r in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+            if "trace_context" not in cols:
+                conn.execute("ALTER TABLE jobs ADD COLUMN trace_context TEXT")
 
     # -- dialect hooks (PostgresJobStore overrides) ----------------------------------------
     _TRUE_SQL = "1"
@@ -337,8 +343,11 @@ class SqliteJobStore:
         model_routing_id: str | None = None,
         site_id: str | None = None,
         captured_at: float | None = None,
+        trace_context: str | None = None,
     ) -> tuple[str, bool]:
-        """Queue a job; the same ``(user_id, idempotency_key)`` returns the original job id."""
+        """Queue a job; the same ``(user_id, idempotency_key)`` returns the original job id.
+
+        ``trace_context`` is a W3C ``traceparent`` the worker continues."""
         job_id = uuid.uuid4().hex
         with self._tx() as conn:
             cur = conn.execute(
@@ -355,6 +364,7 @@ class SqliteJobStore:
                     site_id,
                     captured_at,
                     self.clock(),
+                    trace_context,
                 ),
             )
             if cur.rowcount == 0:
@@ -400,6 +410,7 @@ class SqliteJobStore:
                     site_id,
                     captured_at,
                     self.clock(),
+                    None,
                 ),
             )
             if cur.rowcount == 0:
@@ -413,8 +424,10 @@ class SqliteJobStore:
             )
         return job_id, True
 
-    def queue_draft(self, job_id: str) -> bool:
-        """``draft -> queued`` (consumes a rate-limit token). False if it was not a draft."""
+    def queue_draft(self, job_id: str, trace_context: str | None = None) -> bool:
+        """``draft -> queued`` (consumes a rate-limit token). False if it was not a draft.
+
+        A given ``trace_context`` (``traceparent``) is stored on the job."""
         with self._tx() as conn:
             row = conn.execute(
                 "SELECT user_id, status FROM jobs WHERE id = ?", (job_id,)
@@ -423,8 +436,9 @@ class SqliteJobStore:
                 return False
             self._consume_token(conn, row["user_id"])
             conn.execute(
-                "UPDATE jobs SET status = 'queued', stage = 'queued', created_at = ? WHERE id = ?",
-                (self.clock(), job_id),
+                "UPDATE jobs SET status = 'queued', stage = 'queued', created_at = ?, "
+                "trace_context = COALESCE(?, trace_context) WHERE id = ?",
+                (self.clock(), trace_context, job_id),
             )
         return True
 

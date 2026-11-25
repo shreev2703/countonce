@@ -383,3 +383,26 @@ def test_cli_worker_and_api_on_postgres(tmp_path: Path, capsys: pytest.CaptureFi
     )
     assert "processed 1 job" in capsys.readouterr().out
     assert store.get(jid)["status"] == "dead_letter"  # bogus image, permanent error
+
+
+TP = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+
+
+def test_trace_context_roundtrip(make_store: StoreFactory) -> None:
+    store = make_store()
+    plain, _ = store.submit("u", "apple", ["a.jpg"])
+    traced, _ = store.submit("u", "apple", ["a.jpg"], trace_context=TP)
+    draft, _ = store.create_draft("u", "apple")
+    assert store.get(draft)["trace_context"] is None
+    assert store.queue_draft(draft, TP)
+    assert store.get(plain)["trace_context"] is None  # old jobs: nothing stored
+    store.register_worker("w1")
+    claimed = {j["id"]: j["trace_context"] for j in (store.claim("w1") for _ in range(3)) if j}
+    assert claimed == {plain: None, traced: TP, draft: TP}
+
+
+def test_queue_draft_without_context_keeps_none(make_store: StoreFactory) -> None:
+    store = make_store()
+    draft, _ = store.create_draft("u", "apple")
+    assert store.queue_draft(draft)
+    assert store.get(draft)["trace_context"] is None

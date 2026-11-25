@@ -27,8 +27,43 @@ from typing import Any
 
 log = logging.getLogger("countonce.tracing")
 
-EXPORTERS = ("none", "jsonl", "otlp")
+EXPORTERS = ("none", "jsonl", "otlp", "memory")
 DEFAULT_DIR = Path("runs/traces")
+
+
+@dataclass(frozen=True)
+class TraceContext:
+    """A remote parent: W3C ``traceparent`` fields (version 00)."""
+
+    trace_id: str
+    span_id: str
+    sampled: bool = True
+
+
+_HEX = frozenset("0123456789abcdef")
+
+
+def _hex(s: str, n: int) -> bool:
+    return len(s) == n and set(s) <= _HEX and set(s) != {"0"}
+
+
+def parse_traceparent(value: str | None) -> TraceContext | None:
+    """Parse ``00-<32 hex trace id>-<16 hex span id>-<2 hex flags>``; None if absent or invalid."""
+    if not value:
+        return None
+    parts = value.strip().lower().split("-")
+    if len(parts) < 4 or parts[0] == "ff" or (parts[0] == "00" and len(parts) != 4):
+        return None
+    ver, tid, sid, flags = parts[:4]
+    if len(ver) != 2 or not set(ver) <= _HEX or not _hex(tid, 32) or not _hex(sid, 16):
+        return None
+    if len(flags) != 2 or not set(flags) <= _HEX:
+        return None
+    return TraceContext(tid, sid, bool(int(flags, 16) & 1))
+
+
+def format_traceparent(trace_id: str, span_id: str, sampled: bool = True) -> str:
+    return f"00-{trace_id}-{span_id}-{'01' if sampled else '00'}"
 
 
 @dataclass
@@ -74,12 +109,25 @@ class TracingConfig:
         return self.exporter != "none"
 
 
+class InMemoryExporter:
+    """Collects the spans of every finished trace (exporter ``memory``; for tests)."""
+
+    def __init__(self) -> None:
+        self.spans: list[Span] = []
+
+    def clear(self) -> None:
+        self.spans.clear()
+
+
+MEMORY = InMemoryExporter()
+
+
 class Tracer:
     """Collects the spans of one trace and exports them when the root closes."""
 
-    def __init__(self, job_id: str, cfg: TracingConfig) -> None:
+    def __init__(self, job_id: str, cfg: TracingConfig, trace_id: str | None = None) -> None:
         self.job_id, self.cfg = job_id, cfg
-        self.trace_id = secrets.token_hex(16)
+        self.trace_id = trace_id or secrets.token_hex(16)
         self.spans: list[Span] = []
         # perf_counter -> epoch offset, so pipeline timings can become spans without a second clock
         self._offset_ns = time.time_ns() - time.perf_counter_ns()
@@ -105,6 +153,8 @@ class Tracer:
             return export_jsonl(self.spans, self.cfg.dir / f"{self.job_id}.jsonl")
         if exp == "otlp":
             export_otlp(self.spans, service_name="countonce")
+        elif exp == "memory":
+            MEMORY.spans.extend(self.spans)
         return None
 
 
@@ -118,6 +168,12 @@ def current_span() -> Span | None:
 
 def active() -> bool:
     return _TRACER.get() is not None
+
+
+def current_traceparent() -> str | None:
+    """``traceparent`` of the current span (what to hand to another process), else None."""
+    sp = _CURRENT.get()
+    return format_traceparent(sp.trace_id, sp.span_id) if sp is not None else None
 
 
 def _fail(sp: Span, exc: BaseException) -> None:
@@ -138,19 +194,23 @@ def trace(
     name: str = "job",
     *,
     start_perf: float | None = None,
+    parent: TraceContext | None = None,
     **attrs: Any,
 ) -> Iterator[Span | None]:
     """Open a trace with a root span; no-op (yields None) when disabled or one is already active.
 
     ``start_perf`` backdates the root to a ``time.perf_counter()`` reading (the worker starts it
-    after the claim, which is what tells it the job id).
+    after the claim, which is what tells it the job id). ``parent`` continues a remote trace: the
+    root keeps its trace id and hangs off the remote span id.
     """
     if cfg is None or not cfg.enabled or _TRACER.get() is not None:
         yield None
         return
-    tracer = Tracer(job_id, cfg)
+    tracer = Tracer(job_id, cfg, parent.trace_id if parent else None)
     start = tracer.ns(start_perf) if start_perf is not None else time.time_ns()
     root = tracer.new_span(name, None, start, {"job_id": job_id, **attrs})
+    if parent is not None:
+        root.parent_id = parent.span_id
     tracer.spans.append(root)
     t_tok, s_tok = _TRACER.set(tracer), _CURRENT.set(root)
     try:

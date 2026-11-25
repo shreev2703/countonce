@@ -15,6 +15,7 @@ import asyncio
 import json
 import threading
 import time
+import uuid
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,7 @@ from pydantic import BaseModel, Field
 from countonce.errors import CountOnceError, ErrorCode, is_retryable, user_tip
 from countonce.jobs.store import TERMINAL, RateLimitError, SqliteJobStore
 from countonce.jobs.uploads import UploadLimits, UploadService
+from countonce.monitor import tracing
 from countonce.storage import BlobStore, LocalBlobStore
 
 HTTP_STATUS: dict[ErrorCode, int] = {
@@ -169,6 +171,52 @@ def _result_view(row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+class TraceMiddleware:
+    """Pure-ASGI request span: continues an incoming ``traceparent``, tags method/route/status and
+    echoes the request span as a ``traceparent`` response header. The span is current while the
+    route runs, so ``submit`` can store its context on the job for the worker to continue."""
+
+    def __init__(self, app: Any, cfg: tracing.TracingConfig) -> None:
+        self.app, self.cfg = app, cfg
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        headers = {k.decode("latin-1"): v.decode("latin-1") for k, v in scope["headers"]}
+        parent = tracing.parse_traceparent(headers.get("traceparent"))
+        method = scope["method"]
+        with tracing.trace(
+            f"req-{uuid.uuid4().hex[:12]}",
+            self.cfg,
+            f"{method} {scope['path']}",
+            parent=parent,
+            **{"http.method": method},
+        ) as root:
+
+            async def send_wrapped(message: Any) -> None:
+                if root is not None and message["type"] == "http.response.start":
+                    root.attrs["http.status_code"] = message["status"]
+                    if message["status"] >= 500:
+                        root.status = "error"
+                    tp = tracing.format_traceparent(root.trace_id, root.span_id)
+                    message = {
+                        **message,
+                        "headers": [*message["headers"], (b"traceparent", tp.encode())],
+                    }
+                await send(message)
+
+            try:
+                await self.app(scope, receive, send_wrapped)
+            finally:
+                if root is not None:
+                    route = scope.get("route")
+                    path = getattr(route, "path", None)
+                    if path:  # the route template, not the raw path (no ids in span names)
+                        root.name = f"{method} {path}"
+                        root.attrs["http.route"] = path
+
+
 def create_app(
     store: SqliteJobStore,
     uploads: UploadService | None = None,
@@ -178,12 +226,15 @@ def create_app(
     worker_online_s: float = WORKER_ONLINE_S,
     sse_poll_s: float = 0.5,
     sse_max_s: float = 3600.0,
+    tracing_cfg: tracing.TracingConfig | None = None,
 ) -> FastAPI:
     """Build the app. ``store.rate_limit`` limits job *submits*; ``request_rate_limit`` limits all
     authenticated requests per user (both give 429 with ``Retry-After``)."""
     svc = uploads or UploadService(store, limits=UploadLimits())
     limiter = _RequestLimiter(request_rate_limit, request_rate_window_s, time.time)
     app = FastAPI(title="CountOnce API", version="0.1.0")
+    if tracing_cfg is not None and tracing_cfg.enabled:
+        app.add_middleware(TraceMiddleware, cfg=tracing_cfg)
 
     # -- errors ---------------------------------------------------------------------------
     @app.exception_handler(ApiError)
@@ -280,7 +331,7 @@ def create_app(
                     400, ErrorCode.ERR_INVALID_INPUT.value, "the job has no uploaded files",
                     "Upload at least one photo or video before submitting.",
                 )  # fmt: skip
-            store.queue_draft(job_id)  # raises RateLimitError -> 429
+            store.queue_draft(job_id, tracing.current_traceparent())  # RateLimitError -> 429
             replay = False
         else:
             replay = True  # queue_draft is a state transition: a retry never queues twice
@@ -469,6 +520,7 @@ def open_app(
     store_kind: str = "sqlite",
     pg_url: str | None = None,
     blobs: BlobStore | None = None,
+    tracing_cfg: tracing.TracingConfig | None = None,
 ) -> FastAPI:
     """App for a job database; upload limits from ``configs/uploads.yaml``.
 
@@ -488,5 +540,8 @@ def open_app(
     )
     limits = UploadLimits.from_yaml(resolve_config(limits_path or Path("configs/uploads.yaml")))
     return create_app(
-        store, UploadService(store, upload_root, limits), request_rate_limit=request_rate_limit
+        store,
+        UploadService(store, upload_root, limits),
+        request_rate_limit=request_rate_limit,
+        tracing_cfg=tracing_cfg,
     )

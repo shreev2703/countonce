@@ -73,6 +73,7 @@ class Job(Base):
     # queue bookkeeping beyond the plan
     heartbeat_at: Mapped[float | None] = mapped_column(Float)
     next_attempt_at: Mapped[float] = mapped_column(Float, nullable=False, server_default="0")
+    trace_context: Mapped[str | None] = mapped_column(Text)  # W3C traceparent of the submit
 
 
 class JobFile(Base):
@@ -341,7 +342,11 @@ PLAN_COLUMNS: dict[str, tuple[str, ...]] = {
 
 # Columns/tables beyond the plan, with the reason each exists.
 EXTRA_COLUMNS: dict[str, tuple[str, ...]] = {
-    "jobs": ("heartbeat_at", "next_attempt_at"),  # stale requeue, retry backoff
+    "jobs": (
+        "heartbeat_at",  # stale requeue
+        "next_attempt_at",  # retry backoff
+        "trace_context",  # W3C traceparent of the submit (migration 0002)
+    ),
     "api_keys": ("salt",),  # PBKDF2 salt for hashed_key
 }
 EXTRA_TABLES = ("rate_buckets", "upload_sessions", "upload_chunks")
