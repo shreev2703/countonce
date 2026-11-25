@@ -257,3 +257,6 @@ so `scripts/render_mockups.py` skips; open the HTML files directly or install pl
 ## 2026-11-24: Fuji Core report re-run not possible (no Fuji rows)
 - `results/bench.csv` does not exist and `configs/fuji_core.yaml` is still missing, so step 2 (test-split runs) never produced rows. `python -m bench.fuji_report` and `bench.figures` would write only TODO cells, and `make_all` rejects an empty CSV. Nothing was filled; the DEVIATIONS "assoc_f1 is not filled" TODO stays.
 - Unblock: finish step 1 (commit the frozen config), run step 2 on Tree01-08, then re-queue this task. The task stays `[ ]` in `TASKS_OVERNIGHT.md`.
+
+## 2026-11-24: Fuji Core report re-run still blocked (second attempt)
+- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; steps 1 and 2 have not produced Fuji rows. Nothing was run or filled, and the DEVIATIONS "assoc_f1 not filled" TODO stays. Task left `[ ]`; re-queue after step 2 writes rows.
