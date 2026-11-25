@@ -19,7 +19,14 @@ def build_app() -> FastAPI:
     root = Path(os.environ.get("COUNTONCE_DATA_DIR", tempfile.gettempdir())) / "countonce"
     root.mkdir(parents=True, exist_ok=True)
     kind = "postgres" if os.environ.get("COUNTONCE_PG_URL") else "sqlite"
-    return open_app(root / "jobs.db", root / "uploads", store_kind=kind)
+    app = open_app(root / "jobs.db", root / "uploads", store_kind=kind)
+
+    @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+    def index() -> dict[str, str]:
+        """Landing probe so the bare production URL answers 200 (GET and HEAD)."""
+        return {"service": "countonce", "health": "/health", "docs": "/docs"}
+
+    return app
 
 
 app = build_app()

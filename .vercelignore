@@ -1,14 +1,24 @@
+# Keep the upload small (Vercel: 15,000 files, 500 MB function). pyproject.toml must NOT be listed
+# here: Vercel reads [project] dependencies and [tool.vercel] from it.
+.git/
+.venv/
+.venv-gpu/
+.hypothesis/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 data/
 weights/
-.venv/
 results/
+runs/
+logs/
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
 synth/
 *.rar
 *.tar
 *.pt
 *.pth
-data/
-.venv/
-.venv-gpu/
-runs/
-__pycache__/
