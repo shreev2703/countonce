@@ -550,3 +550,11 @@ One entry per decision: date, what the plan said, what was done, why.
 - The middleware is opt-in (`create_app(tracing_cfg=...)`, `serve-api --tracing`). With tracing off there is no span, no `traceparent` header and no stored context.
 - `submit` stores the context on `queue_draft`; `trace_context` is carried through retries. A malformed stored context starts a fresh trace.
 - SQLite upgrades old DBs in place with `ALTER TABLE`; Postgres uses Alembic `0002` (not run against a real Postgres here; the contract cases skip without `COUNTONCE_PG_URL`).
+
+## First real-VGGT GPU run and baseline profile (overnight)
+- GPU env is `.venv-gpu/` (gitignored): cu128 torch 2.11, `-e .[recon]`, and `vggt` from the public GitHub repo (the `recon` extra does not pull vggt, so it is installed separately; not added to pyproject).
+- `countonce run` requires `--prompt`; used `red ball`. The default dedup kept 1 of the 5 views, so the correctness check ran on 1 frame (count 5, same as the fixture backbone).
+- The profile uses a driver, `scripts/profile_gpu_baseline.py`, that builds scratch scenes of 3/5/10 frames, sets `dedup_threshold: 0` and `max_frames: N`, and runs `countonce profile` per N. The tiny scene has only 5 views, so N=10 repeats each view twice.
+- "Memory guard on" = the default OOM ladder in `countonce/oom.py`. No OOM occurred, so no rung was recorded; the OOM-ladder table stays TODO.
+- No separate `lift` timing exists in the pipeline; it is inside `associate`, which PROFILE.md says.
+- Recon time is non-monotonic in frame count; recorded as measured, cause not isolated.

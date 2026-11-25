@@ -49,3 +49,4 @@ site/
 # Orchestrator logs
 logs/
 .vercel
+.venv-gpu/

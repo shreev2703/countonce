@@ -16,16 +16,43 @@ recon_cache_hit, det_cache_hit`. The last three are append-only and empty except
 
 ## Baseline breakdown
 
-Hardware: TODO: fill from results. Frames: TODO: fill from results.
+Hardware: NVIDIA GeForce RTX 5070 Laptop GPU (8 GB, driver 616.92, WSL2), torch 2.11.0+cu128,
+real `facebook/VGGT-1B` weights (`HF_HUB_OFFLINE=1`),
+Frames: 10 (the largest measured count). Medians of 3 repeats after 1 warmup, from
+`scripts/profile_gpu_baseline.py` (tiny synthetic scene, 128x96 images, dedup off).
+
+Detect is the **color_blob** backend (a colour-threshold stand-in, not CountGD), so its time
+says nothing about a real detector. `lift` is not timed as its own stage by the pipeline; it is
+inside `associate`. `confidence` is the sensitivity-interval stage.
 
 | Stage | Wall time (s, median) | Share of total | Peak VRAM (MB) |
 |---|---|---|---|
-| ingest | TODO: fill from results | TODO: fill from results | n/a |
-| detect | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| recon | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| associate | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| confidence | TODO: fill from results | TODO: fill from results | n/a |
-| total | TODO: fill from results | 100% | TODO: fill from results |
+| ingest | 0.018 | 0.1% | n/a |
+| detect (color_blob) | 0.036 | 0.2% | n/a |
+| recon (VGGT-1B) | 20.957 | 88.7% | 4834.2 |
+| associate (incl. lift) | 0.496 | 2.1% | n/a |
+| confidence | 1.992 | 8.4% | n/a |
+| total | 23.628 | 100% | 4834.2 |
+
+### By frame count
+
+| Frames | ingest (s) | detect (s) | recon (s) | associate (s) | confidence (s) | total (s) | Peak VRAM (MB) |
+|---|---|---|---|---|---|---|---|
+| 3 | 0.008 | 0.009 | 17.751 | 0.143 | 0.613 | 18.520 | 3494.1 |
+| 5 | 0.008 | 0.014 | 26.213 | 0.250 | 1.082 | 27.579 | 3987.6 |
+| 10 | 0.018 | 0.036 | 20.957 | 0.496 | 1.992 | 23.628 | 4834.2 |
+
+The bundled tiny scene has 5 views, so the 10-frame run cycles each view twice (identical
+images); recon time and VRAM depend on frame count, not content. No OOM occurred up to 10
+frames on the 8 GB card. Recon wall time is **not monotonic** in frame count (per-repeat recon:
+3 frames 23.9/17.7/17.8 s, 5 frames 26.2/26.2/18.0 s, 10 frames 22.3/20.6/21.0 s), so at these
+sizes it is not dominated by frame count; the cause is not yet isolated (TODO: fill from
+results). Peak VRAM rises steadily with frames. Correctness check: `countonce run examples/tiny_scene --backbone vggt --detector color_blob`
+(default dedup, which kept 1 usable frame of 5) and the fixture backbone both gave count 5
+(ground truth 5).
+
+License: the VGGT-1B weights are released under a **non-commercial** license; check the model
+card before any commercial use of results or of a service built on them.
 
 ## Optimization before/after
 
