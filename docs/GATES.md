@@ -222,3 +222,20 @@ R2 bucket, then `dvc remote add -d r2 s3://<bucket>/dvc`, set the endpoint URL a
 Static mockups are in `docs/mockups/` (upload, progress, results, history, states) with an approval checklist in `docs/mockups/README.md`.
 **Shreev must approve (or request changes) before any `frontend/` code starts.** No screenshots yet: `playwright` is not installed,
 so `scripts/render_mockups.py` skips; open the HTML files directly or install playwright and rerun.
+
+## 2026-11-24: Fourteenth tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state: at HEAD the code is healthy (`ruff check .`, `ruff format --check .` and `mypy countonce` (112 files) are clean), but **task 102 (API load test) was
+  marked `[x]` without being committed**. Its untracked and modified files are still in the working tree, and with them `pytest` gives 938 passed, 26 skipped and
+  **2 failed** (`test_coldstart.py::test_report_with_and_without_rows` and `test_loadtest_api.py::test_rate_limit_produces_429_and_still_reconciles`). Finishing
+  and committing it is queued first. The audit left those files untouched. `runs/` (generated outputs) is untracked and not gitignored, and the same task fixes that.
+- **Fuji-SfM is resolved:** it is downloaded and unpacked in `data/fuji_sfm/`, and `LICENSE.txt` says **CC BY-NC-SA 4.0** (research and education only). No images or derived GT
+  may go into git, an HF dataset or a commercial product. The loader verification and the first real Core benchmark are queued.
+- **Detector and mask weights partly resolved:** `IDEA-Research/grounding-dino-tiny` and `facebook/sam2.1-hiera-small` are public, ungated and Apache-2.0 on the HF Hub, and they
+  load through `transformers`. The real forward passes are queued. **CountGD is still yours:** its checkpoint and the GroundingDINO Swin-B base aren't on an ungated HF repo
+  this audit could confirm, so `CountGDDetector` stays a stub.
+- **GPU tasks queued:** the Fuji-SfM benchmark (90 min cap) and a capped v3 training run (45 min cap). If you'd rather watch GPU runs, delete those tasks before the orchestrator reaches them.
+- **Still yours (unchanged):** **mockup approval** (`docs/mockups/`) before any `frontend/` code, plus the frontend, 3D viewer and Google sign-in after it; own captures, hand counts and
+  identity labels (the own-capture half of Core); a real Postgres and R2 bucket with credentials, the DVC remote, deploys, the OTLP endpoint, HF uploads, the LICENSE choice (note that
+  Fuji-SfM is NC-SA); Docker (Kubric, the worker image); CountGD/CountGD++/VGGT-Ω/VGG-T³ weights; the video datasets and C-DOG/CountVid/DG-Net baselines (CountVid is a Core baseline,
+  so it is the biggest remaining Core gap); frontier-VLM API spend; interviews, the professor meeting, the pilot, the human baseline study, the demo video and the paper venue; and
+  whether to commit `uv.lock` and the orchestrator scripts.
