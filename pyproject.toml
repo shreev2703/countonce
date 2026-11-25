@@ -110,3 +110,6 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*", "sam2.*", "opentelemetry.*", "uvicorn.*", "pyarrow.*", "alembic.*", "psycopg.*", "duckdb.*", "boto3.*", "botocore.*", "moto.*"]
 ignore_missing_imports = true
+
+[tool.vercel]
+entrypoint = "countonce.api:app"
