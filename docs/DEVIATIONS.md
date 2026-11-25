@@ -146,7 +146,7 @@ One entry per decision: date, what the plan said, what was done, why.
 
 ## 2026-11-24: Core figure set and failure gallery
 - **CSV schema is append-only:** `peak_vram_mb`, `timings_json`, `assoc_f1` and `run_dir` were appended to `bench.runner.COLUMNS`. `read_rows` accepts the original 18-column header (or any prefix of the current one) and fills missing columns with `""`; `run_jobs` rewrites an old file once with the new header (atomic replace) before appending. Test: `tests/test_bench_core_figures.py`.
-- **`assoc_f1` is not filled by the default executor yet:** pairwise F1 needs identity labels (GT projection matching, `bench/gt_matching.py`) that the own-capture `gt.json` scenes do not carry. The column and the figure exist; rows stay blank (and the figure is skipped) until the Fuji-SfM path fills it. TODO: wire after the real loader is verified.
+- **`assoc_f1` is filled for the Fuji Core cells that have complete rows** (the k=20 v1 and v2 cells, 0.954 and 0.955; see `docs/RESULTS_FUJI.md`). It stays blank for the own-capture `gt.json` scenes, which carry no identity labels, and for Fuji cells where not all 16 tree-sides have a defined F1 (`TODO: fill from results`).
 - **Figures 4, 6, 7** (`fig_assoc_f1`, `fig_runtime_vs_views`, `fig_ablation`) skip silently in `make_all` when their data is absent. Ablation deltas pair on per-scene mean percent error (ordered runs) against the `ablation_base` method; the base is inferred from the `base+field=value` names unless passed (`countonce bench --figures` passes `ablation_base`).
 - **Failure gallery:** each sampled run gets a contact sheet (max 12 evenly subsampled overlay frames) in `<figures>/gallery/`, embedded in its Markdown row; runs are located by the CSV `run_dir`, else `runs_dir/<run_key>`. Rows without overlays say "no overlay". Baselines have no overlays or VRAM.
 
@@ -653,3 +653,27 @@ One entry per decision: date, what the plan said, what was done, why.
   3.58 s to 2.06 s, identical count 42 and interval (14, 120). The 97-frame overview case was not
   re-run, so its 25.0 s is unchanged as a recorded number. Details in `docs/PROFILE.md`.
 - `pipeline.make_count_at_reference` keeps the original sweep for the equivalence tests only.
+
+## Fuji-SfM Core benchmark: steps 1 and 2 and report (2026-11-25)
+- **Step 1 (training trees Tree09-11, windows 5 and 10, 12 rows per setting):** grid score_threshold
+  {0.2,0.3,0.4,0.5} x merge_k {0.3,0.5,0.8}, mean absolute count error. v1 / v2: 0.2/0.3 54.4 / 60.9;
+  0.2/0.5 59.6 / 60.9; 0.2/0.8 63.5 / 60.9; 0.3/0.3 79.1 / 81.8; 0.4/0.3 88.2 / 89.3; 0.5/0.3 91.2 / 91.3.
+  Error falls as the score threshold falls. Settings below 0.2 were also tried (0.15: 7 of 12 rows,
+  0.1 and 0.05: 6 of 12 rows, hit the per-run budget), are not comparable, and 0.05 and 0.1 overcount
+  by 100+ apples, so the frozen values are the best complete setting: `score_threshold: 0.2`,
+  `merge_k: 0.3` (`configs/fuji_core.yaml`).
+- **Not tuned:** the registration inlier distance and ROI margin are code constants in
+  `bench/fuji_core.py` (the oracle alignment uses them only to place cameras), and v2's gate is
+  scaled from `merge_k`. The task asked to tune these too; only the two thresholds the runner reads
+  were tuned. `scripts/run_fuji_core.py bench` gained `--merge-k` and reads `merge_k` from the frozen file.
+- **Step 2 (test trees Tree01-08):** all 320 rows ok (k 3/5/10/20, east and west, 5 methods), in two
+  invocations because the first stopped at its 38-minute budget with 25 rows missing and the
+  runner resumed them (6.9 min). Test numbers were never used to pick settings.
+- **Report:** `python -m bench.fuji_report` filled 27 cells; a cell needs all 8 trees x 2 sides
+  defined, so most MAPE-style and assoc F1 cells for small k stay `TODO: fill from results`.
+- **Failure analysis (observed, not root-caused):** Tree06/west k=5 returned 0 predictions for all
+  five methods including the per-image baselines against GT 417, which points at detection or
+  frame selection for that window, not association. Tree01 and Tree02 windows frequently have small
+  GT counts (down to 0) with far larger predictions, which drives their very high MAPE. At k=20
+  every method overcounts (v1 MAE 99.6, v2 101.5, sum 156.9), and v2 is better than v1 at k=10 only
+  (-13.4 [-22.3, -5.0]). Foliage occlusion is not scored separately.

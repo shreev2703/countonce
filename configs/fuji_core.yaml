@@ -1,0 +1,7 @@
+# Frozen Fuji-SfM Core thresholds, chosen on the TRAINING-split trees only (Tree09, Tree10, Tree11;
+# `val` in bench/splits_fuji_sfm.json), windows of 5 and 10 views, GroundingDINO-tiny "apple" +
+# VGGT-1B. Grid: score_threshold {0.2,0.3,0.4,0.5} x merge_k {0.3,0.5,0.8}, lowest mean absolute
+# count error (v1) with all 12 window rows complete. Evidence: docs/DEVIATIONS.md. Never edit after
+# looking at test-split numbers.
+score_threshold: 0.2   # detector box threshold applied to raw detections
+merge_k: 0.3           # v1 association distance (x object size); v2 gate scales with it

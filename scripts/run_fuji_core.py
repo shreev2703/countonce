@@ -127,10 +127,16 @@ def load_frozen(path: Path, split: str) -> tuple[dict[str, Any], str]:
     return (yaml.safe_load(path.read_text()) or {}), fc.config_hash(path)
 
 
+def _mk(args: argparse.Namespace) -> dict[str, Any]:
+    return {} if args.merge_k is None else {"merge_k": args.merge_k}
+
+
 def cmd_bench(args: argparse.Namespace) -> None:
     frozen, cfg_hash = load_frozen(args.config, args.split)
     if "score_threshold" in frozen:
         args.score_threshold = float(frozen["score_threshold"])
+    if "merge_k" in frozen:
+        args.merge_k = float(frozen["merge_k"])
     scene = load_fuji_sfm("data/fuji_sfm", validate=False)
     imgs = fc.prepare_images(scene, WORK / "img")
     ov = {}
@@ -142,7 +148,7 @@ def cmd_bench(args: argparse.Namespace) -> None:
     split_key = {"test": "test", "val": "training"}[args.split]
     trees = scene.trees[split_key]
     box = fc.roi_box(scene.gt_xyz)
-    base = base_config(score_threshold=args.score_threshold)
+    base = base_config(score_threshold=args.score_threshold, **_mk(args))
     det, rec = build_detector(base), build_reconstructor(base)
     model_cfg = {
         "detector": f"{det.name}@{det.version}",
@@ -164,7 +170,7 @@ def cmd_bench(args: argparse.Namespace) -> None:
         start, stop, paths, gt_ext = _window(scene, imgs, ov, side, tree, k)
         runs: dict[str, Any] = {}
         for assoc in ("v1", "v2"):
-            cfg = base_config(assoc=assoc, score_threshold=args.score_threshold)
+            cfg = base_config(assoc=assoc, score_threshold=args.score_threshold, **_mk(args))
             res = run(paths, PROMPT, cfg, detector=det, reconstructor=rec, export=False)
             recon = load_recon(cfg, res.recon_cache_key or "")
             if recon.n_views != k:
@@ -233,6 +239,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--ks", type=int, nargs="+", default=[3, 5, 10, 20])
     b.add_argument("--sides", nargs="+", default=["east", "west"])
     b.add_argument("--score-threshold", type=float, default=0.3)
+    b.add_argument("--merge-k", type=float, default=None, help="v1 association distance (x size)")
     b.add_argument("--budget-min", type=float, default=90.0)
     b.add_argument("--config", type=Path, default=FROZEN_CONFIG)
     b.add_argument("--csv", type=Path, default=DEFAULT_CSV)
