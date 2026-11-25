@@ -112,4 +112,4 @@ module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", 
 ignore_missing_imports = true
 
 [tool.vercel]
-entrypoint = "countonce.api:app"
+entrypoint = "countonce.api.asgi:app"
