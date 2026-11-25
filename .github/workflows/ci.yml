@@ -37,6 +37,22 @@ jobs:
 
   full-cpu:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: countonce_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      COUNTONCE_PG_URL: postgresql://postgres:postgres@localhost:5432/countonce_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -46,7 +62,7 @@ jobs:
       - name: Install CPU torch
         run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Install
-        run: pip install -e .[dev,test,data,api,db]
+        run: pip install -e .[dev,test,data,api,db,dvc]
       - name: Type check
         run: mypy
       - name: Test (report skips)

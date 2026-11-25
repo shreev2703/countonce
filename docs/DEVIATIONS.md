@@ -532,3 +532,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - **Adapters register in a separate `Registry` root** (`models/detector_adapters`) reusing `countonce.match.registry.Registry`; the base-checkpoint hash is stored in `config.base_checkpoint_sha256` (the registry has no dedicated field) and the dataset version is `finetune-splits@<git sha>` from the CLI.
 - **Fuji-SfM is scored end to end only**: its GT is 3D instances, so there is no per-image 2D count. The unseen per-image cell stays `TODO: fill from results` unless a 2D-labelled unseen set is configured. The end-to-end scorer is a callable passed to `run_adaptation(e2e=...)`; the CLI does not wire it yet (needs real weights and data).
 - `countonce finetune-detector` requires `--module PKG.MOD:FACTORY`; without it, it exits 2 with the weights-gated message. Config `target_layers` globs for CountGD are `TODO: verify`.
+
+## full-cpu: dvc extra, Postgres service, workflow test
+- `full-cpu` now installs `.[dev,test,data,api,db,dvc]` and runs a `postgres:16` service (health-checked, `COUNTONCE_PG_URL=postgresql://postgres:postgres@localhost:5432/countonce_test`). The skip allow-list is unchanged.
+- `tests/test_ci_workflow.py` keeps a hand-maintained module -> extra map; a new `importorskip` module not in the map fails the test on purpose.
+- pgserver (embedded Postgres, unix socket) ran the 49 contract + schema cases once with no failures, so no `PostgresJobStore` changes were needed. It was uninstalled afterwards.

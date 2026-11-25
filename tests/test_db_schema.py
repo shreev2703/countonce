@@ -93,3 +93,29 @@ def test_pg_store_translates_placeholders() -> None:
     )
     assert "FOR UPDATE SKIP LOCKED" in PostgresJobStore._CLAIM_SQL
     assert "FOR UPDATE" not in SqliteJobStore._CLAIM_SQL
+
+
+@pytest.mark.postgres
+def test_alembic_roundtrip_on_postgres() -> None:
+    """upgrade head -> downgrade base -> upgrade head against a real Postgres."""
+    import os
+
+    url = os.environ.get("COUNTONCE_PG_URL")
+    if not url:
+        pytest.skip(
+            "COUNTONCE_PG_URL not set: Alembic Postgres round-trip needs a scratch database"
+        )
+    pytest.importorskip("psycopg")
+    engine = create_engine(f"postgresql+psycopg://{url.split('://', 1)[1]}")
+    try:
+        migrate.downgrade(url)  # start clean whatever earlier tests left behind
+        migrate.upgrade(url)
+        assert set(Base.metadata.tables) <= set(inspect(engine).get_table_names())
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), Base.metadata) == []
+        migrate.downgrade(url)
+        assert set(inspect(engine).get_table_names()) <= {"alembic_version"}
+        migrate.upgrade(url)
+        assert set(Base.metadata.tables) <= set(inspect(engine).get_table_names())
+    finally:
+        engine.dispose()
