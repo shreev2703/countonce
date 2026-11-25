@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from run_fuji_core import PROMPT, STRIDE, WORK, _window, base_config, load_recon
 
 import countonce.pipeline as pl
 from bench import fuji_core as fc
@@ -24,7 +25,6 @@ from bench.datasets.fuji_sfm import load_fuji_sfm
 from countonce.pipeline import build_detector, build_reconstructor, run
 from countonce.recon.align import camera_centers, transform_extrinsics
 from countonce.recon.chunked import align_chunk
-from run_fuji_core import PROMPT, STRIDE, WORK, _window, base_config, load_recon
 
 THR = [0.2, 0.25, 0.3, 0.35, 0.4, 0.5]
 MARGIN = [0.3, 0.5, 0.7, 1.0]
@@ -55,7 +55,6 @@ def main() -> None:
     assert set(trees) == {"Tree09", "Tree10", "Tree11"}, trees
     imgs = fc.prepare_images(scene, WORK / "img")
     ov = {s: json.loads((WORK / f"overview_{s}.json").read_text()) for s in ("east", "west")}
-    box0 = fc.roi_box(scene.gt_xyz)
     det, rec = build_detector(base_config()), build_reconstructor(base_config())
     out: dict[str, Any] = {"trees": trees}
 
@@ -73,7 +72,8 @@ def main() -> None:
             r = fc.register_to_gt(src, scene.gt_xyz, m)
             reg_rows.append({"side": side, "inlier_m": m, "inlier_frac": r.inlier_frac,
                              "median_err_m": r.median_err_m, "scale": r.sim.s,
-                             "candidate": r.candidate, "same_cand_as_0.08": r.candidate == ref.candidate,
+                             "candidate": r.candidate,
+                             "same_cand_as_0.08": r.candidate == ref.candidate,
                              "scale_vs_0.08": r.sim.s / ref.sim.s})  # fmt: skip
         print("reg", side, flush=True)
     out["registration"] = reg_rows
@@ -135,9 +135,7 @@ def main() -> None:
         {"roi_margin_m": m, **score(both, **{**cur, "margin": m})} for m in MARGIN
     ]
     cur["margin"] = pick(stages["roi_margin_m"], "roi_margin_m")
-    stages["merge_k"] = [
-        {"merge_k": m, **score(("v1",), **{**cur, "mk": m})} for m in MERGE_K
-    ]
+    stages["merge_k"] = [{"merge_k": m, **score(("v1",), **{**cur, "mk": m})} for m in MERGE_K]
     cur["mk"] = pick(stages["merge_k"], "merge_k")
     stages["v2_gate_scale"] = [
         {"v2_gate_scale": s, **score(("v2",), **{**cur, "v2s": s})} for s in V2_SCALE

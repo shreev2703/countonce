@@ -333,3 +333,85 @@ def test_script_arg_parsing() -> None:
         with pytest.raises(SystemExit) as e:
             p.parse_args(bad)
         assert e.value.code == 2
+
+
+# --- resume / skip logic (fake runner, CPU) -------------------------------------------------
+
+
+def _fake_jobs(split: str = "test") -> list:
+    return [
+        fc.make_job(t, split, s, k, m, {"host": "h"})
+        for k in (3, 5)
+        for t in ("Tree01", "Tree02")
+        for s in ("east", "west")
+        for m in ("countonce_v1", "countonce_v2", "sum", "max", "median")
+    ]
+
+
+def test_resume_skips_finished_slices_and_appends(tmp_path):
+    from bench.runner import RunOutput, read_rows, run_jobs
+
+    csv_path = tmp_path / "bench.csv"
+    calls: list[tuple] = []
+
+    def fake(job):
+        calls.append((job.scene_id, job.sample, job.n_views, job.method))
+        if len(calls) > 7:
+            raise KeyboardInterrupt  # simulated timeout mid-run
+        return RunOutput(pred=1.0, gt=2.0)
+
+    jobs = _fake_jobs()
+    try:
+        run_jobs(fc.pending_jobs(iter(jobs), csv_path), fake, csv_path, {})
+    except KeyboardInterrupt:
+        pass
+    assert len(read_rows(csv_path)) == 7  # rows were written as each finished
+    first = list(calls[:7])
+    calls.clear()
+
+    def ok(job):
+        calls.append((job.scene_id, job.sample, job.n_views, job.method))
+        return RunOutput(pred=1.0, gt=2.0)
+
+    ran, skipped, errored = run_jobs(fc.pending_jobs(iter(jobs), csv_path), ok, csv_path, {})
+    assert (ran, errored) == (len(jobs) - 7, 0)
+    assert not set(first) & set(calls)  # nothing finished was rerun
+    assert len(read_rows(csv_path)) == len(jobs)
+    # a third pass does nothing
+    calls.clear()
+    assert run_jobs(fc.pending_jobs(iter(jobs), csv_path), ok, csv_path, {})[0] == 0
+    assert calls == []
+
+
+def test_skip_ignores_other_split_host_and_errors(tmp_path):
+    from bench.runner import RunOutput, run_jobs
+
+    csv_path = tmp_path / "bench.csv"
+    run_jobs(iter(_fake_jobs("val")[:3]), lambda j: RunOutput(pred=0.0, gt=0.0), csv_path, {})
+
+    def boom(job):
+        raise RuntimeError("x")
+
+    run_jobs(iter(_fake_jobs("test")[:2]), boom, csv_path, {})
+    assert fc.done_slices(csv_path, "test") == set()  # error rows are retried
+    assert len(fc.done_slices(csv_path, "val")) == 3
+    other_host = fc.make_job("Tree01", "val", "east", 3, "countonce_v1", {"host": "other"})
+    assert list(fc.pending_jobs(iter([other_host]), csv_path)) == []
+
+
+def test_test_split_requires_frozen_config(tmp_path):
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "run_fuji_core", Path(__file__).parent.parent / "scripts" / "run_fuji_core.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    with pytest.raises(SystemExit):
+        mod.load_frozen(tmp_path / "none.yaml", "test")
+    assert mod.load_frozen(tmp_path / "none.yaml", "val") == ({}, "none")
+    f = tmp_path / "c.yaml"
+    f.write_text("score_threshold: 0.35\n")
+    vals, h = mod.load_frozen(f, "test")
+    assert vals == {"score_threshold": 0.35} and len(h) == 12

@@ -22,6 +22,7 @@ Images are pre-downscaled 3x into ``runs/`` (derived data, git-ignored; CC BY-NC
 
 from __future__ import annotations
 
+import hashlib
 import json
 import socket
 import time
@@ -35,7 +36,7 @@ from bench import metrics
 from bench.baselines import BASELINES
 from bench.datasets.fuji_sfm import FujiScene
 from bench.gt_matching import match_detections_to_gt
-from bench.runner import Job, RunOutput
+from bench.runner import Job, RunOutput, read_rows
 from countonce.recon.align import Sim3, camera_centers, transform_extrinsics, umeyama
 from countonce.types import Detection
 
@@ -283,6 +284,34 @@ def evaluate_window(
 
 def host_info() -> dict[str, str]:
     return {"host": socket.gethostname()}
+
+
+def config_hash(path: Path) -> str:
+    """Short hash of the frozen config file's bytes; recorded in every row's config_json."""
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:12]
+
+
+def done_slices(csv_path: Path, split: str) -> set[tuple[str, str, int, str]]:
+    """(tree, side, k, method) of every finished (status ok) row of ``split`` in the CSV."""
+    return {
+        (r["scene_id"], r["sample"], int(r["n_views"]), r["method"])
+        for r in read_rows(csv_path)
+        if r["status"] == "ok" and r["split"] == split and r["n_views"]
+    }
+
+
+def pending_jobs(jobs: Any, csv_path: Path) -> Any:
+    """Yield only jobs whose (tree, side, k, method) has no ok row yet.
+
+    Keyed on the slice and not on ``Job.key()``, so a resume on another host or after a
+    harmless config-metadata change does not redo finished work. The CSV is re-read lazily
+    per job so rows appended meanwhile are respected.
+    """
+    for job in jobs:
+        slice_id = (job.scene_id, job.sample, int(job.n_views or 0), job.method)
+        if slice_id in done_slices(csv_path, job.split):
+            continue
+        yield job
 
 
 def make_job(tree: str, split: str, side: str, k: int, method: str, config: dict[str, Any]) -> Job:

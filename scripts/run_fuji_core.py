@@ -113,7 +113,24 @@ def _window(
     return start, stop, [imgs[ids[i]] for i in range(start, stop)], ext[start:stop]
 
 
+FROZEN_CONFIG = Path("configs/fuji_core.yaml")
+
+
+def load_frozen(path: Path, split: str) -> tuple[dict[str, Any], str]:
+    """Frozen thresholds (chosen on the training trees) and their hash. Test needs the file."""
+    if not path.exists():
+        if split == "test":
+            raise SystemExit(f"{path} is missing: choose thresholds on the training split first")
+        return {}, "none"
+    import yaml
+
+    return (yaml.safe_load(path.read_text()) or {}), fc.config_hash(path)
+
+
 def cmd_bench(args: argparse.Namespace) -> None:
+    frozen, cfg_hash = load_frozen(args.config, args.split)
+    if "score_threshold" in frozen:
+        args.score_threshold = float(frozen["score_threshold"])
     scene = load_fuji_sfm("data/fuji_sfm", validate=False)
     imgs = fc.prepare_images(scene, WORK / "img")
     ov = {}
@@ -134,7 +151,8 @@ def cmd_bench(args: argparse.Namespace) -> None:
         "downscale": fc.DOWNSCALE, "stride": STRIDE, "roi_margin_m": fc.ROI_MARGIN_M,
         "gt_tol_occ_m": fc.GT_TOL_OCC_M, "gt_max_depth_m": fc.GT_MAX_DEPTH_M,
         "match_px": fc.MATCH_PX, "chunk_size": base.chunk_size, "protocol": "fuji_core_v1",
-        **fc.host_info(),
+        "frozen_config": str(args.config), "frozen_config_hash": cfg_hash,
+        "frozen_values": frozen, **fc.host_info(),
     }  # fmt: skip
     t_start = time.time()
     memo: dict[tuple[str, str, int], dict[str, Any]] = {}
@@ -197,7 +215,10 @@ def cmd_bench(args: argparse.Namespace) -> None:
               "f1", out.assoc_f1, "align", extra, flush=True)  # fmt: skip
         return out
 
-    print(run_jobs(jobs(), fn, args.csv, model_cfg), f"wall_min={(time.time() - t_start) / 60:.1f}")
+    print(
+        run_jobs(fc.pending_jobs(jobs(), args.csv), fn, args.csv, model_cfg),
+        f"wall_min={(time.time() - t_start) / 60:.1f}",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -213,6 +234,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--sides", nargs="+", default=["east", "west"])
     b.add_argument("--score-threshold", type=float, default=0.3)
     b.add_argument("--budget-min", type=float, default=90.0)
+    b.add_argument("--config", type=Path, default=FROZEN_CONFIG)
     b.add_argument("--csv", type=Path, default=DEFAULT_CSV)
     b.set_defaults(fn=cmd_bench)
     return p
