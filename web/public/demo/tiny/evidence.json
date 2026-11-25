@@ -1,0 +1,206 @@
+{
+  "schema_version": "1.1",
+  "scene_id": "tiny",
+  "evidence": [
+    {
+      "det_a": "2:0",
+      "det_b": "3:1",
+      "dist_3d_norm": 0.29831987216396283,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.40336025567207434,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "0:0",
+      "det_b": "1:1",
+      "dist_3d_norm": 0.34053271927204215,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.3189345614559157,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "2:2",
+      "det_b": "3:0",
+      "dist_3d_norm": 0.36394886733128123,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.27210226533743753,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "1:0",
+      "det_b": "2:1",
+      "dist_3d_norm": 0.3662771927613713,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.26744561447725745,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "3:0",
+      "det_b": "4:1",
+      "dist_3d_norm": 0.3728547102472746,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.25429057950545075,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "0:1",
+      "det_b": "4:0",
+      "dist_3d_norm": 0.3753173501410628,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.24936529971787436,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "0:2",
+      "det_b": "1:0",
+      "dist_3d_norm": 0.37561771246107095,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.2487645750778581,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "3:2",
+      "det_b": "4:0",
+      "dist_3d_norm": 0.38151178154327664,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.23697643691344672,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "0:1",
+      "det_b": "1:3",
+      "dist_3d_norm": 0.39154840672193564,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.21690318655612872,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "0:0",
+      "det_b": "4:2",
+      "dist_3d_norm": 0.4073910791741913,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.18521784165161737,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "1:2",
+      "det_b": "2:0",
+      "dist_3d_norm": 0.4160498181410923,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.16790036371781536,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "1:1",
+      "det_b": "2:3",
+      "dist_3d_norm": 0.4180946930043129,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.1638106139913742,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "0:3",
+      "det_b": "4:1",
+      "dist_3d_norm": 0.42263955205734755,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.1547208958853049,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "3:1",
+      "det_b": "4:3",
+      "dist_3d_norm": 0.4288801917033388,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.1422396165933224,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "2:1",
+      "det_b": "3:3",
+      "dist_3d_norm": 0.4458936140601569,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.10821277187968625,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "1:4",
+      "det_b": "2:2",
+      "dist_3d_norm": 0.45610203472672883,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.08779593054654233,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "3:4",
+      "det_b": "4:2",
+      "dist_3d_norm": 0.4684043193654894,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.06319136126902125,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "2:4",
+      "det_b": "3:2",
+      "dist_3d_norm": 0.4690535946082565,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.06189281078348696,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "0:4",
+      "det_b": "1:2",
+      "dist_3d_norm": 0.46991394935866315,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.060172101282673696,
+      "merged": true,
+      "reason": "merged"
+    },
+    {
+      "det_a": "0:2",
+      "det_b": "4:4",
+      "dist_3d_norm": 0.4851335769513765,
+      "reproj_error_px": 0.0,
+      "appearance_sim": 0.0,
+      "match_prob": 0.029732846097247023,
+      "merged": true,
+      "reason": "merged"
+    }
+  ]
+}

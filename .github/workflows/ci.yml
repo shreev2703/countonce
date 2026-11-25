@@ -69,6 +69,9 @@ jobs:
         run: pytest -m "not slow and not gpu" -rs | tee pytest-full-cpu.log
       - name: Fail on unexpected skips
         run: python scripts/check_skips.py pytest-full-cpu.log
+      # backend/web schema versions agree and the committed demo assets are current
+      - name: Demo assets check
+        run: python scripts/build_demo.py --check
 
   web:
     runs-on: ubuntu-latest

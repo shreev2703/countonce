@@ -1,0 +1,35 @@
+{
+  "demo_format_version": "1",
+  "schema_version": "1.1",
+  "points_format_version": 1,
+  "scene_id": "tiny",
+  "label": "synthetic test scene",
+  "prompt": "red sphere",
+  "count": 5,
+  "gt_count": 5,
+  "n_points": 4073,
+  "frames": [
+    "frame_0000",
+    "frame_0001",
+    "frame_0002",
+    "frame_0003",
+    "frame_0004"
+  ],
+  "files": {
+    "evidence.json": "ef6978268e4a0c35629783b9fad8e28e6eabeeee08143c7852e2fd0b6a917fe3",
+    "markers.json": "82da6fa33fd0e6602507aa00a4ba4b7162523f85e49d02442c1eb605758b34f1",
+    "overlays/frame_0000.png": "cd1b322140f3de46b171f4467e0992f630b62e88cb5eb3785482b5d7988dc16d",
+    "overlays/frame_0001.png": "35f871cb957dc7e418c838560cdc7dc5a55f5e639467c5f8d8bfdbbc28388968",
+    "overlays/frame_0002.png": "3fba48f73112fd3e135896d051179f79cf401fbb91cb1b940b1dc09c99437845",
+    "overlays/frame_0003.png": "172ed7959de91909ef2c2e903cda96c17215882de6b8e1055dbad7ac36ee05e7",
+    "overlays/frame_0004.png": "dc7010b6cb01f6968fcae52e2d8fffe329feb6aa322467aa738084cc9398342d",
+    "points.bin": "88d8ef2178ce8091188d5e922d0c63b6d9cb7079250c3f34fc151ba4be48d4c3",
+    "provenance.json": "47f11da8f557f24dbda2790069f12e1a2f3cf1ce122f97ea295564de54d645b3",
+    "result.json": "5dfc5a0ce2e4e0a4fda7ec0b5fc17707d9b3f4a4713eb117ac641266fd2fe762",
+    "thumbs/frame_0000.jpg": "da8a025a8f02608ea5cf49f291f0a28adc775c28635ecf264d50f66ce584a5f7",
+    "thumbs/frame_0001.jpg": "94df4dbbb828b63fac31e2eeb00d994f164de0bec9d1c20e5f1f68e9d578ed05",
+    "thumbs/frame_0002.jpg": "7ed3d50e678d6e3670e8dd0bbbf6e49f9911cc74298786e68417da038dacbc41",
+    "thumbs/frame_0003.jpg": "0799256b5794553bb46146d6eb4cab6c91993bc75c5765a0d3bb581f8c54bf57",
+    "thumbs/frame_0004.jpg": "b668f755920b5ea9341c0a8561d72e7ca4abedba33df4ed588e517262877b639"
+  }
+}
