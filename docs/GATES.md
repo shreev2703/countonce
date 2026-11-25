@@ -302,3 +302,6 @@ so `scripts/render_mockups.py` skips; open the HTML files directly or install pl
 
 ## 2026-11-24: Fuji Core report re-run still blocked (sixteenth attempt)
 - `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+
+## 2026-11-24: Fuji Core report re-run still blocked (seventeenth attempt)
+- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
