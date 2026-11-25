@@ -1,0 +1,54 @@
+{
+  "current": "v001",
+  "models": [
+    {
+      "config": {
+        "activation_checkpointing": "none",
+        "batch_size": 8,
+        "corrections": "",
+        "corrections_weight": 1.0,
+        "count_weight": 0.1,
+        "cycle_weight": 0.0,
+        "data_version": "",
+        "device": "cuda",
+        "early_stop_patience": 8,
+        "epochs": 40,
+        "feature_group": "full",
+        "feature_store": "data/dag_v3_capped/features/features.parquet",
+        "grad_clip": 1.0,
+        "init_checkpoint": "",
+        "lr": 0.0003,
+        "match_threshold": 0.5,
+        "max_triplets": 8,
+        "max_wall_minutes": 45,
+        "model": {
+          "heads": 4,
+          "layers": 4,
+          "width": 128
+        },
+        "out_dir": "runs/match_v3_capped",
+        "results_csv": "results/match_v3_capped_curves.csv",
+        "resume": false,
+        "run_name": "match_v3_capped",
+        "seed": 0,
+        "stop_after_epoch": null,
+        "train_dir": "data/dag_v3_capped/episodes/train",
+        "val_dir": "data/dag_v3_capped/episodes/val",
+        "weight_decay": 0.01
+      },
+      "dataset_version": "e9673a1bbeb2",
+      "git_sha": "44e536b083629846b562abe9b815f88f24f42e7d",
+      "metrics": {
+        "best_epoch": 35,
+        "val_f1": 0.9430309559266183,
+        "val_nll": 0.16432580590248108
+      },
+      "path": "checkpoints/v001.pt",
+      "recipe_version": "1.0",
+      "registered_at": "2026-11-25T09:08:41+00:00",
+      "sha256": "ebd3f291fc111374ab388ba5f55d7f62d94f98be8226a3ba5efb2ae085114a34",
+      "version": "v001"
+    }
+  ],
+  "schema": 1
+}

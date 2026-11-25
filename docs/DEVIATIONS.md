@@ -619,3 +619,14 @@ One entry per decision: date, what the plan said, what was done, why.
   the 40-epoch run. Only timing is meaningful.
 - Equivalence is tested on CPU (1e-5, float32). On GPU under bf16 autocast, padded and per-pair
   Sinkhorn differ in summation order, so exact bit equality is not expected.
+
+## First capped v3 matcher run, take 2 (2026-11-25)
+- Data hash matched the recorded one (`e9673a1bbeb2`), so nothing was regenerated. The old
+  run was moved to `runs/match_v3_capped_slow/`.
+- Trained 37 epochs (about 72 s each) and stopped at the 45-minute cap, not by early stop. Best
+  val F1 0.9430 at epoch 35. Epoch-to-epoch val F1 drops: [(10, 0.0048), (16, 0.0009), (18, 0.0001), (22, 0.0008), (25, 0.0014), (27, 0.0007), (33, 0.0006), (36, 0.0005)] (no divergence).
+- The cap fired while val F1 was still flat-to-rising only marginally; a longer run is the human's call.
+- `v001` registered and promoted. With no incumbent the existing gate promotes the first model without
+  comparison (integrity check only), so this promotion is not evidence of quality; the synthetic eval
+  is in `docs/RESULTS_V3_SYNTH.md`.
+- `scripts/eval_v3_synth.py` needs `PYTHONPATH=.` when run directly.
