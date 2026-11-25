@@ -17,6 +17,7 @@ import csv
 import hashlib
 import json
 import math
+import time
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
@@ -63,6 +64,8 @@ class TrainConfig:
     stop_after_epoch: int | None = None  # pause a run early (the cosine horizon stays `epochs`)
     model: dict[str, Any] = field(default_factory=dict)  # make_model kwargs
     activation_checkpointing: str = "none"  # none | attention | all (training memory only)
+    max_wall_minutes: float = 0.0  # >0: stop after the epoch that crosses this wall-clock budget
+    early_stop_patience: int = 0  # >0: stop after this many epochs without a val_f1 improvement
 
     @classmethod
     def from_yaml(cls, path: Path | str) -> TrainConfig:
@@ -355,6 +358,8 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
             },
         )
 
+    t_start = time.monotonic()
+    stopped_early = ""
     stop = cfg.epochs if cfg.stop_after_epoch is None else min(cfg.epochs, cfg.stop_after_epoch)
     for epoch in range(start, stop):
         model.train()
@@ -398,6 +403,7 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
         rec.update({f"train_{k}": v / max(n_eps, 1) for k, v in sums.items() if k != "corr"})
         if groups:
             rec["train_corr"] = sums["corr"] / max(n_corr, 1)
+        rec["wall_s"] = time.monotonic() - t_start
         history.append(rec)
         if rec["val_f1"] > best_f1:
             best_f1 = rec["val_f1"]
@@ -423,8 +429,17 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
             last,
         )
         _append_jsonl(log, {"event": "epoch", **rec})
+        if cfg.max_wall_minutes > 0 and rec["wall_s"] >= cfg.max_wall_minutes * 60:
+            stopped_early = "wall_clock_cap"
+        elif cfg.early_stop_patience > 0:
+            f1s = [h["val_f1"] for h in history]
+            if len(f1s) - 1 - int(np.argmax(f1s)) >= cfg.early_stop_patience:
+                stopped_early = "early_stop_val_f1"
+        if stopped_early:
+            _append_jsonl(log, {"event": "stop", "reason": stopped_early, "epoch": epoch + 1})
+            break
 
-    if history and history[-1]["epoch"] == cfg.epochs:
+    if history and (stopped_early or history[-1]["epoch"] == cfg.epochs):
         csv_path = Path(cfg.results_csv or f"results/{cfg.run_name}.csv")
         write_results_csv(csv_path, history)
         _fit_calibration(cfg, best, val_set, out / "calibration.json")

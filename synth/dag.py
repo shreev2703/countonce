@@ -194,11 +194,24 @@ def _split_seeds(cfg: DagConfig) -> dict[str, list[int]]:
     return out
 
 
+def _resolve_pins(pins: dict[str, Any], seed: int) -> dict[str, Any]:
+    """Recipe pins for one seed: a ``[lo, hi]`` list pin draws an integer in that inclusive range
+    from a generator seeded by (seed, key), so it is reproducible and independent per field."""
+    out: dict[str, Any] = {}
+    for k, v in pins.items():
+        if isinstance(v, list | tuple):
+            lo, hi = int(v[0]), int(v[1])
+            out[k] = int(np.random.default_rng([seed, sum(map(ord, k))]).integers(lo, hi + 1))
+        else:
+            out[k] = v
+    return out
+
+
 def _exec_recipe(dag: Dag) -> None:
     out = dag.stage_dir("recipe")
     for split, seeds in _split_seeds(dag.cfg).items():
         for s in seeds:
-            r = make_recipe(s, **dag.cfg.recipe)
+            r = make_recipe(s, **_resolve_pins(dag.cfg.recipe, s))
             p = out / split / f"recipe_{s:06d}.json"
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(r.to_json())

@@ -1,0 +1,22 @@
+# First capped v3 matcher run on GPU (PLAN §10.4). Data from configs/dag_v3_capped.yaml.
+# Run: .venv-gpu/bin/python -m countonce.cli train --config configs/match_v3_capped.yaml
+# Nothing here is a result.
+train_dir: data/dag_v3_capped/episodes/train
+val_dir: data/dag_v3_capped/episodes/val
+feature_store: data/dag_v3_capped/features/features.parquet
+out_dir: runs/match_v3_capped
+run_name: match_v3_capped
+results_csv: results/match_v3_capped_curves.csv
+epochs: 40
+batch_size: 8
+lr: 0.0003
+weight_decay: 0.01
+grad_clip: 1.0
+count_weight: 0.1
+cycle_weight: 0.0
+seed: 0
+device: cuda
+resume: false
+model: {width: 128, layers: 4, heads: 4}
+max_wall_minutes: 45
+early_stop_patience: 8

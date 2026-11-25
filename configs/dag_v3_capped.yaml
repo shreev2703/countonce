@@ -1,0 +1,10 @@
+# Capped first v3 run data: countonce dag run --only <stage> for recipe..catalog (train/evaluate are
+# done by configs/match_v3_capped.yaml, which has the wall-clock cap). Nothing here is a result.
+work_dir: data/dag_v3_capped
+seed: 0
+splits: {train: 800, val: 100, test: 100}   # 1,000 episodes, disjoint seed ranges
+recipe: {n_objects: [5, 60], n_views: [3, 8]}   # ranges drawn per scene (matches configs/synth.yaml)
+geometry: {drop_prob: 0.15, false_positive_rate: 0.1, pixel_noise: 2.0}
+train: {epochs: 1, batch_size: 8, model: {width: 128, layers: 4, heads: 4}}
+ablate: {}
+shards: {max_bytes: 1073741824}

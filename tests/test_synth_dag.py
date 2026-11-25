@@ -177,3 +177,14 @@ def test_versions_record_dvc_lock_hash_when_present(tmp_path, monkeypatch):
     (tmp_path / "dvc.lock").write_text("schema: '2.0'\n")
     assert _episodes_version(dag) == dvc_lock_hash() != fallback
     assert _train_config(dag).data_version == dvc_lock_hash()
+
+
+def test_list_recipe_pin_draws_reproducibly_within_range():
+    from synth.dag import _resolve_pins
+
+    pins = {"n_objects": [5, 60], "n_views": [3, 8], "arrangement": "row"}
+    draws = [_resolve_pins(pins, s) for s in range(50)]
+    assert draws == [_resolve_pins(pins, s) for s in range(50)]
+    assert all(5 <= d["n_objects"] <= 60 and 3 <= d["n_views"] <= 8 for d in draws)
+    assert len({d["n_objects"] for d in draws}) > 5
+    assert {d["arrangement"] for d in draws} == {"row"}
