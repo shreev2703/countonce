@@ -14,7 +14,7 @@
 
 ## Verification & Roadblock Policy
 1. Work strictly on the single task assigned to this session.
-2. Before committing, run `ruff check .` and `pytest` (if tests exist) and fix any failures.
+2. Before committing, run `.venv/bin/ruff check .` and `.venv/bin/pytest -m "not slow and not gpu"` (if tests exist) and fix any failures.
 3. Make one clean git commit when the task is complete.
 4. Mark the task `[x]` in `TASKS_OVERNIGHT.md` and append a short handoff note (what was built, files changed, any decisions/next steps) to `/mnt/c/Users/super_nga/second-brain/countonce-handoff.md`.
 5. **If you hit a genuine roadblock** (missing credentials, gated weights, broken external download, or 2 failed fix attempts): do NOT spin. Log the exact error and what you tried in `docs/GATES.md`, leave the repo clean (`git status` clean or WIP committed), and exit immediately so the orchestrator can move to the next task.

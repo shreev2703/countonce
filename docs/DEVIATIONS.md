@@ -677,3 +677,10 @@ One entry per decision: date, what the plan said, what was done, why.
   GT counts (down to 0) with far larger predictions, which drives their very high MAPE. At k=20
   every method overcounts (v1 MAE 99.6, v2 101.5, sum 156.9), and v2 is better than v1 at k=10 only
   (-13.4 [-22.3, -5.0]). Foliage occlusion is not scored separately.
+
+## M1: GroundingDINO default, CountGD planned (2026-11-25)
+- `Config.detector` and `LiveRoute.detector` default to `gdino` (HF GroundingDINO). `countgd` and `countgdpp` stay valid names (saved configs still load) but `build_detector` raises `PlannedComponentError` (a `NotImplementedError`, so the CLI exits with the message). The `CountGDDetector` class is untouched.
+- Removed the `countgd` vs `gdino` ablation from `configs/bench.yaml` (default is now gdino; no second implemented detector to compare). `configs/profile.yaml` uses `gdino`.
+- README quickstart installs the `hf` extra (it was missing; the default detector needs `transformers`). README "no real-data benchmark" claim corrected to match the Fuji Core run. New `docs/STATUS.md` is the source of truth for evidence levels.
+- Not verified: a literal clean-venv install (no network install attempted); the tiny-scene quickstart command was run in the existing `.venv`.
+- Ruff: wrapped/fixed pre-existing lint in `scripts/diag_fuji_protocol.py`. `tests/test_fuji_protocol.py` (untracked, not mine) has a failing test and is left uncommitted.
