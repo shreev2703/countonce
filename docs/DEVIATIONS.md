@@ -788,3 +788,12 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **Confidence badge rule** (`confidenceBadge`): Low if the range is wider than the count itself, Medium if wider than 20% or any warning, else High. The thresholds are provisional until calibrated (P-track); the reason is always shown next to the badge.
 - **Report / Share:** Report calls `window.print()` (a real PDF report needs the backend); CSV is generated in the browser; Share copies the page URL. Corrections, feedback, the Gaussian splat toggle and `/jobs/[id]`, `/s/[token]` routes are out of scope for M14 (demo assets only).
 - **Match lines** draw for the selected or hovered object; the numbered 3D markers are 1-based (`#1` is `instances[0]`).
+
+## M15: landing page and demo gallery
+- **Hero is a static photo, not a spinning 3D scene.** PLAN 17.3 asks for an interactive 3D hero. Loading three.js on `/` would cost most of the Lighthouse performance score, so the hero is the scene's first photo thumbnail linking to `/demo/<scene>` where the real viewer lives.
+- **Proof points are empty states** ("No published number yet") until benchmark numbers are final; no figures were invented.
+- **"Count your own photos" is a disabled button** with an explanation: `/new` and sign-in do not exist yet.
+- **No links to unbuilt routes** (`/benchmark`, `/how-it-works`, `/about`): the nav only has the gallery. The benchmark teaser section is omitted until `/benchmark` exists.
+- **Only one demo scene exists** (synthetic `tiny`), so the gallery has one card and says real scenes are added after review.
+- Components live in `web/src/components/chrome/`, not `site/`, because `.gitignore` ignores `site/`.
+- **Lighthouse** (v13, mobile preset, production build, headless Chromium): performance 0.96, accessibility 1.00, best-practices 0.96 on `/`. Reproduce with `npm run build && npx next start -p 3100` then `npm run lighthouse` in `web/`.
