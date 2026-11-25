@@ -1,0 +1,9 @@
+data/
+weights/
+.venv/
+results/
+synth/
+*.rar
+*.tar
+*.pt
+*.pth
