@@ -27,10 +27,14 @@ import yaml
 
 from countonce.match.model import (
     DetInputs,
+    PairLayout,
+    build_layout,
     episode_inputs,
     make_model,
     mask_inputs,
+    pair_nll_padded,
     save_checkpoint,
+    unpad_log_assignments,
 )
 from countonce.provenance import git_commit, git_is_dirty
 from synth.geometry import Episode, load_episode
@@ -140,13 +144,57 @@ def soft_count(logps: dict[tuple[int, int], Any], views: np.ndarray) -> Any:
     return (1.0 / (1.0 + row)).sum()
 
 
+def soft_count_padded(logp: Any, lay: PairLayout) -> Any:
+    """``soft_count`` from the padded batch: one scatter instead of a loop over view pairs."""
+    import torch
+
+    mm, nn_ = lay.ma.shape[1], lay.mb.shape[1]
+    core = logp[:, :mm, :nn_].exp()
+    valid = (lay.ma.unsqueeze(-1) & lay.mb.unsqueeze(-2)).to(core.dtype)
+    core = core * valid
+    row = torch.zeros(lay.n_det, device=core.device, dtype=core.dtype)
+    row = row.index_add(0, lay.a_idx.reshape(-1)[lay.sel_a], core.sum(2).reshape(-1)[lay.sel_a])
+    row = row.index_add(0, lay.b_idx.reshape(-1)[lay.sel_b], core.sum(1).reshape(-1)[lay.sel_b])
+    return (1.0 / (1.0 + row)).sum()
+
+
 def episode_terms(
+    model: Any,
+    ep: Episode,
+    d: DetInputs,
+    cfg: TrainConfig,
+    rng: np.random.Generator,
+    layout: PairLayout | None = None,
+) -> dict[str, Any] | None:
+    """Loss terms for one episode, or None when it has no view pair to learn from.
+
+    All view pairs go through one padded forward. Pass a cached ``layout`` (device-resident, with
+    targets) to skip the per-step host-to-device copies; one is built on the fly otherwise.
+    """
+    lay = layout or build_layout(d, model.bin_score.device, ep)
+    if lay is None:
+        return None
+    logp = model.pair_log_assignments_padded(d, lay)
+    out: dict[str, Any] = {"nll": pair_nll_padded(logp, lay)}
+    if cfg.count_weight > 0:
+        truth = max(ep.true_count(), 1)
+        out["count"] = (soft_count_padded(logp, lay) - ep.true_count()).abs() / truth
+    if cfg.cycle_weight > 0:
+        n_views = len(set(ep.view.tolist()))
+        cyc = triplet_cycle_loss(unpad_log_assignments(logp, lay), n_views, rng, cfg.max_triplets)
+        if cyc is not None:
+            out["cycle"] = cyc
+    return out
+
+
+def episode_terms_loop(
     model: Any, ep: Episode, d: DetInputs, cfg: TrainConfig, rng: np.random.Generator
 ) -> dict[str, Any] | None:
-    """Loss terms for one episode, or None when it has no view pair to learn from."""
+    """Reference path (one Sinkhorn and one NLL per view pair); equivalence-tested against
+    ``episode_terms``."""
     from countonce.match.model import pair_nll
 
-    logps = model.pair_log_assignments(d)
+    logps = model.pair_log_assignments_loop(d)
     if not logps:
         return None
     ids = sorted(set(ep.view.tolist()))
@@ -162,6 +210,9 @@ def episode_terms(
         if cyc is not None:
             out["cycle"] = cyc
     return out
+
+
+_SUM_KEYS = ("loss", "nll", "count", "cycle", "corr")
 
 
 def _stack_mean(xs: list[Any]) -> Any:
@@ -209,8 +260,15 @@ def pair_labels(ep: Episode) -> tuple[np.ndarray, np.ndarray]:
     return np.stack([iu, ju]), same
 
 
+def make_layouts(split: list[tuple[Episode, DetInputs]], device: Any) -> list[PairLayout | None]:
+    """Device-resident padded layouts (with targets), one per episode, built once."""
+    return [build_layout(d, device, ep) for ep, d in split]
+
+
 def collect_pair_probs(
-    model: Any, split: list[tuple[Episode, DetInputs]]
+    model: Any,
+    split: list[tuple[Episode, DetInputs]],
+    layouts: list[PairLayout | None] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Flattened cross-view match probabilities and GT labels (input to calibration)."""
     import torch
@@ -218,9 +276,14 @@ def collect_pair_probs(
     probs, labels = [], []
     model.eval()
     with torch.no_grad():
-        for ep, d in split:
+        for k, (ep, d) in enumerate(split):
             (iu, ju), same = pair_labels(ep)
-            p = model.match_probs(d).cpu().numpy()
+            lay = layouts[k] if layouts else None
+            p = (
+                model.match_probs(d, lay).cpu().numpy()
+                if lay
+                else model.match_probs(d).cpu().numpy()
+            )
             probs.append(p[iu, ju])
             labels.append(same)
     if not probs:
@@ -236,7 +299,10 @@ def association_f1(probs: np.ndarray, labels: np.ndarray, threshold: float) -> f
 
 
 def evaluate(
-    model: Any, split: list[tuple[Episode, DetInputs]], cfg: TrainConfig
+    model: Any,
+    split: list[tuple[Episode, DetInputs]],
+    cfg: TrainConfig,
+    layouts: list[PairLayout | None] | None = None,
 ) -> dict[str, float]:
     import torch
 
@@ -244,12 +310,12 @@ def evaluate(
     rng = np.random.default_rng([cfg.seed, 99])
     nll, n = 0.0, 0
     with torch.no_grad():
-        for ep, d in split:
-            t = episode_terms(model, ep, d, cfg, rng)
+        for k, (ep, d) in enumerate(split):
+            t = episode_terms(model, ep, d, cfg, rng, layouts[k] if layouts else None)
             if t is not None:
                 nll += float(t["nll"])
                 n += 1
-    probs, labels = collect_pair_probs(model, split)
+    probs, labels = collect_pair_probs(model, split, layouts)
     return {
         "val_nll": nll / max(n, 1),
         "val_f1": association_f1(probs, labels, cfg.match_threshold),
@@ -328,6 +394,8 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
         model = make_model(**cfg.model, activation_checkpointing=cfg.activation_checkpointing).to(
             device
         )
+    train_lay = make_layouts(train_set, device)
+    val_lay = make_layouts(val_set, device)
     steps_per_epoch = math.ceil(len(train_set) / cfg.batch_size)
     opt, sched = _make_optim(model, cfg, cfg.epochs * steps_per_epoch)
 
@@ -365,7 +433,8 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
         model.train()
         rng = np.random.default_rng([cfg.seed, epoch])
         order = rng.permutation(len(train_set))
-        sums = {"loss": 0.0, "nll": 0.0, "count": 0.0, "cycle": 0.0, "corr": 0.0}
+        # accumulated as device tensors: no per-episode host sync
+        sums: dict[str, Any] = {k: torch.zeros((), device=device) for k in _SUM_KEYS}
         n_eps = 0
         n_corr = 0
         step_no = 0
@@ -375,22 +444,22 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
             for i in order[s : s + cfg.batch_size]:
                 ep, d = train_set[int(i)]
                 with torch.autocast("cuda", dtype=torch.bfloat16, enabled=use_amp):
-                    terms = episode_terms(model, ep, d, cfg, rng)
+                    terms = episode_terms(model, ep, d, cfg, rng, train_lay[int(i)])
                 if terms is None:
                     continue
                 loss = _total(terms, cfg)
                 batch_loss.append(loss)
                 n_eps += 1
-                sums["loss"] += float(loss.detach())
+                sums["loss"] += loss.detach().float()
                 for k in ("nll", "count", "cycle"):
                     if k in terms:
-                        sums[k] += float(terms[k].detach())
+                        sums[k] += terms[k].detach().float()
             if groups:
                 from countonce.match.correction_data import correction_loss
 
                 closs = correction_loss(model, groups[(epoch * 7919 + step_no) % len(groups)])
                 batch_loss.append(cfg.corrections_weight * closs)
-                sums["corr"] += float(closs.detach())
+                sums["corr"] += closs.detach().float()
                 n_corr += 1
                 step_no += 1
             if batch_loss:
@@ -398,11 +467,12 @@ def train(cfg: TrainConfig) -> list[dict[str, Any]]:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
                 opt.step()
             sched.step()
-        val = evaluate(model, val_set, cfg)
+        val = evaluate(model, val_set, cfg, val_lay)
         rec: dict[str, Any] = {"epoch": epoch + 1, "lr": sched.get_last_lr()[0], **val}
-        rec.update({f"train_{k}": v / max(n_eps, 1) for k, v in sums.items() if k != "corr"})
+        host = {k: float(v) for k, v in sums.items()}
+        rec.update({f"train_{k}": v / max(n_eps, 1) for k, v in host.items() if k != "corr"})
         if groups:
-            rec["train_corr"] = sums["corr"] / max(n_corr, 1)
+            rec["train_corr"] = host["corr"] / max(n_corr, 1)
         rec["wall_s"] = time.monotonic() - t_start
         history.append(rec)
         if rec["val_f1"] > best_f1:

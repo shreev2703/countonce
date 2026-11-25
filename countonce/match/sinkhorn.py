@@ -42,6 +42,44 @@ def log_sinkhorn(scores: Any, bin_score: Any, iters: int = 50) -> Any:
     return z + u.unsqueeze(-1) + v.unsqueeze(-2) - norm
 
 
+def log_sinkhorn_padded(
+    scores: Any, ma: Any, mb: Any, m: Any, n: Any, bin_score: Any, iters: int = 50
+) -> Any:
+    """Batched ``log_sinkhorn`` over pairs padded to a common (M, N).
+
+    ``scores`` is (P, M, N); ``ma`` (P, M) and ``mb`` (P, N) mark the real rows/columns and ``m``,
+    ``n`` (P,) are their float counts. The dustbin sits at fixed index M / N, so the result is
+    (P, M+1, N+1); a pair's real block is ``[:m, :n]`` plus row M / column N. Padded entries are
+    pushed to a large negative value so they drop out of every logsumexp. For each pair the
+    real entries match ``log_sinkhorn`` on the unpadded scores.
+    """
+    torch = _torch()
+    p, mm, nn = scores.shape
+    bs = bin_score
+    s = scores.to(bs.dtype)
+    neg = -1e9
+    valid = ma.unsqueeze(-1) & mb.unsqueeze(-2)
+    row = torch.where(ma, bs, bs.new_tensor(neg)).unsqueeze(-1)
+    col = torch.where(mb, bs, bs.new_tensor(neg)).unsqueeze(-2)
+    top = torch.cat([torch.where(valid, s, bs.new_tensor(neg)), row], -1)
+    bottom = torch.cat([col, bs.expand(p, 1, 1)], -1)
+    z = torch.cat([top, bottom], -2)
+
+    rm = torch.cat([ma, ma.new_ones(p, 1)], -1)
+    cm = torch.cat([mb, mb.new_ones(p, 1)], -1)
+    norm = -torch.log(m + n).to(z.dtype)  # (P,)
+    zeros_m, zeros_n = z.new_zeros(p, mm), z.new_zeros(p, nn)
+    log_mu = norm[:, None] + torch.cat([zeros_m, torch.log(n).to(z.dtype)[:, None]], -1)
+    log_nu = norm[:, None] + torch.cat([zeros_n, torch.log(m).to(z.dtype)[:, None]], -1)
+
+    u = torch.zeros_like(log_mu)
+    v = torch.zeros_like(log_nu)
+    for _ in range(iters):
+        u = torch.where(rm, log_mu - torch.logsumexp(z + v.unsqueeze(-2), dim=-1), 0.0)
+        v = torch.where(cm, log_nu - torch.logsumexp(z + u.unsqueeze(-1), dim=-2), 0.0)
+    return z + u.unsqueeze(-1) + v.unsqueeze(-2) - norm[:, None, None]
+
+
 class DustbinSinkhorn:
     """Module factory: built lazily so importing this file never needs torch."""
 

@@ -18,7 +18,7 @@ from typing import Any
 
 import numpy as np
 
-from countonce.match.sinkhorn import log_sinkhorn
+from countonce.match.sinkhorn import log_sinkhorn, log_sinkhorn_padded
 
 NOMINAL_OBJECT_SIZE = 0.1  # world units; the synthetic generator has no per-object size
 # xyz 3, size 1, box 4, score 1, lift_conf 1, ray 3, camera centre 3, log-depth 1
@@ -71,6 +71,116 @@ class DetInputs:
             self.view[order],
             app,
         )
+
+
+@dataclass
+class PairLayout:
+    """All view pairs of one episode padded to a common shape, device-resident (torch tensors).
+
+    Built once per episode (``build_layout``) so a training step does no host-to-device copies and
+    runs a single batched Sinkhorn instead of one per view pair. ``keys`` are positions in
+    ``sorted(views)``. Targets are present only when an episode was given.
+    """
+
+    keys: list[tuple[int, int]]
+    a_idx: Any  # (P,M) long detection indices of view a, padded with 0
+    b_idx: Any  # (P,N)
+    ma: Any  # (P,M) bool real rows
+    mb: Any  # (P,N)
+    m: Any  # (P,) float counts
+    n: Any
+    feats: Any  # (N_det, F) float32
+    xyz: Any  # (N_det, 3)
+    same: Any  # (N_det, N_det) bool, same view
+    appearance: Any | None = None
+    t_match: Any | None = None  # (P,M,N) bool
+    t_ua: Any | None = None  # (P,M) bool
+    t_ub: Any | None = None  # (P,N)
+    t_count: Any | None = None  # (P,) float
+    sel_a: Any | None = None  # flat positions of real rows in a (P*M) vector
+    sel_b: Any | None = None
+    n_det: int = 0
+
+
+def build_layout(d: DetInputs, device: Any, ep: Any | None = None) -> PairLayout | None:
+    """Padded pair layout for ``d`` (and GT targets when ``ep`` is given); None if < 2 views."""
+    torch = _torch()
+    vw = np.asarray(d.view)
+    ids = sorted(set(vw.tolist()))
+    groups = [np.flatnonzero(vw == i) for i in ids]
+    keys = [(a, b) for a in range(len(ids)) for b in range(a + 1, len(ids))]
+    if not keys:
+        return None
+    mm = max(groups[a].size for a, _ in keys)
+    nn_ = max(groups[b].size for _, b in keys)
+    p = len(keys)
+    a_idx = np.zeros((p, mm), dtype=np.int64)
+    b_idx = np.zeros((p, nn_), dtype=np.int64)
+    ma = np.zeros((p, mm), dtype=bool)
+    mb = np.zeros((p, nn_), dtype=bool)
+    for k, (a, b) in enumerate(keys):
+        a_idx[k, : groups[a].size] = groups[a]
+        b_idx[k, : groups[b].size] = groups[b]
+        ma[k, : groups[a].size] = True
+        mb[k, : groups[b].size] = True
+
+    def dev(x: Any, **kw: Any) -> Any:
+        return torch.as_tensor(x, device=device, **kw)
+
+    lay = PairLayout(
+        keys=keys,
+        a_idx=dev(a_idx),
+        b_idx=dev(b_idx),
+        ma=dev(ma),
+        mb=dev(mb),
+        m=dev(ma.sum(1), dtype=torch.float32),
+        n=dev(mb.sum(1), dtype=torch.float32),
+        feats=dev(d.features()),
+        xyz=dev(d.xyz, dtype=torch.float32),
+        same=dev(vw[:, None] == vw[None, :]),
+        appearance=None if d.appearance is None else dev(d.appearance, dtype=torch.float32),
+        sel_a=dev(np.flatnonzero(ma.reshape(-1))),
+        sel_b=dev(np.flatnonzero(mb.reshape(-1))),
+        n_det=int(vw.shape[0]),
+    )
+    if ep is not None:
+        tm = np.zeros((p, mm, nn_), dtype=bool)
+        ua = np.zeros((p, mm), dtype=bool)
+        ub = np.zeros((p, nn_), dtype=bool)
+        for k, (a, b) in enumerate(keys):
+            m_, ua_, ub_ = ep.pair_targets(ids[a], ids[b])
+            tm[k, : m_.shape[0], : m_.shape[1]] = m_
+            ua[k, : ua_.size] = ua_
+            ub[k, : ub_.size] = ub_
+        lay.t_match, lay.t_ua, lay.t_ub = dev(tm), dev(ua), dev(ub)
+        lay.t_count = dev((tm.sum((1, 2)) + ua.sum(1) + ub.sum(1)).clip(min=1), dtype=torch.float32)
+    return lay
+
+
+def pair_nll_padded(logp: Any, lay: PairLayout) -> Any:
+    """Mean over pairs of the per-pair NLL (same value as the mean of ``pair_nll``)."""
+    if lay.t_match is None:
+        raise ValueError("layout has no targets")
+    mm, nn_ = lay.ma.shape[1], lay.mb.shape[1]
+    tot = (
+        (logp[:, :mm, :nn_] * lay.t_match).sum((1, 2))
+        + (logp[:, :mm, nn_] * lay.t_ua).sum(1)
+        + (logp[:, mm, :nn_] * lay.t_ub).sum(1)
+    )
+    return (-tot / lay.t_count).mean()
+
+
+def unpad_log_assignments(logp: Any, lay: PairLayout) -> dict[tuple[int, int], Any]:
+    """Per-pair (m+1, n+1) log-assignments from the padded batch (dustbin last)."""
+    torch = _torch()
+    mm, nn_ = lay.ma.shape[1], lay.mb.shape[1]
+    out = {}
+    for k, key in enumerate(lay.keys):
+        mk, nk = int(lay.m[k]), int(lay.n[k])
+        rows = torch.cat([torch.arange(mk), torch.tensor([mm])]).to(logp.device)
+        cols = torch.cat([torch.arange(nk), torch.tensor([nn_])]).to(logp.device)
+        out[key] = logp[k][rows][:, cols]
+    return out
 
 
 FEATURE_GROUPS = ("3d", "3d_rays", "full")
@@ -230,19 +340,27 @@ def make_model(
             self.iters = sinkhorn_iters
             self.activation_checkpointing = activation_checkpointing
 
-        def encode(self, d: DetInputs) -> Any:
+        def encode(self, d: DetInputs, lay: PairLayout | None = None) -> Any:
             dev = self.bin_score.device
-            feats = torch.as_tensor(d.features(), device=dev)
+            if lay is not None:
+                feats, app, xyz, same = lay.feats, lay.appearance, lay.xyz, lay.same
+            else:
+                feats = torch.as_tensor(d.features(), device=dev)
+                app = (
+                    None
+                    if d.appearance is None
+                    else torch.as_tensor(d.appearance, dtype=torch.float32, device=dev)
+                )
+                xyz = torch.as_tensor(d.xyz, dtype=torch.float32, device=dev)
+                vw = torch.as_tensor(d.view, device=dev)
+                same = vw[:, None] == vw[None, :]
             x = self.inp(feats)
             if self.app is not None:
-                if d.appearance is None:
+                if app is None:
                     raise ValueError("model has an appearance slot but inputs carry none")
-                x = x + self.app(torch.as_tensor(d.appearance, dtype=torch.float32, device=dev))
-            xyz = torch.as_tensor(d.xyz, dtype=torch.float32, device=dev)
+                x = x + self.app(app)
             diff = xyz[None, :, :] - xyz[:, None, :]
             rel = torch.cat([diff, diff.norm(dim=-1, keepdim=True)], dim=-1)
-            vw = torch.as_tensor(d.view, device=dev)
-            same = vw[:, None] == vw[None, :]
             for blk in self.blocks:
                 allow = same if not blk.cross else ~same
                 x = blk(x, rel, allow.unsqueeze(0).expand(heads, -1, -1), allow.any(-1).float())
@@ -272,26 +390,63 @@ def make_model(
                         ib = torch.as_tensor(nb, device=desc.device)
                         yield a, b, na, nb, self._pair_scores(desc, xyz, ia, ib)
 
-        def pair_log_assignments(self, d: DetInputs) -> dict[tuple[int, int], Any]:
+        def _scores_padded(self, desc: Any, lay: PairLayout) -> Any:
+            xa, xb = lay.xyz[lay.a_idx], lay.xyz[lay.b_idx]  # (P,M,3), (P,N,3)
+            diff = xb[:, None, :, :] - xa[:, :, None, :]  # (P,M,N,3)
+            dist = diff.norm(dim=-1, keepdim=True)
+            geo = (
+                self.pair_head(torch.cat([diff, dist], -1))
+                + self.pair_head(torch.cat([-diff, dist], -1))
+            ) / 2
+            da, db = desc[lay.a_idx], desc[lay.b_idx]
+            return da @ db.transpose(1, 2) / width**0.5 + geo.squeeze(-1)
+
+        def pair_log_assignments_padded(self, d: DetInputs, lay: PairLayout) -> Any:
+            """(P, M+1, N+1) log-assignments of every view pair in one batched Sinkhorn."""
+            desc = self.encode(d, lay)
+            s = self._scores_padded(desc, lay)
+            return log_sinkhorn_padded(s, lay.ma, lay.mb, lay.m, lay.n, self.bin_score, self.iters)
+
+        def pair_log_assignments(
+            self, d: DetInputs, lay: PairLayout | None = None
+        ) -> dict[tuple[int, int], Any]:
             """Log-assignment (m+1, n+1) per view pair, keyed by positions in ``sorted(views)``."""
+            lay = lay or build_layout(d, self.bin_score.device)
+            if lay is None:
+                return {}
+            return unpad_log_assignments(self.pair_log_assignments_padded(d, lay), lay)
+
+        def pair_log_assignments_loop(self, d: DetInputs) -> dict[tuple[int, int], Any]:
+            """Reference implementation: one Sinkhorn per view pair (kept for equivalence tests)."""
             return {
                 (a, b): log_sinkhorn(s, self.bin_score, self.iters)
                 for a, b, _, _, s in self._pairs(d)
             }
 
-        def match_probs(self, d: DetInputs) -> Any:
+        def match_probs(self, d: DetInputs, lay: PairLayout | None = None) -> Any:
             """(N,N) symmetric match probability; zero within a view and on the diagonal.
 
             Truncated Sinkhorn is not exactly transpose-symmetric, so both orientations are
             averaged: the result then cannot depend on how the views happen to be ordered.
             """
             p = torch.zeros(d.n, d.n, device=self.bin_score.device)
-            for _, _, ia, ib, s in self._pairs(d):
-                fwd = log_sinkhorn(s, self.bin_score, self.iters)[:-1, :-1].exp()
-                bwd = log_sinkhorn(s.T, self.bin_score, self.iters)[:-1, :-1].exp().T
-                core = (fwd + bwd) / 2
-                p[np.ix_(ia, ib)] = core
-                p[np.ix_(ib, ia)] = core.T
+            lay = lay or build_layout(d, self.bin_score.device)
+            if lay is None:
+                return p
+            mm, nn_ = lay.ma.shape[1], lay.mb.shape[1]
+            desc = self.encode(d, lay)
+            s = self._scores_padded(desc, lay)
+            fwd = log_sinkhorn_padded(s, lay.ma, lay.mb, lay.m, lay.n, self.bin_score, self.iters)
+            bwd = log_sinkhorn_padded(
+                s.transpose(1, 2), lay.mb, lay.ma, lay.n, lay.m, self.bin_score, self.iters
+            )
+            core = (fwd[:, :mm, :nn_].exp() + bwd[:, :nn_, :mm].exp().transpose(1, 2)) / 2
+            valid = lay.ma.unsqueeze(-1) & lay.mb.unsqueeze(-2)
+            rows = lay.a_idx.unsqueeze(-1).expand_as(core)[valid]
+            cols = lay.b_idx.unsqueeze(-2).expand_as(core)[valid]
+            vals = core[valid]
+            p[rows, cols] = vals
+            p[cols, rows] = vals
             return p
 
     return MatchNet()

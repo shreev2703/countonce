@@ -7,3 +7,8 @@ synth/
 *.tar
 *.pt
 *.pth
+data/
+.venv/
+.venv-gpu/
+runs/
+__pycache__/

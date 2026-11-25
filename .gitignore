@@ -54,3 +54,4 @@ runs/
 
 # Stray job logs
 *.out
+.env*

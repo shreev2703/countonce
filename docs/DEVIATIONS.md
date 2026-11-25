@@ -609,3 +609,13 @@ One entry per decision: date, what the plan said, what was done, why.
 - **"assoc_f1 is not filled" TODO (above) stays:** no Fuji cell is filled yet, so there is nothing to remove it for. Re-running `python -m bench.fuji_report` after step 2 fills the cells that have complete rows.
 - **Figures not generated:** `bench.figures.make_all` raises on an empty CSV, so no Core figures exist. Run `python -m bench.figures` after step 2.
 - Foliage occlusion is not recorded per row by the runner, so the analysis can only point to miss rate.
+
+## Matcher training speed-up (2026-11-25)
+- **Measured s/epoch, GPU, 800-episode `data/dag_v3_capped`, one epoch incl. val pass:** 703.4 s
+  before (the recorded epoch-1 `wall_s` of the slow capped run, same data and config) vs 85.4 s
+  after. No target was set; this is the measured ratio (about 8x). Table in `docs/PROFILE.md`.
+- The "before" number was not re-measured on the old code; it is the earlier run's log. The "after"
+  run used `epochs: 1`, so its cosine schedule decays to 0 and its val metrics are not comparable to
+  the 40-epoch run. Only timing is meaningful.
+- Equivalence is tested on CPU (1e-5, float32). On GPU under bf16 autocast, padded and per-pair
+  Sinkhorn differ in summation order, so exact bit equality is not expected.
