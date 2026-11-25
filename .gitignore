@@ -51,3 +51,6 @@ logs/
 .vercel
 .venv-gpu/
 runs/
+
+# Stray job logs
+*.out

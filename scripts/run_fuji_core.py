@@ -12,17 +12,19 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
 from bench import fuji_core as fc
-from bench.datasets.fuji_sfm import load_fuji_sfm
-from bench.runner import DEFAULT_CSV, run_jobs
+from bench.datasets.fuji_sfm import FujiScene, load_fuji_sfm
+from bench.runner import DEFAULT_CSV, Job, RunOutput, run_jobs
 from countonce.config import Config
 from countonce.pipeline import build_detector, build_reconstructor, run
+from countonce.recon.align import camera_centers, transform_extrinsics
 from countonce.recon.cache import ReconCache
 from countonce.recon.chunked import align_chunk
 
@@ -31,8 +33,8 @@ PROMPT = "apple"
 STRIDE = 3
 
 
-def base_config(**kw) -> Config:  # type: ignore[no-untyped-def]
-    d = dict(
+def base_config(**kw: Any) -> Config:
+    d: dict[str, Any] = dict(
         detector="gdino",
         backbone="vggt",
         assoc="v1",
@@ -48,8 +50,9 @@ def base_config(**kw) -> Config:  # type: ignore[no-untyped-def]
     return Config(**d)
 
 
-def load_recon(cfg: Config, key: str):  # type: ignore[no-untyped-def]
-    rc = ReconCache(Path(cfg.cache_dir) / "recon")  # type: ignore[arg-type]
+def load_recon(cfg: Config, key: str) -> Any:
+    assert cfg.cache_dir is not None
+    rc = ReconCache(Path(cfg.cache_dir) / "recon")
     rec = rc.get(key)
     if rec is None:
         raise RuntimeError(f"recon {key} missing from cache")
@@ -74,8 +77,8 @@ def cmd_overview(args: argparse.Namespace) -> None:
         recon = load_recon(cfg, res.recon_cache_key or "")
         src = np.stack([i.xyz for i in res.instances if i.n_views >= 2])
         reg = fc.register_to_gt(src, scene.gt_xyz)
-        ext = fc.transform_extrinsics(recon.extrinsics, reg.sim)
-        cen = fc.camera_centers(ext)
+        ext = transform_extrinsics(recon.extrinsics, reg.sim)
+        cen = camera_centers(ext)
         all_idx = np.arange(len(ids))
         full = fc.interpolate_poses(local, ext, all_idx)
         info = {
@@ -94,10 +97,17 @@ def cmd_overview(args: argparse.Namespace) -> None:
         print(side, {k: v for k, v in info.items() if k != "ext_full"})
 
 
-def _window(scene, imgs, ov, side, tree, k):  # type: ignore[no-untyped-def]
+def _window(
+    scene: FujiScene,
+    imgs: list[Path],
+    ov: dict[str, Any],
+    side: str,
+    tree: str,
+    k: int,
+) -> tuple[int, int, list[Path], np.ndarray]:
     ids = scene.side_indices[side]
     ext = np.array(ov[side]["ext_full"])
-    cam_y = fc.camera_centers(ext)[:, 1]
+    cam_y = camera_centers(ext)[:, 1]
     tree_y = float(scene.gt_xyz[scene.tree_mask(tree)][:, 1].mean())
     start, stop = fc.window_for_tree(cam_y, len(ids), tree_y, k)
     return start, stop, [imgs[ids[i]] for i in range(start, stop)], ext[start:stop]
@@ -127,14 +137,14 @@ def cmd_bench(args: argparse.Namespace) -> None:
         **fc.host_info(),
     }  # fmt: skip
     t_start = time.time()
-    memo: dict[tuple[str, str, int], dict] = {}
+    memo: dict[tuple[str, str, int], dict[str, Any]] = {}
 
-    def group(tree: str, side: str, k: int) -> dict:
+    def group(tree: str, side: str, k: int) -> dict[str, Any]:
         key = (tree, side, k)
         if key in memo:
             return memo[key]
         start, stop, paths, gt_ext = _window(scene, imgs, ov, side, tree, k)
-        runs = {}
+        runs: dict[str, Any] = {}
         for assoc in ("v1", "v2"):
             cfg = base_config(assoc=assoc, score_threshold=args.score_threshold)
             res = run(paths, PROMPT, cfg, detector=det, reconstructor=rec, export=False)
@@ -144,8 +154,8 @@ def cmd_bench(args: argparse.Namespace) -> None:
             sim = align_chunk(gt_ext, recon.extrinsics)
             ev = fc.evaluate_window(res, recon, sim, scene.gt_ids, scene.gt_xyz, box)
             runs[assoc] = (ev, res)
-        c_gt = fc.camera_centers(gt_ext)
-        c_al = fc.camera_centers(fc.transform_extrinsics(recon.extrinsics, sim))
+        c_gt = camera_centers(gt_ext)
+        c_al = camera_centers(transform_extrinsics(recon.extrinsics, sim))
         runs["align"] = {
             "scale": sim.s, "cam_rms_m": float(np.sqrt(((c_gt - c_al) ** 2).sum(1).mean())),
             "cam_span_m": float(np.linalg.norm(np.ptp(c_gt, axis=0))), "frames": [start, stop],
@@ -154,7 +164,7 @@ def cmd_bench(args: argparse.Namespace) -> None:
         memo[key] = runs
         return runs
 
-    def jobs():  # type: ignore[no-untyped-def]
+    def jobs() -> Iterator[Job]:
         for k in args.ks:
             for tree in trees:
                 for side in args.sides:
@@ -165,7 +175,8 @@ def cmd_bench(args: argparse.Namespace) -> None:
                         cfg = {**model_cfg, "tree": tree, "side": side}
                         yield fc.make_job(tree, args.split, side, k, method, cfg)
 
-    def fn(job):  # type: ignore[no-untyped-def]
+    def fn(job: Job) -> RunOutput:
+        assert job.n_views is not None
         runs = group(job.scene_id, job.sample, job.n_views)
         v1_ev, v1_res = runs["v1"]
         if job.method.startswith("countonce"):
@@ -189,8 +200,8 @@ def cmd_bench(args: argparse.Namespace) -> None:
     print(run_jobs(jobs(), fn, args.csv, model_cfg), f"wall_min={(time.time() - t_start) / 60:.1f}")
 
 
-def main() -> None:
-    p = argparse.ArgumentParser()
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     sub = p.add_subparsers(dest="cmd", required=True)
     o = sub.add_parser("overview")
     o.add_argument("--sides", nargs="+", default=["east", "west"])
@@ -204,9 +215,13 @@ def main() -> None:
     b.add_argument("--budget-min", type=float, default=90.0)
     b.add_argument("--csv", type=Path, default=DEFAULT_CSV)
     b.set_defaults(fn=cmd_bench)
-    args = p.parse_args()
+    return p
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
     args.fn(args)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

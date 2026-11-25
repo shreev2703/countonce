@@ -64,9 +64,9 @@ def prepare_images(scene: FujiScene, out_dir: Path, scale: int = DOWNSCALE) -> l
         with Image.open(p) as im:
             w, h = im.size
             im.draft("RGB", (w // scale, h // scale))
-            im = im.convert("RGB").resize((w // scale, h // scale), Image.BILINEAR)
+            small = im.convert("RGB").resize((w // scale, h // scale), Image.Resampling.BILINEAR)
             tmp = dst.with_suffix(".tmp.jpg")
-            im.save(tmp, quality=92)
+            small.save(tmp, quality=92)
             tmp.replace(dst)
         return dst
 
@@ -328,29 +328,65 @@ def dump_json(path: Path, obj: Any) -> None:
 # ----------------------------------------------------------------------------- dense registration
 
 
-def load_gt_cloud(root: Path, every: int = 40) -> np.ndarray:
-    """Every ``every``-th point of the scene point cloud (GT frame, metres, shifted frame)."""
+MAX_CLOUD_POINTS = 200_000  # cap on points fed to a KD-tree; bounds host RAM (float32, ~2.4 MB)
+CLOUD_VOXEL_M = 0.02
+
+
+def subsample_cloud(
+    xyz: np.ndarray, voxel: float = CLOUD_VOXEL_M, max_points: int = MAX_CLOUD_POINTS
+) -> np.ndarray:
+    """Memory-bounded float32 copy of a point cloud: one point per ``voxel`` cell (the first in
+    each cell), then an evenly strided cut to at most ``max_points``. Deterministic."""
+    pts = np.asarray(xyz, dtype=np.float32).reshape(-1, 3)
+    if voxel > 0 and len(pts):
+        cell = np.floor((pts - pts.min(0)) / np.float32(voxel)).astype(np.int64)
+        _, first = np.unique(cell, axis=0, return_index=True)
+        pts = pts[np.sort(first)]
+    if len(pts) > max_points:
+        pts = pts[np.linspace(0, len(pts) - 1, max_points).astype(np.int64)]
+    return np.ascontiguousarray(pts)
+
+
+def load_gt_cloud(
+    root: Path,
+    every: int = 40,
+    voxel: float = CLOUD_VOXEL_M,
+    max_points: int = MAX_CLOUD_POINTS,
+) -> np.ndarray:
+    """Scene point cloud (GT frame, metres, shifted frame) as a bounded float32 array.
+
+    The file is streamed, keeping every ``every``-th row, so the full 542k-point text file is
+    never held in memory; the result is voxel-thinned and capped at ``max_points``.
+    """
+    import itertools
+
     path = Path(root) / "3-3D_data" / "Fuji_apple_trees_point_cloud.txt"
     rows = []
     with path.open() as f:
-        for i, line in enumerate(f):
-            if i % every == 0:
-                rows.append([float(x) for x in line.split()[:3]])
-    return np.asarray(rows, dtype=np.float64)
+        for line in itertools.islice(f, 0, None, max(every, 1)):
+            parts = line.split()
+            if len(parts) >= 3:
+                rows.append((float(parts[0]), float(parts[1]), float(parts[2])))
+    return subsample_cloud(np.asarray(rows, dtype=np.float32), voxel, max_points)
 
 
 def register_dense(
-    src: np.ndarray, dst: np.ndarray, trim: float = 0.4, iters: int = 30
+    src: np.ndarray,
+    dst: np.ndarray,
+    trim: float = 0.4,
+    iters: int = 30,
+    max_points: int = MAX_CLOUD_POINTS,
 ) -> Registration:
     """Sim(3) taking a reconstruction's confident points onto the GT scene cloud: PCA-initialised
     trimmed ICP (each step fits the closest ``trim`` share of points). Score = number of source
-    points within 5 cm of the cloud."""
+    points within 5 cm of the cloud. Both clouds are thinned to at most ``max_points`` (float32
+    voxel/stride subsample) before the KD-tree is built, so memory is bounded."""
     import itertools
 
     from scipy.spatial import cKDTree
 
-    src = np.asarray(src, float)
-    dst = np.asarray(dst, float)
+    src = subsample_cloud(src, voxel=0.0, max_points=max_points).astype(float)
+    dst = subsample_cloud(dst, voxel=CLOUD_VOXEL_M, max_points=max_points).astype(float)
     tree = cKDTree(dst)
     a, b = _axes(src), _axes(dst)
     s0 = float(np.sqrt(np.var(dst @ b[:, 0]) / max(np.var(src @ a[:, 0]), 1e-18)))
