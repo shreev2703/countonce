@@ -779,3 +779,12 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - Zod schemas (`web/src/lib/schemas/result.ts`) are strict and upgrade 1.0 -> 1.1 like the backend; Vitest reads the backend's `tests/fixtures/schemas/v*` so versions cannot drift unnoticed.
 - CI `web` job now also runs Playwright (+ axe, desktop and phone projects). Not yet run on hosted CI.
 - Not done (later tasks): Lighthouse CI, the "no `TODO: fill from results` outside empty states" build check, charts, auth, upload client.
+
+## M14: results experience on demo assets
+- **Directory name `result-view`, not `results`:** the repo `.gitignore` has `results/`, which would have excluded `web/src/**/results/` from git *and* from Tailwind v4's source scan (utilities such as `py-2` silently vanished from the CSS). Components live in `web/src/components/result-view/`, helpers in `web/src/lib/result-view/`.
+- **Detection boxes are fixed-size squares (18 px) centred on `uv`:** `result.json` stores only the detection centre, not box extents, so the Photos tab and strip draw a square marker with the status outline style (solid / dashed / dotted) and label. The exported thumbnails (`thumbs/*.jpg`) already have the backend overlay burned in, so each tile shows the exporter's boxes plus the interactive ones. A follow-up should export clean thumbnails and real box extents.
+- **Camera fly-to keeps world-up (+z):** orbit controls stay z-up, so the view matches the photo's position, direction and field of view but not any roll. Verified visually that the point cloud lines up with the photo on the tiny scene.
+- **Interval wording:** the tiny scene's interval method is `sensitivity` (no calibration set yet), shown as "sensitivity to settings"; the "split conformal, n = ..." wording appears only when `n_calibration` is present.
+- **Confidence badge rule** (`confidenceBadge`): Low if the range is wider than the count itself, Medium if wider than 20% or any warning, else High. The thresholds are provisional until calibrated (P-track); the reason is always shown next to the badge.
+- **Report / Share:** Report calls `window.print()` (a real PDF report needs the backend); CSV is generated in the browser; Share copies the page URL. Corrections, feedback, the Gaussian splat toggle and `/jobs/[id]`, `/s/[token]` routes are out of scope for M14 (demo assets only).
+- **Match lines** draw for the selected or hovered object; the numbered 3D markers are 1-based (`#1` is `instances[0]`).
