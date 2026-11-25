@@ -20,6 +20,7 @@ from scipy.optimize import linear_sum_assignment
 from countonce.lift import frame_affine
 from countonce.merge.appearance import FeatureExtractor, cosine_sim
 from countonce.merge.base import ClusterResult
+from countonce.merge.order import canonical_frame_order
 from countonce.types import Detection, Frame, Instance, LiftedDetection, MatchEvidence, Recon
 
 _BIG = 1e9
@@ -190,7 +191,7 @@ class V2Associator:
             by_frame.setdefault(ld.det.frame_id, []).append(ld)
 
         tracks: list[_Track] = []
-        for fid in sorted(by_frame):
+        for fid in canonical_frame_order(by_frame, recon, self.frame_to_view):
             dets = sorted(by_frame[fid], key=lambda m: m.det.id)
             self._match_frame(fid, dets, tracks, geo, feats, res)
 

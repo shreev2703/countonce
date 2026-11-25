@@ -722,3 +722,15 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **Wrong merge vs missed:** a true object with detections that is the majority of no cluster counts as a wrong merge; one with no detection at all counts as missed.
 - **Decomposition scope:** `bench.evaluate` computes it only for scenes with identity labels (`instances`, optional `objects`) whose object count equals GT `count`; it is a mean over those scenes. Cluster count, not the submitted `count`, is what it explains.
 - `assoc_f1` stays in the result but is labelled explanatory and listed after every count metric. Fuji report gained a signed-bias column; the old `bench.csv` needs no change (bias is computed from pred - gt).
+
+## M4: photo-order invariance (2026-11-25)
+- **The old test did not test this.** `test_invariant_to_view_and_detection_order` shuffles the detection list and reorders whole-frame blocks, but every frame keeps its frame id and camera. v2 visits frames in ascending id, so it passed while still depending on photo order.
+- **True test:** `bench/order_invariance.py` moves photo `p` to frame id `sigma[p]` and permutes `intrinsics/extrinsics/depth/depth_conf/world_points*` with it (detection ids stay tied to the photo). `tests/test_photo_order_invariance.py` runs 12 random permutations per scene, 4 synthetic scenes (15 objects, 6 views, box noise 0.03 / 0.15 / 0.4 of object size, `make_scene`), for v1, v2, sync, v3 and v3+sync, plus a check that the harness catches the old behaviour.
+- **Measured before the fix** (4 scenes x 10 permutations per noise level; "changed" = partition differs from identity order):
+  - v1, v3 (threshold): 0/40 changed at every noise level.
+  - v2: 0/40 at noise 0.03, 38/40 at 0.15 (count range 3), 38/40 at 0.4 (count range 4); worst Rand index 0.988.
+  - sync: 0/40, 19/40 (range 1), 0/40. v3 + sync: 34/40, 34/40, 33/40 changed (count range 0, Rand index down to 0.94).
+  - Cause: v2 builds tracks greedily in frame-id order; the spectral rounding in `synchronize` assigns views in sorted view-id order.
+- **Decision: fix, do not narrow the claim.** New `countonce/merge/order.py` orders frames by camera centre (frame id only breaks exact ties). v2 visits frames in that order, `SyncAssociator` sorts detections and passes the rank as the view id, and `V3Associator(synchronize=True)` does the same. No global refinement was added: a canonical visit order makes the result a function of the photos, which is what the invariance claim needs. It does not make the greedy result optimal; quality vs the old order was not re-benchmarked on Fuji (a GPU/benchmark re-run is needed for that).
+- **After the fix:** 0 changed partitions and count range 0 for all five associators, all scenes, all permutations. Scope: synthetic scenes with finite-precision cameras; exact ties in camera centre (duplicated cameras) fall back to frame id and are not invariant.
+- Plain v3 and v1 needed no change. Defaults and published numbers for v1 and v3 are unchanged; v2/sync outputs can differ from before on scenes where the frame-id order mattered.

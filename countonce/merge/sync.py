@@ -21,6 +21,7 @@ from scipy.optimize import linear_sum_assignment
 from countonce.merge.appearance import FeatureExtractor, cosine_sim
 from countonce.merge.base import ClusterResult
 from countonce.merge.match import V2Associator, V2Config, _det_center_scale, _size, _Views
+from countonce.merge.order import frame_rank
 from countonce.types import Frame, LiftedDetection, MatchEvidence, Recon
 
 
@@ -167,7 +168,8 @@ class SyncAssociator:
             raise ValueError("SyncAssociator needs the Recon for projection")
         res = ClusterResult(instances=[])
         ok: list[LiftedDetection] = []
-        for ld in sorted(lifted, key=lambda m: (m.det.frame_id, m.det.id)):
+        rank = frame_rank({m.det.frame_id for m in lifted}, recon, self.frame_to_view)
+        for ld in sorted(lifted, key=lambda m: (rank(m.det.frame_id), m.det.id)):
             if ld.ok:
                 ok.append(ld)
             else:
@@ -179,7 +181,7 @@ class SyncAssociator:
         geo = _Views(recon, frames, self.frame_to_view)
         feats = self._v2._features(ok, frames)
         mat = self.pairwise_matrix(ok, geo, feats)
-        labels = synchronize(mat, [ld.det.frame_id for ld in ok], self.config)
+        labels = synchronize(mat, [rank(ld.det.frame_id) for ld in ok], self.config)
 
         groups: dict[int, list[int]] = {}
         for i, lab in enumerate(labels):

@@ -17,6 +17,7 @@ import numpy as np
 from countonce.match.instances import form_instances
 from countonce.match.model import DetInputs, load_checkpoint, mask_inputs
 from countonce.merge.base import ClusterResult
+from countonce.merge.order import frame_rank
 from countonce.merge.sync import SyncConfig
 from countonce.merge.sync import synchronize as spectral_sync
 from countonce.types import Detection, Frame, Instance, LiftedDetection, MatchEvidence, Recon
@@ -143,7 +144,16 @@ class V3Associator:
 
         res = ClusterResult(instances=[])
         ok: list[LiftedDetection] = []
-        for ld in lifted:
+        # With synchronization the spectral rounding visits views in order, so visit them in a
+        # camera-derived order, not upload order (M4). Plain thresholding is already invariant.
+        rank = (
+            frame_rank({m.det.frame_id for m in lifted}, recon, self.frame_to_view)
+            if (self.synchronize and recon is not None)
+            else None
+        )
+        for ld in (
+            sorted(lifted, key=lambda m: (rank(m.det.frame_id), m.det.id)) if rank else lifted
+        ):
             if ld.ok:
                 ok.append(ld)
             else:
@@ -165,7 +175,8 @@ class V3Associator:
             probs = self.model.match_probs(inputs).cpu().numpy()
         self.model.train(was_training)
         if self.synchronize:
-            labels = spectral_sync(probs, inputs.view.tolist(), SyncConfig())
+            views = [rank(m.det.frame_id) for m in ok] if rank else inputs.view.tolist()
+            labels = spectral_sync(probs, views, SyncConfig())
         else:
             labels = form_instances(probs, inputs.view, self.threshold)
 
