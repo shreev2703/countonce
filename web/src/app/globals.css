@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens (docs/PLAN.md 17.10). One accent, neutrals, status colours, a 4 px spacing
+ * scale, radius/shadow scales; light and dark themes come from the same variables.
+ * Status colours are never the only signal: each status also has its own outline style and
+ * label (see components/ui/status-badge.tsx).
+ */
+:root {
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.2 0.01 260);
+  --muted: oklch(0.96 0.005 260);
+  --muted-foreground: oklch(0.45 0.01 260);
+  --border: oklch(0.9 0.005 260);
+  --card: oklch(1 0 0);
+  --accent: oklch(0.5 0.17 255);
+  --accent-foreground: oklch(0.99 0 0);
+  --ring: oklch(0.5 0.17 255);
+  --status-new: oklch(0.45 0.13 150);
+  --status-duplicate: oklch(0.45 0.14 70);
+  --status-rejected: oklch(0.45 0.17 25);
+  --shadow-sm: 0 1px 2px oklch(0.2 0.01 260 / 0.08);
+  --shadow-md: 0 4px 12px oklch(0.2 0.01 260 / 0.12);
+  color-scheme: light;
+}
+
+.dark {
+  --background: oklch(0.16 0.01 260);
+  --foreground: oklch(0.96 0 0);
+  --muted: oklch(0.22 0.01 260);
+  --muted-foreground: oklch(0.72 0.01 260);
+  --border: oklch(0.3 0.01 260);
+  --card: oklch(0.2 0.01 260);
+  --accent: oklch(0.72 0.14 255);
+  --accent-foreground: oklch(0.16 0.01 260);
+  --ring: oklch(0.72 0.14 255);
+  --status-new: oklch(0.75 0.14 150);
+  --status-duplicate: oklch(0.8 0.13 80);
+  --status-rejected: oklch(0.72 0.16 25);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px oklch(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: oklch(0.16 0.01 260);
+    --foreground: oklch(0.96 0 0);
+    --muted: oklch(0.22 0.01 260);
+    --muted-foreground: oklch(0.72 0.01 260);
+    --border: oklch(0.3 0.01 260);
+    --card: oklch(0.2 0.01 260);
+    --accent: oklch(0.72 0.14 255);
+    --accent-foreground: oklch(0.16 0.01 260);
+    --ring: oklch(0.72 0.14 255);
+    --status-new: oklch(0.75 0.14 150);
+    --status-duplicate: oklch(0.8 0.13 80);
+    --status-rejected: oklch(0.72 0.16 25);
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+    --shadow-md: 0 4px 12px oklch(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --color-status-new: var(--status-new);
+  --color-status-duplicate: var(--status-duplicate);
+  --color-status-rejected: var(--status-rejected);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --spacing: 4px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --text-count: 4.5rem;
+  --text-count--line-height: 1;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 1rem; /* 16 px+ body */
+  line-height: 1.6;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,9 @@
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
+
+const config = [
+  ...nextCoreWebVitals,
+  ...nextTypescript,
+  { ignores: [".next/**", "node_modules/**", "src/lib/api/schema.gen.ts", "playwright-report/**", "test-results/**"] },
+];
+export default config;

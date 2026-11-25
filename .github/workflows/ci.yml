@@ -77,7 +77,7 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
-      # web/ is scaffolded by a later task (PLAN 0.2 M12); until then the job passes as a no-op
+      # the job is a no-op while web/package.json is absent
       - id: detect
         working-directory: .
         run: |
@@ -108,3 +108,9 @@ jobs:
       - name: Build
         if: steps.detect.outputs.present == 'true'
         run: npm run build
+      - name: Install Playwright browser
+        if: steps.detect.outputs.present == 'true'
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end and accessibility (Playwright + axe)
+        if: steps.detect.outputs.present == 'true'
+        run: npm run test:e2e

@@ -771,3 +771,11 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - `scripts/ingest_captures.py` re-encodes pixels to JPEG (q95, orientation applied, long side <= 2048, no EXIF/ICC) and renames to `img_NNN.jpg`; original filenames are not kept (they can carry dates). HEIC is rejected with a message rather than adding a plugin dependency.
 - Hand counts are required (`--counts A B [C]`, or `hand_counts` in the scene list); two must agree. A count of 0 needs `--zero` (and `--zero` needs count 0), so zero scenes are deliberate. `gt.json` adds `prompt`, `physical_scene`, `zero_target`, `hand_counts`, `count_definition`, per-image sha256; extra keys are ignored by `bench.sweep`.
 - Template `configs/capture_scenes.template.yaml` lists 20 scenes (16 positive across tiers, 4 zero-target); PLAN asks for 20-30, so add more as places are found. Video is not ingested.
+
+## M12 web scaffold (2026-11-25)
+- Scaffolded `web/` by hand (not `create-next-app`/`shadcn init`, both interactive): Next 16, React 19, Tailwind v4 (tokens in `globals.css` via `@theme`), shadcn-style `Button`/`Card` with `components.json` so `shadcn add` works later. TypeScript pinned to 5.x (7.x is too new for the Next toolchain).
+- `scripts/export_openapi.py` writes `web/openapi.json`; `npm run gen:api` makes `schema.gen.ts`. Committed both; `tests/test_export_openapi.py` fails when the spec is stale.
+- Backend fix found by type generation: `/health` was one `api_route(GET, HEAD)` giving duplicate operation IDs; now `GET` documented, `HEAD` hidden from the schema.
+- Zod schemas (`web/src/lib/schemas/result.ts`) are strict and upgrade 1.0 -> 1.1 like the backend; Vitest reads the backend's `tests/fixtures/schemas/v*` so versions cannot drift unnoticed.
+- CI `web` job now also runs Playwright (+ axe, desktop and phone projects). Not yet run on hosted CI.
+- Not done (later tasks): Lighthouse CI, the "no `TODO: fill from results` outside empty states" build check, charts, auth, upload client.
