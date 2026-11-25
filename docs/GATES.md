@@ -253,3 +253,7 @@ so `scripts/render_mockups.py` skips; open the HTML files directly or install pl
 ## 2026-11-24: Fuji Core step 2 not run (step 1 left no frozen config)
 - `configs/fuji_core.yaml` does not exist: step 1 (thresholds from Tree09-11) is still `[!]` and stopped partway (`runs/fuji_core/tune.log`). Running the test trees (Tree01-08) without frozen thresholds would tune on the test split, so no GPU run was started. Step 2 stays `[ ]` and needs re-queueing once step 1 commits the config.
 - Done meanwhile: the runner now takes `--config` (default `configs/fuji_core.yaml`, required for `--split test`), records its hash, and skips finished (tree, side, k, method) slices. See `docs/DEVIATIONS.md`.
+
+## 2026-11-24: Fuji Core report re-run not possible (no Fuji rows)
+- `results/bench.csv` does not exist and `configs/fuji_core.yaml` is still missing, so step 2 (test-split runs) never produced rows. `python -m bench.fuji_report` and `bench.figures` would write only TODO cells, and `make_all` rejects an empty CSV. Nothing was filled; the DEVIATIONS "assoc_f1 is not filled" TODO stays.
+- Unblock: finish step 1 (commit the frozen config), run step 2 on Tree01-08, then re-queue this task. The task stays `[ ]` in `TASKS_OVERNIGHT.md`.
