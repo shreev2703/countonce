@@ -492,7 +492,7 @@ def create_app(
         return out
 
     # -- health ---------------------------------------------------------------------------
-    @app.get("/health")
+    @app.api_route("/health", methods=["GET", "HEAD"])
     def health() -> dict[str, Any]:
         cutoff = store.clock() - worker_online_s
         workers = store._query(
