@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>History · CountOnce mockup</title>
+<link rel="stylesheet" href="style.css">
+<script src="theme.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="upload.html">CountOnce</a>
+  <nav aria-label="Main"><ul>
+    <li><a href="upload.html">New count</a></li>
+    <li><a href="progress.html">Progress</a></li>
+    <li><a href="results.html">Results</a></li>
+    <li><a href="history.html" aria-current="page">History</a></li>
+    <li><a href="states.html">States</a></li>
+  </ul></nav>
+  <button class="theme-btn" id="theme-toggle" type="button">Theme: auto</button>
+</header>
+<main id="main">
+<p class="placeholder-note"><span class="badge mock">MOCKUP</span> Static design mockup. Every number, name and date on this page is a placeholder example, not a real result.</p>
+<h1>History</h1>
+<div class="btn-row" style="margin-bottom:1rem"><a class="btn" href="upload.html">New count</a></div>
+<table class="stack">
+  <caption class="hint" style="text-align:left">All rows are placeholder examples.</caption>
+  <thead><tr><th>What</th><th>Count</th><th>Range</th><th>Date</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+    <tr><td data-label="What">apples, Row 4</td><td data-label="Count">47</td><td data-label="Range">44–51</td><td data-label="Date">2000-01-03</td><td data-label="Status"><span class="status">Done</span></td><td><a href="results.html">Open</a></td></tr>
+    <tr><td data-label="What">apples, Row 4</td><td data-label="Count">–</td><td data-label="Range">–</td><td data-label="Date">2000-01-02</td><td data-label="Status"><span class="status">Running: detecting</span></td><td><a href="progress.html">Open</a></td></tr>
+    <tr><td data-label="What">pears</td><td data-label="Count">–</td><td data-label="Range">–</td><td data-label="Date">2000-01-01</td><td data-label="Status"><span class="status">Failed: video codec</span></td><td><a href="states.html#error-codec">Details</a></td></tr>
+  </tbody>
+</table>
+</main>
+</body>
+</html>

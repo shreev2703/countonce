@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Progress · CountOnce mockup</title>
+<link rel="stylesheet" href="style.css">
+<script src="theme.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="upload.html">CountOnce</a>
+  <nav aria-label="Main"><ul>
+    <li><a href="upload.html">New count</a></li>
+    <li><a href="progress.html" aria-current="page">Progress</a></li>
+    <li><a href="results.html">Results</a></li>
+    <li><a href="history.html">History</a></li>
+    <li><a href="states.html">States</a></li>
+  </ul></nav>
+  <button class="theme-btn" id="theme-toggle" type="button">Theme: auto</button>
+</header>
+<main id="main">
+<p class="placeholder-note"><span class="badge mock">MOCKUP</span> Static design mockup. Every number, name and date on this page is a placeholder example, not a real result.</p>
+<h1>Counting apples…</h1>
+<div class="banner" role="status">Processing paused: no worker is online. Your job is saved and will start when a worker comes back. You can close this page.</div>
+<section class="card" aria-labelledby="st">
+  <h2 id="st">Stages <span class="badge mock">example times</span></h2>
+  <div class="bar" role="progressbar" aria-label="Overall progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="20"><span style="width:20%"></span></div>
+  <p class="hint">Elapsed: 00:42 (example). Stage 2 of 6.</p>
+  <ol class="stages">
+    <li><span class="state">Done</span> Queued <span class="t">00:03</span></li>
+    <li class="current" aria-current="step"><span class="state">In progress</span> Extracting frames <span class="t">00:39</span></li>
+    <li><span class="state">Waiting</span> Detecting <span class="t">–</span></li>
+    <li><span class="state">Waiting</span> Reconstructing in 3D <span class="t">–</span></li>
+    <li><span class="state">Waiting</span> Matching across photos <span class="t">–</span></li>
+    <li><span class="state">Waiting</span> Done <span class="t">–</span></li>
+  </ol>
+  <div class="btn-row">
+    <a class="btn secondary" href="history.html">Back to history</a>
+    <button class="btn danger" type="button">Cancel and delete</button>
+  </div>
+</section>
+<p class="hint">Updates arrive live; if the connection drops, this page reconnects and catches up.</p>
+</main>
+</body>
+</html>

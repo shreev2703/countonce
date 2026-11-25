@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>States · CountOnce mockup</title>
+<link rel="stylesheet" href="style.css">
+<script src="theme.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="upload.html">CountOnce</a>
+  <nav aria-label="Main"><ul>
+    <li><a href="upload.html">New count</a></li>
+    <li><a href="progress.html">Progress</a></li>
+    <li><a href="results.html">Results</a></li>
+    <li><a href="history.html">History</a></li>
+    <li><a href="states.html" aria-current="page">States</a></li>
+  </ul></nav>
+  <button class="theme-btn" id="theme-toggle" type="button">Theme: auto</button>
+</header>
+<main id="main">
+<p class="placeholder-note"><span class="badge mock">MOCKUP</span> Static design mockup. Every number, name and date on this page is a placeholder example, not a real result.</p>
+<h1>Empty, loading and error states</h1>
+<section class="state-demo" id="empty"><h2>Empty history</h2><div class="card"><p><b>No counts yet.</b></p><p>Add photos or a short video and say what to count. Your first result will appear here.</p><a class="btn" href="upload.html">New count</a></div></section>
+<section class="state-demo" id="loading"><h2>Loading results</h2><div class="card" role="status" aria-live="polite"><p><b>Loading your result…</b></p><div class="skeleton" style="width:60%"></div><div class="skeleton" style="width:90%"></div><div class="skeleton" style="width:40%"></div></div></section>
+<section class="state-demo" id="error-codec"><h2>Error: unsupported video codec</h2><div class="banner error" role="alert"><b>ERR_UNSUPPORTED_CODEC</b><br>Your video uses a codec we can't read. Export it as MP4/H.264.</div><div class="btn-row"><a class="btn" href="upload.html">Upload again</a><a class="btn secondary" href="history.html">Back to history</a></div></section>
+<section class="state-demo" id="error-few"><h2>Error: too few frames</h2><div class="banner error" role="alert"><b>ERR_TOO_FEW_FRAMES</b><br>Not enough usable frames. Capture more photos or a longer video with overlap.</div><div class="btn-row"><a class="btn" href="upload.html">Upload again</a><a class="btn secondary" href="history.html">Back to history</a></div></section>
+<section class="state-demo" id="error-overlap"><h2>Error: no overlap</h2><div class="banner error" role="alert"><b>ERR_NO_OVERLAP</b><br>The views do not overlap. Capture the scene so neighbouring views share content.</div><div class="btn-row"><a class="btn" href="upload.html">Upload again</a><a class="btn secondary" href="history.html">Back to history</a></div></section>
+<section class="state-demo" id="error-large"><h2>Error: file too large</h2><div class="banner error" role="alert"><b>ERR_FILE_TOO_LARGE</b><br>The file exceeds the size, resolution or duration limit. Trim the video or downscale the photos and upload again.</div><div class="btn-row"><a class="btn" href="upload.html">Upload again</a><a class="btn secondary" href="history.html">Back to history</a></div></section>
+<section class="state-demo" id="error-oom"><h2>Error: GPU out of memory (retried automatically)</h2><div class="banner error" role="alert"><b>ERR_GPU_OOM</b><br>The GPU ran out of memory even after freeing the cache, using smaller chunks and lowering the resolution. Use fewer or shorter frames (lower max_frames or fps), close other GPU programs, or retry later.</div><div class="btn-row"><a class="btn" href="upload.html">Upload again</a><a class="btn secondary" href="history.html">Back to history</a></div></section>
+<section class="state-demo" id="error-link"><h2>Error: merge refused</h2><div class="banner error" role="alert"><b>ERR_CANNOT_LINK</b><br>Those detections appear in the same photo, so they must be different objects and cannot be merged.</div><div class="btn-row"><a class="btn" href="upload.html">Upload again</a><a class="btn secondary" href="history.html">Back to history</a></div></section>
+<section class="state-demo" id="offline"><h2>No worker online</h2><div class="banner" role="status">Processing paused: no worker is online. Your job is saved and will start when a worker comes back.</div></section>
+</main>
+</body>
+</html>

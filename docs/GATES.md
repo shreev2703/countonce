@@ -216,3 +216,9 @@ R2 bucket, then `dvc remote add -d r2 s3://<bucket>/dvc`, set the endpoint URL a
   API spend, captures, hand counts, identity labels, interviews, the professor meeting, the pilot, the human baseline study, the demo video and the paper venue.
   Also still yours from earlier audits: whether to commit `uv.lock` and the orchestrator scripts.
 - **After this batch:** the remaining PLAN.md work needs your approval (frontend), accounts (deploys, Postgres/R2 hosting), gated weights or data, or Docker.
+
+## Mockup approval (PLAN §17) — human gate, open
+
+Static mockups are in `docs/mockups/` (upload, progress, results, history, states) with an approval checklist in `docs/mockups/README.md`.
+**Shreev must approve (or request changes) before any `frontend/` code starts.** No screenshots yet: `playwright` is not installed,
+so `scripts/render_mockups.py` skips; open the HTML files directly or install playwright and rerun.

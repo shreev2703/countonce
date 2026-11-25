@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Results · CountOnce mockup</title>
+<link rel="stylesheet" href="style.css">
+<script src="theme.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="upload.html">CountOnce</a>
+  <nav aria-label="Main"><ul>
+    <li><a href="upload.html">New count</a></li>
+    <li><a href="progress.html">Progress</a></li>
+    <li><a href="results.html" aria-current="page">Results</a></li>
+    <li><a href="history.html">History</a></li>
+    <li><a href="states.html">States</a></li>
+  </ul></nav>
+  <button class="theme-btn" id="theme-toggle" type="button">Theme: auto</button>
+</header>
+<main id="main">
+<p class="placeholder-note"><span class="badge mock">MOCKUP</span> Static design mockup. Every number, name and date on this page is a placeholder example, not a real result.</p>
+<h1>Results</h1>
+<section class="count-card" aria-labelledby="cc">
+  <div class="big" id="cc">47</div>
+  <div class="what">apples</div>
+  <div class="range">Likely between <b>44</b> and <b>51</b></div>
+  <div class="meta">Example numbers only. 90% range from a placeholder method.</div>
+</section>
+
+<section aria-labelledby="w">
+  <h2 id="w">Things to know</h2>
+  <div class="warn"><b>Warning: low overlap (example)</b>Photos 5 and 6 share little content. Retake with a step between shots to tighten the range.</div>
+  <div class="warn"><b>Warning: 2 objects rejected (example)</b>Two detections were outside the target scene and were left out.</div>
+</section>
+
+<div class="grid-2">
+  <section class="card" aria-labelledby="v">
+    <h2 id="v">3D view</h2>
+    <div class="viewer" role="img" aria-label="3D viewer placeholder with numbered markers 1 to 4">
+      <span>3D viewer placeholder (point cloud with markers)</span>
+      <span class="pt" style="left:12%;top:20%">1</span>
+      <span class="pt" style="left:70%;top:30%">2</span>
+      <span class="pt dup" style="left:40%;top:65%">3</span>
+      <span class="pt rej" style="left:82%;top:72%">4</span>
+    </div>
+    <div class="btn-row" style="margin-top:.75rem">
+      <button class="btn secondary" type="button">Reset view</button>
+    </div>
+    <p class="hint">Select a marker to highlight it in the photos, and the reverse.</p>
+  </section>
+
+  <section class="card" aria-labelledby="c">
+    <h2 id="c">Fix a marker</h2>
+    <p class="hint">Marker 3 selected (example). Corrections help improve counts.</p>
+    <div class="btn-row">
+      <button class="btn secondary" type="button">Split: two objects merged</button>
+      <button class="btn secondary" type="button">Merge: missed duplicate</button>
+      <button class="btn secondary" type="button">Reject: not an apple</button>
+    </div>
+    <p class="hint">Merging detections from the same photo is not allowed, since they must be different objects.</p>
+  </section>
+</div>
+
+<section class="card" aria-labelledby="p">
+  <h2 id="p">Photos</h2>
+  <ul class="legend" aria-label="Overlay legend">
+    <li><span class="badge new">NEW</span> counted for the first time</li>
+    <li><span class="badge dup">DUPLICATE</span> already counted in another photo</li>
+    <li><span class="badge rej">REJECTED</span> left out</li>
+  </ul>
+  <div class="strip">
+    <figure class="photo"><div class="frame"><img src="assets/photo-1.svg" alt="Placeholder photo 1 with two marked apples">
+      <span class="box new" style="left:18%;top:28%;width:16%;height:22%"><span>NEW #1</span></span>
+      <span class="box new" style="left:42%;top:52%;width:16%;height:22%"><span>NEW #2</span></span></div>
+      <figcaption>Photo 1 · 2 new</figcaption></figure>
+    <figure class="photo"><div class="frame"><img src="assets/photo-2.svg" alt="Placeholder photo 2 with one new and one duplicate apple">
+      <span class="box dup" style="left:20%;top:30%;width:16%;height:22%"><span>DUPLICATE of #1</span></span>
+      <span class="box new" style="left:62%;top:26%;width:16%;height:22%"><span>NEW #3</span></span></div>
+      <figcaption>Photo 2 · 1 new, 1 duplicate</figcaption></figure>
+    <figure class="photo"><div class="frame"><img src="assets/photo-3.svg" alt="Placeholder photo 3 with one rejected object">
+      <span class="box rej" style="left:68%;top:56%;width:16%;height:22%"><span>REJECTED: outside scene</span></span></div>
+      <figcaption>Photo 3 · 1 rejected</figcaption></figure>
+  </div>
+</section>
+
+<div class="grid-2">
+  <section class="card" aria-labelledby="f">
+    <h2 id="f">Is this right?</h2>
+    <form onsubmit="return false">
+      <fieldset><legend>Your verdict</legend>
+        <label><input type="radio" name="v" checked> Looks right</label>
+        <label><input type="radio" name="v"> Off by about…</label>
+      </fieldset>
+      <div class="field"><label for="off">Your count</label><input id="off" type="number" min="0" placeholder="e.g. 50"></div>
+      <div class="field"><label for="cm">Comment (optional)</label><textarea id="cm" rows="2"></textarea></div>
+      <button class="btn" type="submit">Send feedback</button>
+    </form>
+  </section>
+  <section class="card" aria-labelledby="d">
+    <h2 id="d">Download and share</h2>
+    <div class="btn-row">
+      <button class="btn secondary" type="button">Report (HTML)</button>
+      <button class="btn secondary" type="button">Report (PDF)</button>
+      <button class="btn secondary" type="button">Data (CSV)</button>
+    </div>
+    <div class="field" style="margin-top:1rem">
+      <label for="share">Read-only share link</label>
+      <input id="share" type="text" readonly value="https://example.invalid/share/EXAMPLE-TOKEN">
+      <p class="hint">Anyone with the link can view this result. You can revoke it at any time.</p>
+    </div>
+    <div class="btn-row">
+      <button class="btn secondary" type="button">Copy link</button>
+      <button class="btn danger" type="button">Revoke link</button>
+      <button class="btn danger" type="button">Delete this count</button>
+    </div>
+  </section>
+</div>
+</main>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New count · CountOnce mockup</title>
+<link rel="stylesheet" href="style.css">
+<script src="theme.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="upload.html">CountOnce</a>
+  <nav aria-label="Main"><ul>
+    <li><a href="upload.html" aria-current="page">New count</a></li>
+    <li><a href="progress.html">Progress</a></li>
+    <li><a href="results.html">Results</a></li>
+    <li><a href="history.html">History</a></li>
+    <li><a href="states.html">States</a></li>
+  </ul></nav>
+  <button class="theme-btn" id="theme-toggle" type="button">Theme: auto</button>
+</header>
+<main id="main">
+<p class="placeholder-note"><span class="badge mock">MOCKUP</span> Static design mockup. Every number, name and date on this page is a placeholder example, not a real result.</p>
+<h1>New count</h1>
+<p>Add photos or a short video, say what to count, and we will give you a number with a range.</p>
+<form onsubmit="return false">
+  <div class="field">
+    <label for="files">Photos or video</label>
+    <div class="drop">
+      <strong>Drag photos or a video here</strong>
+      <p class="hint">or choose files from your device</p>
+      <input id="files" name="files" type="file" multiple accept="image/jpeg,image/png,image/heic,video/mp4,video/quicktime" aria-describedby="limits">
+    </div>
+    <ul class="limits hint" id="limits">
+      <li>Up to 60 images, or one video up to 60 seconds and 200 MB.</li>
+      <li>Accepted: JPG, PNG, HEIC, MP4, MOV.</li>
+      <li>Overlap helps: each photo should share content with the one before it.</li>
+    </ul>
+  </div>
+
+  <section class="card" aria-labelledby="pf">
+    <h2 id="pf">Pre-flight check <span class="badge mock">example</span></h2>
+    <p class="hint">Checked on your device before anything is uploaded. Example tips:</p>
+    <ul class="tips">
+      <li><b>Blurry:</b> Photo 4 is blurry, retake it.</li>
+      <li><b>Duplicates:</b> Photos 2, 3 and 7 are nearly identical. Keep one, or move a step between shots.</li>
+      <li><b>Coverage:</b> Only 3 usable views. Add more photos from different angles.</li>
+    </ul>
+  </section>
+
+  <div class="field">
+    <label for="prompt">What should we count?</label>
+    <input id="prompt" name="prompt" type="text" placeholder="e.g. apples" aria-describedby="prompt-hint">
+    <p class="hint" id="prompt-hint">One kind of object, in plain words.</p>
+  </div>
+
+  <details class="field">
+    <summary>Optional: show us one example</summary>
+    <p class="hint">Draw a box around a single object in your first photo. It helps with unusual items.</p>
+    <div class="viewer" role="img" aria-label="Exemplar box drawing area, placeholder">Example box area (drawn on your first photo)</div>
+  </details>
+
+  <section class="card" aria-labelledby="priv">
+    <h2 id="priv">Privacy</h2>
+    <p>Your uploads are private by default. Location data (EXIF/GPS) is removed when we receive a file. Uploads are deleted after 30 days, or immediately if you delete them. We never train on your photos unless you opt in.</p>
+  </section>
+
+  <div class="btn-row">
+    <button class="btn" type="submit">Start counting</button>
+    <a class="btn secondary" href="history.html">Cancel</a>
+  </div>
+</form>
+</main>
+</body>
+</html>

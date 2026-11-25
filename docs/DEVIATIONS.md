@@ -551,6 +551,13 @@ One entry per decision: date, what the plan said, what was done, why.
 - `submit` stores the context on `queue_draft`; `trace_context` is carried through retries. A malformed stored context starts a fresh trace.
 - SQLite upgrades old DBs in place with `ALTER TABLE`; Postgres uses Alembic `0002` (not run against a real Postgres here; the contract cases skip without `COUNTONCE_PG_URL`).
 
+## HTTP API load test (overnight)
+- No k6/Locust: `countonce/loadtest_api.py` (`countonce loadtest-api`, `scripts/api_load_test.py`, `configs/loadtest_api.yaml`) uses `httpx` clients and uvicorn in-process, and reuses `countonce.loadtest._fake_worker` (no failures or crashes injected: this test is about the HTTP layer).
+- The clients run in the server's process (asyncio in the main thread, uvicorn in a thread), so they share the GIL. Absolute latencies are pessimistic and only comparable between runs on the same machine. A separate-process client pool would be more faithful but adds nothing the relative comparison needs.
+- `results/api_load.csv` is long format: one row per route plus an `ALL` row per run, with git sha, dirty flag and host info repeated. Gitignored like the other `results/` CSVs; `scripts/make_serving_report.py` renders the numbers into `docs/SERVING.md`.
+- "Double-queued" = jobs seen with more than one fresh submit response + job rows beyond the expected count + repeated worker completions + jobs claimed more than once.
+- Fixed an API bug the test found: `POST /jobs/{id}/submit` always answered `idempotent_replay: false` for the request that read the job as `draft`, so two concurrent duplicate submits could both claim to be fresh. The queue state was always right (`queue_draft` is one transition). The route now uses `queue_draft`'s return value. The smoke test asserts exactly one replay per duplicate create and per duplicate submit.
+
 ## First real-VGGT GPU run and baseline profile (overnight)
 - GPU env is `.venv-gpu/` (gitignored): cu128 torch 2.11, `-e .[recon]`, and `vggt` from the public GitHub repo (the `recon` extra does not pull vggt, so it is installed separately; not added to pyproject).
 - `countonce run` requires `--prompt`; used `red ball`. The default dedup kept 1 of the 5 views, so the correctness check ran on 1 frame (count 5, same as the fixture backbone).
@@ -558,3 +565,8 @@ One entry per decision: date, what the plan said, what was done, why.
 - "Memory guard on" = the default OOM ladder in `countonce/oom.py`. No OOM occurred, so no rung was recorded; the OOM-ladder table stays TODO.
 - No separate `lift` timing exists in the pipeline; it is inside `associate`, which PROFILE.md says.
 - Recon time is non-monotonic in frame count; recorded as measured, cause not isolated.
+
+## Static UI mockups (PLAN §17)
+- Pages share `style.css` and a ~20-line `theme.js` (light/dark/auto toggle, localStorage); no framework or build step. Status colours (green/blue/gray) are kept beyond the single accent because §17 requires them, and always carry a text label plus a distinct outline style.
+- `playwright` is not installed, so no PNG screenshots were generated; `scripts/render_mockups.py` skips with a message. Nothing was added to dependencies.
+- Photo placeholders are local SVGs, and the share link uses `example.invalid`. All numbers are labelled placeholders.
