@@ -293,7 +293,9 @@ def score_study(
     abs_err = np.array([np.mean(per_scene_err[s]) for s in scenes])
     pooled["mae"] = _summ(stats.bootstrap_ci(abs_err, n_boot=n_boot, seed=seed))
     pooled["within_10pct"] = _summ(
-        stats.bootstrap_ci([np.mean(per_scene_ok[s]) for s in scenes], n_boot=n_boot, seed=seed)
+        stats.bootstrap_ci(
+            [float(np.mean(per_scene_ok[s])) for s in scenes], n_boot=n_boot, seed=seed
+        )
     )
     pooled["mean_seconds_per_scene"] = float(np.mean([pooled_sec[s] for s in scenes]))
     out["pooled"] = pooled

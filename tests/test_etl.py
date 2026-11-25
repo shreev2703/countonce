@@ -7,11 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from countonce.cli import main
-from countonce.jobs.store import SqliteJobStore
-from countonce.monitor import admin, drift, etl
-
+pytest.importorskip("pyarrow")  # countonce.monitor.etl imports it at module level
 pytest.importorskip("duckdb")
+
+from countonce.cli import main  # noqa: E402
+from countonce.jobs.store import SqliteJobStore  # noqa: E402
+from countonce.monitor import admin, drift, etl  # noqa: E402
 
 DAY1 = datetime(2026, 3, 1, 12, 0, tzinfo=UTC).timestamp()
 MIDNIGHT = datetime(2026, 3, 2, 0, 0, tzinfo=UTC).timestamp()

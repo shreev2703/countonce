@@ -749,3 +749,14 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - Resumed the `fuji_core_v2` test sweep with the frozen `configs/fuji_core.yaml`: 320 rows, 0 failed. A second writer started by mistake appended 2 duplicate rows; both were removed (identical preds). Report, figures and README table regenerated from `results/bench.csv`; the hand-written reading lives in `docs/RESULTS_FUJI_ANALYSIS.md` and is appended by `bench.fuji_report`.
 - Failure-source experiment on Fuji (`scripts/run_failure_sources_fuji.py`, k=10): Fuji has no depth or own poses, so oracle geometry is not available; only oracle-detections and full conditions ran. Assumed apple radius 4 cm for oracle boxes (not measured). Predictions there are not ROI-filtered, so MAE is not comparable with the Core table.
 - Not done: baselines beyond Sum/Max/Median (sync, COLMAP), sweep axes other than k, v3 on Fuji (G4 evidence), own captures.
+
+## M9: CI consistency (overnight, 2026-11-25)
+- **`db` extra:** added to `pyproject.toml` (`sqlalchemy`, `alembic`, `psycopg[binary]`) rather than dropped from `ci.yml`, because `countonce/db` and `jobs/pg_store.py` import them. `uv.lock` updated.
+- **mypy runs only in `full-cpu`.** Without torch/sqlalchemy/httpx the results differ (unfollowed imports become `Any`), so one config cannot be clean in both jobs. `tests/test_mypy_clean.py` skips when those are absent.
+- The `test` job now installs `.[dev,test,data]`; with `.[dev]` alone, collection failed and several tests errored on matplotlib/pyarrow.
+- `full-cpu` test step uses `shell: bash` (pipefail): before, `| tee` hid a pytest failure.
+- GPU modules that skip at import time now say `gpu test: ...` so `scripts/check_skips.py` accepts them.
+- `tests/test_fuji_core.py` resume test was stale since `fuji_core_v2` (protocol belongs in the job config); it also failed locally.
+- `huggingface_hub.*` added to mypy `ignore_missing_imports`; `warn_unused_ignores` off for the two HF model modules.
+- **Node job:** `web/` does not exist yet (M12). The `web` job detects `web/package.json` and is a no-op without it. It expects a committed `package-lock.json` and runs `npm ci`, lint/typecheck/test if present, then build. M12 may need to add Playwright browser install.
+- **Verification is a dry run, not `act`** (no Docker here): the `run:` commands in fresh Python 3.11 venvs on a copy of the tracked files, with embedded Postgres (`pgserver`) in place of the `postgres:16` service. The GitHub Actions themselves and the `web` job did not execute. `golden-gpu.yml` (self-hosted) was not run.

@@ -72,9 +72,9 @@ def synchronize(
                 if cost[r, k] <= cfg.assign_threshold:
                     labels[idx[r]] = k
                     centers[k] = centers[k] + unit[idx[r]]
-                    taken.add(r)
-        for r, i in enumerate(idx):
-            if r not in taken:
+                    taken.add(int(r))
+        for row, i in enumerate(idx):
+            if row not in taken:
                 labels[i] = len(centers)
                 centers.append(unit[i].copy())
     next_label = len(centers)

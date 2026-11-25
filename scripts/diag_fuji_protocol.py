@@ -38,7 +38,10 @@ def main(specs: list[str]) -> None:
     base = base_config(score_threshold=0.2, merge_k=0.3)
     import torch
 
-    torch.cuda.get_device_capability = lambda *a, **k: (12, 0)  # CUDA hidden: pick bf16 as in the run
+    torch.cuda.get_device_capability = lambda *a, **k: (
+        12,
+        0,
+    )  # CUDA hidden: pick bf16 as in the run
     det, rec = build_detector(base), build_reconstructor(base)
 
     def _no_infer(*a: object, **k: object) -> None:
@@ -98,13 +101,19 @@ def main(specs: list[str]) -> None:
                     if vis[v].size:
                         ax.scatter(*uv[vis[v]].T, s=10, c="lime", label="visible")
                     if dd:
-                        ax.scatter(*np.array([d.uv for d in dd]).T, s=14, c="c", marker="x", label="det")
+                        ax.scatter(
+                            *np.array([d.uv for d in dd]).T, s=14, c="c", marker="x", label="det"
+                        )
                     ax.legend(fontsize=6)
                     fig.savefig(DIAG / f"{tree}_{side}_k{k}_v{v}.png", dpi=110)
                     plt.close(fig)
             except Exception as e:  # plotting is best-effort
                 info["plot_error"] = str(e)
-        ixyz = sim.apply(np.array([i.xyz for i in res.instances])) if res.instances else np.zeros((0, 3))
+        ixyz = (
+            sim.apply(np.array([i.xyz for i in res.instances]))
+            if res.instances
+            else np.zeros((0, 3))
+        )
         info["roi_box"] = [box[0].tolist(), box[1].tolist()]
         info["inst_in_roi"] = int(fc.in_roi(ixyz, box).sum())
         if len(ixyz):
@@ -112,18 +121,50 @@ def main(specs: list[str]) -> None:
         info["gt_min_max"] = [scene.gt_xyz.min(0).tolist(), scene.gt_xyz.max(0).tolist()]
         info["cam_centres_gt"] = c_gt.tolist()
         info["cam_centres_aligned"] = c_al.tolist()
-        rr = np.concatenate([
-            np.array([project_points(scene.gt_xyz[[i]], recon.intrinsics[v], ext[v])[1][0]
-                      / max(float(depth[v, int(project_points(scene.gt_xyz[[i]], recon.intrinsics[v], ext[v])[0][0, 1]),
-                                       int(project_points(scene.gt_xyz[[i]], recon.intrinsics[v], ext[v])[0][0, 0])]), 1e-9)
-                      for i in np.flatnonzero(tmask) if _in(scene.gt_xyz[i], recon, ext, v, w, h)])
-            for v in range(recon.n_views)
-        ] or [np.zeros(0)])
-        info["tree_z_over_surf_p10_p50"] = [float(np.percentile(rr, 10)), float(np.median(rr))] if len(rr) else None
+        rr = np.concatenate(
+            [
+                np.array(
+                    [
+                        project_points(scene.gt_xyz[[i]], recon.intrinsics[v], ext[v])[1][0]
+                        / max(
+                            float(
+                                depth[
+                                    v,
+                                    int(
+                                        project_points(
+                                            scene.gt_xyz[[i]], recon.intrinsics[v], ext[v]
+                                        )[0][0, 1]
+                                    ),
+                                    int(
+                                        project_points(
+                                            scene.gt_xyz[[i]], recon.intrinsics[v], ext[v]
+                                        )[0][0, 0]
+                                    ),
+                                ]
+                            ),
+                            1e-9,
+                        )
+                        for i in np.flatnonzero(tmask)
+                        if _in(scene.gt_xyz[i], recon, ext, v, w, h)
+                    ]
+                )
+                for v in range(recon.n_views)
+            ]
+            or [np.zeros(0)]
+        )
+        info["tree_z_over_surf_p10_p50"] = (
+            [float(np.percentile(rr, 10)), float(np.median(rr))] if len(rr) else None
+        )
         info["cam_span_m"] = float(np.linalg.norm(np.ptp(c_gt, axis=0)))
         (DIAG / f"{tree}_{side}_k{k}.json").write_text(json.dumps(info, indent=1))
-        print(spec, {a: b for a, b in info.items() if a not in ("views", "cam_y", "cam_centres_gt", "cam_centres_aligned")})
-
+        print(
+            spec,
+            {
+                a: b
+                for a, b in info.items()
+                if a not in ("views", "cam_y", "cam_centres_gt", "cam_centres_aligned")
+            },
+        )
 
 
 if __name__ == "__main__":

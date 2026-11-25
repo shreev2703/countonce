@@ -17,7 +17,7 @@ pytestmark = pytest.mark.gpu
 
 torch = pytest.importorskip("torch")
 if importlib.util.find_spec("vggt") is None or importlib.util.find_spec("transformers") is None:
-    pytest.skip("vggt/transformers not installed", allow_module_level=True)
+    pytest.skip("gpu test: vggt/transformers not installed", allow_module_level=True)
 
 SCENE = Path(__file__).resolve().parents[1] / "examples" / "tiny_scene"
 

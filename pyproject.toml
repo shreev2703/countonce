@@ -45,6 +45,11 @@ api = [
 storage = [
     "boto3>=1.34",
 ]
+db = [
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.1",
+]
 dvc = [
     "dvc>=3.0",
 ]
@@ -121,8 +126,13 @@ files = ["countonce", "bench", "synth"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*", "sam2.*", "opentelemetry.*", "uvicorn.*", "pyarrow.*", "alembic.*", "psycopg.*", "duckdb.*", "boto3.*", "botocore.*", "moto.*"]
+module = ["torch.*", "vggt.*", "pycolmap.*", "matplotlib.*", "groundingdino.*", "transformers.*", "cv2.*", "mcp.*", "anthropic.*", "openai.*", "google.*", "sam2.*", "opentelemetry.*", "uvicorn.*", "pyarrow.*", "alembic.*", "psycopg.*", "duckdb.*", "boto3.*", "botocore.*", "moto.*", "huggingface_hub.*"]
 ignore_missing_imports = true
+
+# HF model code: whether these ignores are needed depends on which optional extras are installed.
+[[tool.mypy.overrides]]
+module = ["countonce.detect.groundingdino", "countonce.detect.masks"]
+warn_unused_ignores = false
 
 [tool.vercel]
 entrypoint = "countonce.api.asgi:app"

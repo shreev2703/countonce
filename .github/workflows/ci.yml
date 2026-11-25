@@ -14,13 +14,11 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install
-        run: pip install -e .[dev]
+        run: pip install -e .[dev,test,data]
       - name: Lint
         run: ruff check .
       - name: Format check
         run: ruff format --check .
-      - name: Type check
-        run: mypy
       - name: Test
         run: pytest -m "not slow and not gpu"
       - name: Golden gate (CPU synthetic geometry)
@@ -63,9 +61,50 @@ jobs:
         run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Install
         run: pip install -e .[dev,test,data,api,db,dvc]
+      # type checking needs every typed dependency installed, so it runs here only
       - name: Type check
         run: mypy
       - name: Test (report skips)
+        shell: bash  # explicit bash enables pipefail, so a pytest failure is not hidden by tee
         run: pytest -m "not slow and not gpu" -rs | tee pytest-full-cpu.log
       - name: Fail on unexpected skips
         run: python scripts/check_skips.py pytest-full-cpu.log
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      # web/ is scaffolded by a later task (PLAN 0.2 M12); until then the job passes as a no-op
+      - id: detect
+        working-directory: .
+        run: |
+          if [ -f web/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::web/package.json not found; skipping Node steps"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.detect.outputs.present == 'true'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        if: steps.detect.outputs.present == 'true'
+        run: npm ci
+      - name: Lint
+        if: steps.detect.outputs.present == 'true'
+        run: npm run lint --if-present
+      - name: Type check
+        if: steps.detect.outputs.present == 'true'
+        run: npm run typecheck --if-present
+      - name: Test
+        if: steps.detect.outputs.present == 'true'
+        run: npm test --if-present
+      - name: Build
+        if: steps.detect.outputs.present == 'true'
+        run: npm run build

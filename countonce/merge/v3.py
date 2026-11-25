@@ -70,7 +70,7 @@ def build_inputs(
 
     geo = _Views(recon, frames, frame_to_view)
     scale = float(recon.scene_scale) if recon.scene_scale and recon.scene_scale > 0 else 1.0
-    xyz = np.stack([ld.xyz for ld in ok]).astype(float)
+    xyz = np.stack([np.asarray(ld.xyz) for ld in ok]).astype(float)
     shift = xyz.mean(axis=0)
     rot, trans = recon.extrinsics[:, :, :3], recon.extrinsics[:, :, 3]
     centres = -np.einsum("nji,nj->ni", rot, trans)
@@ -180,7 +180,7 @@ class V3Associator:
         else:
             labels = form_instances(probs, inputs.view, self.threshold)
 
-        xyz = np.stack([ld.xyz for ld in ok]).astype(float)
+        xyz = np.stack([np.asarray(ld.xyz) for ld in ok]).astype(float)
         known = [ld.size for ld in ok if ld.size is not None and ld.size > 0]
         fallback = float(np.median(known)) if known else 1.0
         sizes = np.array([ld.size if ld.size else fallback for ld in ok], dtype=float)

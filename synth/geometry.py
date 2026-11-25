@@ -68,7 +68,7 @@ class Episode:
     def pair_targets(self, a: int, b: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """GT targets: (match matrix, unmatched-in-a mask, unmatched-in-b mask)."""
         m = self.match_matrix(a, b)
-        return m, ~m.any(axis=1), ~m.any(axis=0)
+        return m, np.asarray(~m.any(axis=1)), np.asarray(~m.any(axis=0))
 
     def true_count(self) -> int:
         return int(np.unique(self.identity[self.identity >= 0]).size)

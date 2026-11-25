@@ -338,9 +338,9 @@ def test_script_arg_parsing() -> None:
 # --- resume / skip logic (fake runner, CPU) -------------------------------------------------
 
 
-def _fake_jobs(split: str = "test") -> list:
+def _fake_jobs(split: str = "test", **extra) -> list:
     return [
-        fc.make_job(t, split, s, k, m, {"host": "h"})
+        fc.make_job(t, split, s, k, m, {"host": "h", **extra})
         for k in (3, 5)
         for t in ("Tree01", "Tree02")
         for s in ("east", "west")
@@ -387,13 +387,15 @@ def test_skip_ignores_other_split_host_and_errors(tmp_path):
     from bench.runner import RunOutput, run_jobs
 
     csv_path = tmp_path / "bench.csv"
-    proto = {"protocol": fc.PROTOCOL}
-    run_jobs(iter(_fake_jobs("val")[:3]), lambda j: RunOutput(pred=0.0, gt=0.0), csv_path, proto)
+    proto = {"protocol": fc.PROTOCOL}  # lives in the job config, as in run_fuji_core.py
+    run_jobs(
+        iter(_fake_jobs("val", **proto)[:3]), lambda j: RunOutput(pred=0.0, gt=0.0), csv_path, {}
+    )
 
     def boom(job):
         raise RuntimeError("x")
 
-    run_jobs(iter(_fake_jobs("test")[:2]), boom, csv_path, proto)
+    run_jobs(iter(_fake_jobs("test", **proto)[:2]), boom, csv_path, {})
     assert fc.done_slices(csv_path, "test") == set()  # error rows are retried
     assert len(fc.done_slices(csv_path, "val")) == 3
     old = tmp_path / "old.csv"  # rows of an older scoring protocol are not finished work

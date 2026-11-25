@@ -13,7 +13,7 @@ pytestmark = pytest.mark.gpu
 
 torch = pytest.importorskip("torch")
 if importlib.util.find_spec("transformers") is None:
-    pytest.skip("transformers is not installed", allow_module_level=True)
+    pytest.skip("gpu test: transformers is not installed", allow_module_level=True)
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "fuji_sfm"
 

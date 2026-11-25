@@ -121,7 +121,7 @@ def register_to_gt(src: np.ndarray, gt: np.ndarray, inlier_m: float = 0.08) -> R
     for r in cands:
         sim = Sim3(s0, r, gt.mean(0) - s0 * r @ src.mean(0))
         for gate in (1.0, 0.6, 0.4, 0.25, 0.15, 0.1, 0.08, 0.08, 0.08, 0.08):
-            d, j = tree.query(sim.apply(src))
+            d, j = map(np.asarray, tree.query(sim.apply(src)))
             keep = d < gate
             if keep.sum() < 8:
                 break
@@ -129,7 +129,7 @@ def register_to_gt(src: np.ndarray, gt: np.ndarray, inlier_m: float = 0.08) -> R
                 sim = umeyama(src[keep], gt[j[keep]])
             except ValueError:
                 break
-        d, _ = tree.query(sim.apply(src))
+        d, _ = map(np.asarray, tree.query(sim.apply(src)))
         n_in = int((d < inlier_m).sum())
         med = float(np.median(d[d < inlier_m])) if n_in else float("inf")
         reg = Registration(sim, n_in, len(src), n_in / len(src), med, cand)
@@ -383,7 +383,8 @@ PROTOCOL = "fuji_core_v2"
 
 def _row_protocol(r: dict[str, Any]) -> str | None:
     try:
-        return json.loads(r.get("config_json") or "{}").get("protocol")
+        protocol: str | None = json.loads(r.get("config_json") or "{}").get("protocol")
+        return protocol
     except ValueError:
         return None
 
@@ -396,7 +397,9 @@ def done_slices(csv_path: Path, split: str) -> set[tuple[str, str, int, str]]:
     return {
         (r["scene_id"], r["sample"], int(r["n_views"]), r["method"])
         for r in read_rows(csv_path)
-        if r["status"] == "ok" and r["split"] == split and r["n_views"]
+        if r["status"] == "ok"
+        and r["split"] == split
+        and r["n_views"]
         and _row_protocol(r) == PROTOCOL
     }
 
@@ -531,13 +534,13 @@ def register_dense(
                 continue
             sim = Sim3(s0, r, dst.mean(0) - s0 * r @ src.mean(0))
             for _ in range(iters):
-                d, j = tree.query(sim.apply(src))
+                d, j = map(np.asarray, tree.query(sim.apply(src)))
                 keep = d <= np.quantile(d, trim)
                 try:
                     sim = umeyama(src[keep], dst[j[keep]])
                 except ValueError:
                     break
-            d, _ = tree.query(sim.apply(src))
+            d, _ = map(np.asarray, tree.query(sim.apply(src)))
             n_in = int((d < 0.05).sum())
             med = float(np.median(d[d < 0.05])) if n_in else float("inf")
             reg = Registration(sim, n_in, len(src), n_in / len(src), med, cand)

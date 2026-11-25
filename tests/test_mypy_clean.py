@@ -12,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.mark.skipif(importlib.util.find_spec("mypy") is None, reason="mypy not installed")
 def test_mypy_countonce_clean() -> None:
+    # Results are only meaningful with the typed optional deps present (CI full-cpu).
+    for mod in ("torch", "sqlalchemy", "httpx"):
+        pytest.importorskip(mod)
     proc = subprocess.run(
         [sys.executable, "-m", "mypy", "countonce"],
         cwd=ROOT,

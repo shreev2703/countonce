@@ -86,7 +86,7 @@ class SceneBundle:
     real_identity: dict[str, str | None] | None = None  # None: nearest projected GT within match_px
     surface_offset: float = 1.0
     match_px: float = 20.0
-    lift_kw: LiftKwargs = field(default_factory=dict)
+    lift_kw: LiftKwargs = field(default_factory=lambda: LiftKwargs())
 
     @property
     def true_count(self) -> int:
@@ -271,17 +271,17 @@ def attribution(summary: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     by = {(r["condition"], r["method"]): r["mae"] for r in summary}
     out = []
     for m in sorted({r["method"] for r in summary}):
-        get = lambda c, m=m: by.get((c, m), float("nan"))  # noqa: E731
-        full = get("full")
+        mae = {c: by.get((c, m), float("nan")) for c in CONDITIONS}
+        full = mae["full"]
         out.append(
             {
                 "method": m,
                 "mae_full": full,
-                "mae_oracle_det__est_geom": get("oracle_det__est_geom"),
-                "mae_real_det__oracle_geom": get("real_det__oracle_geom"),
-                "mae_oracle_both": get("oracle_det__oracle_geom"),
-                "removed_by_oracle_detections": full - get("oracle_det__est_geom"),
-                "removed_by_oracle_geometry": full - get("real_det__oracle_geom"),
+                "mae_oracle_det__est_geom": mae["oracle_det__est_geom"],
+                "mae_real_det__oracle_geom": mae["real_det__oracle_geom"],
+                "mae_oracle_both": mae["oracle_det__oracle_geom"],
+                "removed_by_oracle_detections": full - mae["oracle_det__est_geom"],
+                "removed_by_oracle_geometry": full - mae["real_det__oracle_geom"],
             }
         )
     return out

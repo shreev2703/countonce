@@ -51,8 +51,9 @@ def test_decomposition_identity_and_fp_counted():
     data = [_prep(s, True) for s in (3, 4, 5)]
     rows = evaluate(make_v1({"k": 0.5}), data)
     for r in rows:
-        assert r["duplicates"] + r["false_positives"] - r["missed"] - r["wrong_merges"] == (
-            r["signed_err"]
+        assert (
+            r["duplicates"] + r["false_positives"] - r["missed"] - r["wrong_merges"]
+            == (r["signed_err"])
         )
     assert "injected_fp_dets" in summarize_counts(rows)
 

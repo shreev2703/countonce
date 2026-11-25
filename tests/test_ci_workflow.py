@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -75,3 +76,12 @@ def test_full_cpu_has_postgres_service_and_url() -> None:
     assert job["services"]["postgres"]["image"] == "postgres:16"
     assert "--health-cmd" in job["services"]["postgres"]["options"]
     assert job["env"]["COUNTONCE_PG_URL"].startswith("postgresql://")
+
+
+def test_every_extra_ci_installs_is_defined() -> None:
+    wf = (ROOT / ".github/workflows/ci.yml").read_text()
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    defined = set(pyproject["project"]["optional-dependencies"])
+    for group in re.findall(r"pip install -e \.\[([^\]]+)\]", wf):
+        missing = {e.strip() for e in group.split(",")} - defined
+        assert not missing, f"ci.yml installs undefined extras: {sorted(missing)}"

@@ -1,5 +1,7 @@
 """True photo-order invariance (PLAN 0.2 M4): permute photo-to-frame assignment AND cameras."""
 
+from functools import cache
+
 import numpy as np
 import pytest
 
@@ -12,13 +14,20 @@ from countonce.merge.v3 import V3Associator
 from tests.test_associators import make_scene
 
 N_PERMS = 12
-V3_MODEL = make_model(width=32, layers=2).eval()  # architecture invariance; weights irrelevant
+
+
+@cache
+def _v3_model():
+    pytest.importorskip("torch")  # only the v3 cases need it
+    return make_model(width=32, layers=2).eval()  # architecture invariance; weights irrelevant
+
+
 FACTORIES = {
     "v1": lambda: V1Associator(k=0.5),
     "v2": V2Associator,
     "sync": SyncAssociator,
-    "v3": lambda: V3Associator(model=V3_MODEL),
-    "v3_sync": lambda: V3Associator(model=V3_MODEL, synchronize=True),
+    "v3": lambda: V3Associator(model=_v3_model()),
+    "v3_sync": lambda: V3Associator(model=_v3_model(), synchronize=True),
 }
 SCENES = [(0, 0.03), (1, 0.15), (2, 0.4), (3, 0.15)]
 
