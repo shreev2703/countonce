@@ -148,10 +148,13 @@ def build_detector(config: Config) -> Detector:
         from countonce.detect.groundingdino import GroundingDinoDetector
 
         return GroundingDinoDetector(**config.detector_options)
-    if config.detector == "countgd":
-        from countonce.detect.countgd import CountGDDetector
+    if config.detector in ("countgd", "countgdpp"):
+        from countonce.errors import PlannedComponentError
 
-        return CountGDDetector(**config.detector_options)
+        raise PlannedComponentError(
+            f"detector {config.detector!r} is planned, not implemented (weights are gated and the "
+            "forward pass is a stub); use 'gdino' (the default). See docs/STATUS.md."
+        )
     if config.detector == "color_blob":  # test backend only (docs/DEVIATIONS.md)
         from countonce.detect.color_blob import ColorBlobDetector
 

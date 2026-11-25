@@ -5,8 +5,10 @@
 Count objects in 3D from a few photos or a short video, without counting any object twice.
 
 > **Status: draft.** The pipeline and benchmark harness are implemented and tested on synthetic
-> and toy inputs. No real-data benchmark has been run yet, so every number, figure and table cell
-> below is `TODO: fill from results`. Nothing here is a measured result.
+> and toy inputs. The real path (HF GroundingDINO, VGGT, v1/v2) has been run on the tiny scene and
+> on the Fuji-SfM Core test trees; see `docs/STATUS.md` for exactly what each component has and
+> has not been tested on. Figures and table cells without a measured value stay
+> `TODO: fill from results`.
 
 ![Headline figure: MAPE vs. number of views](TODO: fill from results)
 
@@ -79,8 +81,9 @@ A longer walk-through is in [docs/EXPLAINER.md](docs/EXPLAINER.md). The full pla
   is. It is not a statistical guarantee that the true count lies inside it
   (`confidence_method="sensitivity"`).
 - Quality warnings and confidence scores are heuristics and are not calibrated.
-- Detector adapters for CountGD / GroundingDINO have not been run against real weights in this repo
-  yet; the CountGD forward pass is a stub until weights are available.
+- The default detector is HuggingFace GroundingDINO (text prompts only). CountGD and CountGD++ are
+  planned, not implemented: selecting them exits with an error. Per-component evidence is in
+  `docs/STATUS.md`, which wins if this README disagrees.
 
 ## Reproduce
 
@@ -95,7 +98,7 @@ countonce env --out results/env.json     # check Python / torch / CUDA / VRAM
 Count objects in a folder of photos or a video:
 
 ```bash
-countonce run --images path/to/photos --prompt "apple" --assoc v2 --out results/run1
+countonce run --images path/to/photos --prompt "apple" --assoc v2 --out results/run1   # defaults: gdino + vggt
 countonce run --video path/to/clip.mp4 --prompt "apple" --fps 2 --out results/run1
 ```
 
@@ -123,7 +126,7 @@ countonce run examples/tiny_scene --prompt "red sphere" --detector color_blob --
 These two backends exist only to exercise the CLI end to end (`tests/test_cli_e2e.py`); they are
 not real detection or reconstruction. Regenerate the scene with `python examples/tiny_scene/generate.py`.
 
-Flags: `--detector {countgd,gdino,countgdpp}`, `--backbone {vggt,vggt_omega,vggt_t3,colmap}`,
+Flags: `--detector {gdino,color_blob}` (`countgd` and `countgdpp` are planned and exit with an error), `--backbone {vggt,vggt_omega,vggt_t3,colmap}`,
 `--assoc {v1,v2,v3,sync}`, `--config file.yaml` (flags override the file). Not every choice has an
 implementation yet; unimplemented ones exit with an error.
 

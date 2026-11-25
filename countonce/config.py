@@ -24,7 +24,7 @@ IntervalMethodName = Literal["sensitivity", "conformal", "jackknife_plus"]
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    detector: DetectorName = "countgd"
+    detector: DetectorName = "gdino"
     backbone: BackboneName = "vggt"
     assoc: AssocName = "v1"
 

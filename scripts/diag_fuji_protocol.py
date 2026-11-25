@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """CPU diagnostic for the Fuji Core protocol (sixteenth audit): replays cached windows.
 
 Run from the repo root with ``CUDA_VISIBLE_DEVICES= PYTHONPATH=.:scripts .venv-gpu/bin/python
@@ -9,7 +10,6 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 
 import numpy as np
 from run_fuji_core import PROMPT, WORK, _window, base_config, load_recon
