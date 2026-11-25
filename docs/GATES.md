@@ -198,3 +198,21 @@ R2 bucket, then `dvc remote add -d r2 s3://<bucket>/dvc`, set the endpoint URL a
 
 ## Real CountGD fine-tune (Track D)
 - **Gate:** CountGD weights (and the real MinneApple/WGISD/Fuji-SfM downloads). The harness (`countonce finetune-detector`, `scripts/make_detector_adaptation_report.py`) is tested with a tiny fake torch detector only. Needs a human to fetch the weights and supply a module factory; layer names in `configs/finetune.yaml` are `TODO: verify`.
+
+## 2026-11-24: Thirteenth tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state: all 96 earlier overnight tasks are checked. In the countonce `.venv`, `pytest` gives 870 passed and 22 skipped (19 Postgres contract cases with no
+  `COUNTONCE_PG_URL`, plus mcp and pycolmap x2). `ruff check .`, `ruff format --check .` and `mypy` (109 files) are clean, and `git status` is clean.
+- **Bugs found and queued:** (1) the CI `full-cpu` job should fail, because `dvc` isn't installed there, so the DVC test skips outside the
+  `check_skips.py` allow-list. (2) `synth/shards.pack_shards` leaks an open tar handle and a partial shard on error, and 18 tests leak file handles.
+  (3) `bench/vlm/parse` reads "Confidence: 80%" as a count of 80 and "No apples are visible." as a parse failure instead of 0.
+- **The GPU is not human-gated:** this machine has an RTX 5070 Laptop GPU (8 GB) and the public `facebook/VGGT-1B` weights cached under `~/.cache/huggingface`.
+  So this batch queues the first real-VGGT run and baseline profile (color-blob detector, tiny scene, capped at 20 minutes, its own `.venv-gpu`, leaving
+  `~/vggtProject` untouched). Earlier audits listed "GPU runs" as yours. If you'd rather watch GPU runs yourself, delete that task before the orchestrator reaches it.
+- **Mockups:** the queued task only *produces* static mockups in `docs/mockups/`. **Your approval** is still required before any `frontend/` code, and the
+  frontend, 3D viewer and Google sign-in stay unqueued until you approve.
+- **Still yours (unchanged):** a real Postgres (Neon/Supabase) and R2 bucket and credentials, the DVC remote, deploys (Vercel/Render), the OTLP endpoint, HF uploads,
+  the LICENSE choice, Docker in WSL2 (Kubric, the worker image build), gated or large weights and datasets (CountGD/GroundingDINO/SAM, VGGT-Ω/VGG-T³/CountGD++,
+  Fuji-SfM, the video datasets, the crop datasets and their license checks), the v3 GPU training run at full scale, Triton and FP8/NVFP4 experiments, frontier-VLM
+  API spend, captures, hand counts, identity labels, interviews, the professor meeting, the pilot, the human baseline study, the demo video and the paper venue.
+  Also still yours from earlier audits: whether to commit `uv.lock` and the orchestrator scripts.
+- **After this batch:** the remaining PLAN.md work needs your approval (frontend), accounts (deploys, Postgres/R2 hosting), gated weights or data, or Docker.
