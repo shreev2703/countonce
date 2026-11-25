@@ -1,0 +1,24 @@
+# HTTP API load test (countonce loadtest-api / scripts/api_load_test.py). Fake workers, sqlite,
+# LocalBlobStore, uvicorn in-process. Results append to results/api_load.csv.
+n_clients: 16
+jobs_per_client: 5
+n_users: 8              # 2 clients share each user's rate limits
+n_workers: 4
+stage_latency_s: {ingest: 0.02, reconstruct: 0.1, detect: 0.05}
+follow: mixed           # poll | sse | mixed
+poll_s: 0.25
+duplicate_rate: 0.3     # jobs whose create and submit are each sent twice concurrently
+request_rate_limit: 300 # per user, all authenticated requests per window
+request_rate_window_s: 60
+submit_rate_limit: 30   # per user, job submits per window
+submit_rate_window_s: 60
+retry_after_cap_s: 1.0
+max_429_retries: 60
+upload_bytes: 12288
+chunk_bytes: 4096
+sse_poll_s: 0.1
+timeout_s: 180
+seed: 0
+work_dir: runs/loadtest_api
+results_csv: results/api_load.csv
+summary_json: results/api_load_summary.json

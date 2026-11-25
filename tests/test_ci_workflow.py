@@ -31,6 +31,7 @@ MODULE_EXTRAS: dict[str, tuple[str, ...]] = {
     "yaml": ("test",),
     "fastapi": ("api",),
     "httpx": ("api",),
+    "uvicorn": ("api",),
     "scipy": ("test",),
     "cv2": ("test",),
 }

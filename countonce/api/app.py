@@ -331,8 +331,9 @@ def create_app(
                     400, ErrorCode.ERR_INVALID_INPUT.value, "the job has no uploaded files",
                     "Upload at least one photo or video before submitting.",
                 )  # fmt: skip
-            store.queue_draft(job_id, tracing.current_traceparent())  # RateLimitError -> 429
-            replay = False
+            # RateLimitError -> 429. False means a concurrent duplicate submit won the
+            # draft -> queued transition, so this response is a replay (found by loadtest-api).
+            replay = not store.queue_draft(job_id, tracing.current_traceparent())
         else:
             replay = True  # queue_draft is a state transition: a retry never queues twice
         return {

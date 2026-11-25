@@ -319,6 +319,11 @@ def _parser() -> argparse.ArgumentParser:
     lt = sub.add_parser("loadtest", help="queue load test with fake workers (sqlite job store)")
     lt.add_argument("--config", type=Path, default=Path("configs/loadtest.yaml"))
 
+    lta = sub.add_parser(
+        "loadtest-api", help="HTTP API load test (uvicorn in-process, fake worker processes)"
+    )
+    lta.add_argument("--config", type=Path, default=Path("configs/loadtest_api.yaml"))
+
     cs = sub.add_parser("coldstart", help="time worker cold start (loads, warm p50/p95)")
     cs.add_argument("--model", action="append", default=[], metavar="NAME=PATH", help="weights")
     cs.add_argument("--weights-dir", type=Path, default=Path("/weights"))
@@ -563,6 +568,19 @@ def _serve_api(args: argparse.Namespace) -> int:
 
     uvicorn.run(app, host=args.host, port=args.port)
     return 0
+
+
+def _loadtest_api(args: argparse.Namespace) -> int:
+    from countonce.loadtest_api import ApiLoadConfig, format_summary, run_api_load
+
+    try:
+        cfg = ApiLoadConfig.from_yaml(args.config)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"countonce: error: {exc}", file=sys.stderr)
+        return 2
+    summary = run_api_load(cfg)
+    print(format_summary(summary))
+    return 0 if summary["reconciled"] else 1
 
 
 def _loadtest(args: argparse.Namespace) -> int:
@@ -1344,6 +1362,8 @@ def main(argv: list[str] | None = None) -> int:
         return _finetune_detector(args)
     if args.cmd == "loadtest":
         return _loadtest(args)
+    if args.cmd == "loadtest-api":
+        return _loadtest_api(args)
     if args.cmd == "etl":
         return _etl(args)
     if args.cmd == "admin-stats":

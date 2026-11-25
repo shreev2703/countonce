@@ -29,6 +29,92 @@ def latest_run(csv_path: Path) -> list[dict[str, str]]:
     return [r for r in rows if r["run_id"] == last]
 
 
+def api_runs(csv_path: Path, last: int = 5) -> list[list[dict[str, str]]]:
+    """The last ``last`` runs of ``results/api_load.csv``, grouped by run id."""
+    if not csv_path.exists():
+        return []
+    with csv_path.open(newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    order: list[str] = []
+    for r in rows:
+        if r["run_id"] not in order:
+            order.append(r["run_id"])
+    return [[r for r in rows if r["run_id"] == rid] for rid in order[-last:]]
+
+
+def _ms(v: str | None) -> str:
+    return TODO if v in (None, "") else f"{float(v):.0f}"
+
+
+def render_api(runs: list[list[dict[str, str]]]) -> list[str]:
+    out = [
+        "## HTTP API load test",
+        "",
+        "`countonce loadtest-api` (config `configs/loadtest_api.yaml`) starts the real FastAPI app "
+        "with uvicorn in-process on a free localhost port, over a temporary sqlite store and "
+        "`LocalBlobStore`, plus fake worker processes. Concurrent `httpx` clients each run "
+        "create, chunked upload, submit, poll or SSE-follow, and fetch the result, with "
+        "idempotency keys and deliberate duplicate create/submit pairs sent concurrently. A 429 "
+        "is retried after `min(Retry-After, retry_after_cap_s)`. The clients share the process "
+        "(and the GIL) with the server and the sqlite file with the workers, and the API key "
+        "check is a 100k-iteration PBKDF2 per request, so absolute latencies are pessimistic and "
+        "only comparable between runs on the same machine. Rows append to `results/api_load.csv` "
+        "(gitignored; git sha and host recorded).",
+        "",
+    ]
+    if not runs:
+        return out + [f"{TODO}", ""]
+    latest = runs[-1]
+    first = latest[0]
+    out += [
+        f"Host of the latest run: `{first['host']}`, {first['cpu_count']} CPUs, Python "
+        f"{first['python']}, git `{first['git_sha']}`"
+        f"{' (dirty tree)' if first['git_dirty'] == 'True' else ''}.",
+        "",
+        "| Run | Clients / users / workers | Request limit per user | Requests | req/s | 429s | "
+        "p50 / p95 / p99 (ms) | Jobs done | Lost | Double-queued |",
+        "|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for run in runs:
+        a = next(r for r in run if r["route"] == "ALL")
+        lim = f"{a['request_rate_limit'] or 'off'} per {float(a['request_rate_window_s']):.0f} s"
+        out.append(
+            f"| `{a['run_id']}` | {a['n_clients']} / {a['n_users']} / {a['n_workers']} | {lim} | "
+            f"{a['requests']} | {float(a['throughput_rps']):.1f} | {a['n_429']} | "
+            f"{_ms(a['p50_ms'])} / {_ms(a['p95_ms'])} / {_ms(a['p99_ms'])} | "
+            f"{a['jobs_done']} of {a['jobs_expected']} | {a['jobs_lost']} | {a['double_queued']} |"
+        )
+    out += [
+        "",
+        f"Per route, run `{first['run_id']}` (latency per request attempt, including 429s; the "
+        "SSE row is time to the first event):",
+        "",
+        "| Route | Requests | p50 (ms) | p95 (ms) | p99 (ms) | Status counts |",
+        "|---|---|---|---|---|---|",
+    ]
+    for r in latest:
+        if r["route"] != "ALL" and int(r["requests"]):
+            out.append(
+                f"| `{r['route']}` | {r['requests']} | {_ms(r['p50_ms'])} | {_ms(r['p95_ms'])} | "
+                f"{_ms(r['p99_ms'])} | `{r['status_counts']}` |"
+            )
+    a = next(r for r in latest if r["route"] == "ALL")
+    out += [
+        "",
+        f"Duplicate retries in run `{first['run_id']}`: {first['dup_pairs']} jobs had their create "
+        f"and submit sent twice at once; {first['dup_replays']} of those responses were flagged "
+        "`idempotent_replay`, and no job was queued twice (extra rows, repeated completions and "
+        f"re-attempts all zero; double-queued = {a['double_queued']}).",
+        "",
+        "Finding: the first runs showed some concurrent duplicate submits both answering "
+        "`idempotent_replay: false`. The database state was right (one `draft -> queued` "
+        "transition), only the response flag was wrong; the submit route now derives the flag "
+        "from `queue_draft`'s result.",
+        "",
+    ]
+    return out
+
+
 def load_rate(path: Path | None, kind: str) -> float | None:
     if path is None or not path.exists():
         return None
@@ -43,7 +129,11 @@ def _fmt(v: float | None, spec: str = ".3f") -> str:
     return TODO if v is None else format(v, spec)
 
 
-def render(rows: list[dict[str, str]], rate: float | None) -> str:
+def render(
+    rows: list[dict[str, str]],
+    rate: float | None,
+    api: list[list[dict[str, str]]] | None = None,
+) -> str:
     def pick(phase: str) -> list[dict[str, str]]:
         return [r for r in rows if r["phase"] == phase]
 
@@ -93,17 +183,19 @@ def render(rows: list[dict[str, str]], rate: float | None) -> str:
         f"{_fmt(cost, '.4f') if cost is not None else TODO} |",
         "",
     ]
+    out += render_api(api or [])
     return "\n".join(out)
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--csv", type=Path, default=Path("results/coldstart.csv"))
+    ap.add_argument("--api-csv", type=Path, default=Path("results/api_load.csv"))
     ap.add_argument("--cost", type=Path, default=Path("countonce/configs/cost.yaml"))
     ap.add_argument("--kind", default="cloud")
     ap.add_argument("--out", type=Path, default=Path("docs/SERVING.md"))
     a = ap.parse_args(argv)
-    text = render(latest_run(a.csv), load_rate(a.cost, a.kind))
+    text = render(latest_run(a.csv), load_rate(a.cost, a.kind), api_runs(a.api_csv))
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(text)
     print(f"wrote {a.out}")

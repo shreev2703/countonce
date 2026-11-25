@@ -192,6 +192,32 @@ def test_same_idempotency_key_queues_one_job(env: Env) -> None:
     assert other.json()["id"] != job_id
 
 
+def test_concurrent_duplicate_submit_is_reported_as_replay(env: Env) -> None:
+    """The route reads ``draft``, then a concurrent duplicate wins the draft -> queued transition.
+
+    ``queue_draft`` then returns False for the loser, which must answer ``idempotent_replay: true``
+    (it used to say false for both). Simulated deterministically by letting a "winner" call run
+    between the route's status read and its own ``queue_draft``.
+    """
+    c = env.client()
+    job_id = c.post("/jobs", headers=env.h, json={"prompt": "apples"}).json()["id"]
+    env.upload(c, job_id)
+    real = env.store.queue_draft
+    calls: list[bool] = []
+
+    def racing_queue_draft(jid: str, *a: object, **kw: object) -> bool:
+        if not calls:
+            assert real(jid, *a, **kw) is True  # the concurrent winner
+        calls.append(True)
+        return bool(real(jid, *a, **kw))  # the request under test lost the race
+
+    env.store.queue_draft = racing_queue_draft  # type: ignore[method-assign]
+    r = c.post(f"/jobs/{job_id}/submit", headers=env.h)
+    assert r.status_code == 200 and r.json()["status"] == "queued"
+    assert r.json()["idempotent_replay"] is True
+    assert env.store.counts()["queued"] == 1
+
+
 def test_sse_stream_reaches_done(env: Env) -> None:
     c = env.client()
     job_id = env.queued_job(c)

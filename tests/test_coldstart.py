@@ -100,7 +100,8 @@ def test_report_with_and_without_rows(tmp_path: Path) -> None:
     assert "| Model load | a | 2.000 |" in full
     assert "| 0.1000 | 0.1000 |" not in full  # latency table uses 3 decimals
     assert "| 3.6000 | 0.1000 |" in full  # 0.1 s * 1000 / 3600 * 3.6
-    assert "TODO" not in full.split("## Cost")[1].split("|---|---|")[1]
+    cost = full.split("## Cost")[1].split("\n## ")[0]  # later sections may keep their own TODOs
+    assert "TODO" not in cost.split("|---|---|")[1]
 
 
 def test_report_cli(tmp_path: Path) -> None:
