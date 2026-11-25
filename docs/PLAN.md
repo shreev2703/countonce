@@ -1,11 +1,11 @@
-# CountOnce: Complete Project Plan (v4.2)
+# CountOnce: Master Project Plan (v6.0)
 
 **Count anything in 3D from a few photos, without counting it twice.**
 
 | | |
 |---|---|
 | **Owner** | Shreev |
-| **Status** | Plan v4.2: full build spec, adding cycle-consistent matching, VLM baselines, conformal intervals, data engineering, reliability/observability, a user-correction flywheel and a credibility/showcase track (see Appendix A for what changed and why) |
+| **Status** | Master plan v6.0. **Start at §0** (what happens next, in order, and the definition of done). §28 is the audit behind it; §17 is the product spec. **Read §28 too:** a brutal audit of the repo as of 2026-11-25 and the recovery order. §17 is now the full product and frontend spec. Earlier changes are in Appendix A |
 | **Builds on** | `vggt-sparse-recon` (finished VGGT vs. COLMAP benchmark) and the CountGD++ paper project |
 | **Repo** | New repo `countonce` (code ported from `vggt-sparse-recon`; see §4.1) |
 | **Hardware** | Laptop with RTX 5070 GPU (8 or 12 GB VRAM, detected at runtime) and AMD Ryzen 9 CPU (core count and RAM detected at runtime); Windows + WSL2; optional pay-per-second cloud GPU |
@@ -15,6 +15,7 @@
 
 ## Table of contents
 
+0. Master execution plan (start here)
 1. Summary
 2. Background, related work and novelty
 3. Goals, scope tiers and success criteria
@@ -32,7 +33,7 @@
 15. Track H: Agent and developer integrations
 16. Track I: Open source and releases
 16B. Additional tracks: J Data engineering, K Reliability/observability/MLOps, L Correction flywheel, M Showcase
-17. UI and design requirements
+17. Product and frontend spec
 18. Testing strategy
 19. Phases, tasks and acceptance criteria
 20. Human tasks (things only Shreev can do)
@@ -43,8 +44,122 @@
 25. Timeline and weekly time budget
 26. Deliverables checklist and resume entries
 27. Glossary
+28. Brutal audit (2026-11-25) and recovery plan
 
 Appendix A: What changed in v4, v4.1 and v4.2, and why
+
+---
+
+## 0. Master execution plan (v6.0): how this project gets finished
+
+This section is the single source of truth for **what happens next, in what order, and when the project counts as done**. Every finding from the internal audit (§28) and the external review (§28.6b) maps to a task below (coverage matrix in §0.7). Agents run the `M` tasks from `TASKS_OVERNIGHT.md` in order; Shreev does the `H` tasks; the `P` tasks run after the photos exist.
+
+### 0.1 Ground rules for finishing
+1. **One reliable path first:** GroundingDINO (HF) → VGGT → v2 (or sync if it wins on validation). Everything else is labelled "planned" in `docs/STATUS.md`.
+2. **No new subsystems.** Only the tasks in this section. §28.4's recovery order still applies.
+3. **No placeholder numbers in the product.** Pages without real results show an honest empty state ("Benchmark in progress"), never `TODO` text or made-up examples.
+4. **Fuji-SfM images are never shown publicly** (CC BY-NC-SA: no redistribution of images or derived GT). Fuji numbers can appear in the benchmark; Fuji photos can't appear in demo mode or the README.
+5. **Design review moves after the build:** the agents build the frontend to §17 tonight; Shreev reviews it in the morning (H2) and requests changes as follow-up tasks. This replaces the "approve mockups before any frontend code" gate for this pass.
+6. **Agent files stay local-only:** `TASKS_OVERNIGHT.md`, `CLAUDE.md` and the orchestrator scripts keep working on the laptop but are untracked from the public repo (task M21), never moved, so the orchestrator doesn't break.
+
+### 0.2 Tonight: agent tasks (no photos needed), in order
+| ID | Task | Done when |
+|---|---|---|
+| **M1** | Make GroundingDINO (HF) the `Config` default; CountGD/CountGD++ marked "planned" with a clear error; write `docs/STATUS.md` (component × implemented / synthetic-tested / real-model-tested / held-out-real-benchmarked) | The README quickstart command works from a clean venv; README and STATUS never contradict each other |
+| **M2** | Debug the tiny-scene over-count (real detector + VGGT gives 7, truth 5): check per-frame duplicate boxes (add per-frame NMS), lifting region/background pixels, merge radius; check the "five views deduplicated to one" smoke-check note | Real path counts 5 on the tiny scene; GPU-marked regression test; root cause written in DEVIATIONS |
+| **M3** | Count-first metrics: signed bias, zero-scene false count, and the error decomposition (missed + duplicates + false positives − wrong merges = predicted − true) in `bench/metrics.py`, wired into reports and figures (§9.4) | Unit tests on toy inputs; reports lead with count metrics; F1 reported only as an explanation |
+| **M4** | True photo-order invariance test: permute photo-to-frame assignment and camera arrays (≥10 permutations); measure count and partition variation for v1/v2/sync/v3; fix v2 (global refinement) or narrow the claim | Test exists; result and decision in DEVIATIONS |
+| **M5** | Synthetic eval upgrade: add a finite noisy-depth variant (visibility check active), count injected false positives, tune v1/v2/sync on the synthetic validation split, re-run the v3 comparison; label it "component test" in `docs/RESULTS_V3_SYNTH.md` | Table regenerated with tuned baselines and count-first metrics |
+| **M6** | Controlled failure-source harness (§9.6): oracle detections + estimated geometry; real detections + oracle geometry; full pipeline; identical upstream inputs for every associator | Runs on the tiny scene and a synthetic fixture; ready for Fuji and own captures |
+| **M7** | Download Fuji-SfM (`scripts/download_fuji_sfm.sh`, research use under CC BY-NC-SA), confirm layout, close the loader TODOs; if the download fails, log it in GATES and continue | Loader passes on real files |
+| **M8** | Fuji-SfM Core run: freeze settings on validation trees, then run the Core sweep on the frozen test trees; keep failed rows; then the existing report task (`bench.fuji_report`, figures, failure analysis) and the M6 experiments on Fuji | `docs/RESULTS_FUJI.md` and the README Fuji table filled from `results/bench.csv`; gate G3 decided in GATES |
+| **M9** | Fix CI: the `db` extra (add it to `pyproject.toml` or drop it from `ci.yml`); green on `main` locally with `act` or a dry run; add a Node job for `web/` | CI config consistent; badge expected green after push |
+| **M10** | Read CountVid, DG-Net and OneScene-Bench in full (arXiv); rewrite `docs/RELATED_WORK.md` around the §2.4 hypothesis; remove unverified "does not do X" claims | No unverified claims left |
+| **M11** | Capture kit: `docs/CAPTURE_GUIDE.md` (one printable page: what to shoot, how, the ground-truth definition, the hand-count procedure), a `scripts/ingest_captures.py` that turns a phone folder into `data/scenes/<id>/{images/, gt.json}` with EXIF stripping, and a scene list template covering ≥3 zero-target scenes | Running the script on a test folder produces a valid scene |
+| **M12** | Frontend scaffold `web/`: Next.js App Router + TypeScript strict + Tailwind + shadcn/ui + react-three-fiber + TanStack Query; design tokens (§17.10); OpenAPI → TypeScript types and Zod `result.json` schemas by `schema_version`; Vitest + Playwright + axe set up | `npm run build` and tests pass |
+| **M13** | Demo exporter `scripts/build_demo.py`: runs the real pipeline on demo scenes and writes static assets (result, compact binary point cloud, markers, overlays, thumbnails, match evidence, provenance); starts with the tiny scene, labelled "synthetic test scene" | Assets validate against the Zod schemas; a CI check fails if versions don't match |
+| **M14** | Results experience (§17.5) on demo assets: count card, 3D viewer (LOD point cloud, numbered markers, camera frusta with fly-to, match lines, two-way highlighting, keyboard navigation), Photos / Explain / Warnings / Details tabs, phone layout | Works on the tiny-scene demo with no backend; Playwright test |
+| **M15** | Landing page and demo gallery (§17.2–17.4), with proof points as honest empty states until real numbers exist | Lighthouse ≥ 90 on performance, accessibility and best practices for `/` |
+| **M16** | Signed-in flow wired to the existing API: Google sign-in, `/new` (capture guide, camera input, browser pre-flight checks, resumable multipart upload, prompt + negative prompt + example box, idempotent submit), `/jobs/[id]` progress over SSE with polling fallback and the paused-worker banner, `/history`, share links `/s/[token]` with Open Graph images, corrections and feedback | Playwright end-to-end test against a mocked API and against a local API + fake worker |
+| **M17** | `/benchmark` (reads `results/*.csv` at build time; empty state when missing), `/how-it-works`, `/status`, `/about`, `/privacy` | Pages build; no `TODO` strings in production output (build check) |
+| **M18** | API fit for Vercel: move the API to its own Vercel project or path (`api.` or `/api`); make sure long work never runs in a serverless function (the worker does it); SSE works or falls back to polling; document env vars | Frontend talks to the deployed API; JSON root no longer the main link |
+| **M19** | Worker hardening for the pilot: laptop worker as a service script, heartbeat, typed errors + dead-letter, retention job; one command to start it | Local end-to-end: upload from the frontend → worker on GPU → result page |
+| **M20** | README front page rewrite (§28.6b): input photos, predicted vs. hand count, instance IDs across views, one measured table, one failure, one runnable command, link to the live demo and STATUS; Roadmap section below | No TODO tables on the front page |
+| **M21** | Repo hygiene (§28.5): Apache-2.0 license for code (weights and datasets keep their own); untrack `TASKS_OVERNIGHT.md`, `CLAUDE.md`, orchestrator scripts and handoff paths (`git rm --cached` + `.gitignore`, files stay local); remove personal paths from tracked files | `git ls-files` shows no agent files or personal paths |
+| **M22** | Final consistency pass: PLAN, STATUS, README, EXPLAINER and the site agree; EXPLAINER interview Q&A updated for M2–M8 findings | Checklist in §0.6 rows that don't need photos are ticked |
+
+**Honest expectation:** M1–M9 and M12–M15 are realistic overnight; M16–M22 may spill into a second night. The product shell will be finished before the photos; the product is only *finished* once P1–P5 put real results in it.
+
+### 0.3 Tomorrow: Shreev's tasks
+| ID | Task | Details |
+|---|---|---|
+| **H1** | **Capture day** | Follow `docs/CAPTURE_GUIDE.md` (M11). Target 20–30 static scenes: bike racks, chairs, shelf items, cars in a small lot, potted plants, bins/cones, fruit on a tree or vine if available, plus **≥3 scenes with none of the target object**. Per scene: a 30–60 s video on an arc + ~20 stills. Hand-count from the photos, twice. Ask permission on private property; avoid faces. |
+| **H2** | **Review the built frontend** | Open the deployed site on your phone and laptop; list changes; they become follow-up tasks |
+| **H3** | **Interviews (Phase 0)** | 3–5 people for the ag niche + 2 backup; questions in §20 |
+| **H4** | **Professor meeting** | Bring the §2.4 hypothesis, the Fuji results from M8 and the failure decomposition |
+| **H5** | **Accounts** | Vercel project for `web/`, Google OAuth client, R2 (or the free fallback in §14.7), Neon; put secrets only in the hosts' env settings |
+| **H6** | **Ownership study** | Read the core files in §28.4 Step 6, starting with whatever M2 changed |
+
+### 0.4 After the photos: agent tasks
+| ID | Task | Done when |
+|---|---|---|
+| **P1** | Ingest the captures (M11 script), validate every `gt.json`, split by physical scene into calibration/validation/test, freeze `bench/splits.json` | Splits frozen before any tuning |
+| **P2** | Core benchmark on own captures + the M6 failure-source experiments + zero-target false counts + order-invariance on real data | Results tables and figures filled from `results/bench.csv` |
+| **P3** | Fix the largest error source the decomposition shows (detection, geometry or association), re-run on validation only, then one final test run | Before/after on validation; one test-split run |
+| **P4** | Replace the tiny scene in demo mode with 6–10 own captures (M13 exporter); regenerate landing proof points from real results | Demo shows real scenes and real numbers |
+| **P5** | Fill README, EXPLAINER, `docs/RESULTS_*`, the LinkedIn/resume entries (§26) and the benchmark page from results | No `TODO: fill from results` left in Core docs |
+| **P6** | Then Strong tier in order: rendered synthetic data (Kubric/BlenderProc) → v3 retrain → real-data v3 evaluation; VLM baseline (free tiers only); conformal intervals once ≥15 real calibration scenes exist | Per §19 |
+
+### 0.5 Pilot (after P5)
+Recruit 3–10 users from H3 interviews; run 2–4 weeks with the laptop worker; `docs/PILOT.md` filled from the job store (§19 Phase 5).
+
+### 0.6 Definition of done ("project wrapped up")
+**Core done (required):**
+- [ ] One reliable path works from a clean install; STATUS table accurate
+- [ ] Tiny scene counts correctly with the real detector + VGGT
+- [ ] Fuji-SfM held-out results with CIs, error decomposition and gate G3 decided
+- [ ] 20–30 own scenes (≥3 zero-target) benchmarked with frozen splits
+- [ ] Failure-source experiments show where the remaining error comes from
+- [ ] Order-invariance measured on real data; the "unordered photos" claim matches the evidence
+- [ ] README front page with a real result, a real failure and a runnable command
+- [ ] Related work read in full; one tested hypothesis instead of a novelty claim
+- [ ] Repo hygiene done (license, no agent files or personal paths, green CI)
+
+**Product done (required):**
+- [ ] Live site: landing, demo gallery with real own-capture scenes, results experience with the 3D fly-to and "Explain this match", benchmark page with real numbers
+- [ ] Signed-in flow works end to end from a phone: upload → laptop GPU → result
+- [ ] Playwright, axe and Lighthouse checks pass; no placeholder text in production
+- [ ] 2-minute demo video
+
+**Strong and Moon:** upgrades after the above, in tier order (§3.1, §19).
+
+### 0.7 Coverage matrix (every finding → task)
+| Finding (source) | Task |
+|---|---|
+| Default detector is the CountGD stub (review #1) | M1 |
+| Real path counts 7 vs. 5 on the tiny scene (audit, review #5) | M2 |
+| "Five views deduplicated to one" smoke check (review #5) | M2 |
+| F1 isn't the product metric; count error and decomposition (review #2) | M3 |
+| F1 ignores unlabelled false positives (review #2) | M3, M5 |
+| NaN depth disables the visibility check in the synthetic test (review #3) | M5 |
+| v1/v2 compared with untuned defaults (review #3) | M5, M8 |
+| Failure-source experiments (review #3) | M6, P2 |
+| Photo-order invariance not really tested (review #4) | M4, P2 |
+| README vs. PROFILE contradiction; one status table (review #5) | M1, M22 |
+| CI `db` extra missing (review #5) | M9 |
+| Novelty ahead of the literature (review #6) | M10, §2.4 |
+| README front page is placeholders (review #7, audit §28.5) | M20, P5 |
+| Define the target count; 20–30 scenes incl. zero-target; split by scene (review "next steps") | M11, H1, P1 |
+| Freeze settings before testing; report failures (review "next steps") | M8, P1–P3 |
+| Publish evidence: configs, result rows, failure gallery, demo (review "next steps") | M8, M13, P4–P5 |
+| No real-data results (audit §28.1) | M7–M8, P1–P2 |
+| No frontend; JSON root URL (audit §28.2) | M12–M18 |
+| Scaffolding before Core; scope discipline (audit §28.3) | §0.1 rule 2 |
+| Code ownership in interviews (audit §28.4 Step 6) | H6, M22 |
+| License, agent files, personal paths (audit §28.5) | M21 |
+| Learned matcher only shown on synthetic geometry (audit, review #3) | M5 (honest label), P6 |
+| Product spec §17 (frontend) | M12–M17 |
+| $0 deployment (§14.7) | M18, H5 |
 
 ---
 
@@ -101,6 +216,8 @@ The related work shows that **video counting with de-duplication exists** (Count
 
 > **Open-vocabulary object counting from a few unordered RGB photos, with de-duplication in a 3D frame recovered by feed-forward reconstruction (no depth sensor, no SfM), and a multi-view learned association model trained on synthetic data that transfers to real orchards.**
 
+**Primary hypothesis (v5.1, tested before any novelty claim is made):** *geometry-aware association improves unique-object counting from sparse views compared with video tracking and with simpler geometric matching.* Read CountVid, DG-Net and OneScene-Bench in full before writing any "does not do X" sentence; until then `docs/RELATED_WORK.md` statements are labelled unverified.
+
 The experiments must show where this beats the closest work: few views, unordered photos, large viewpoint changes, no depth sensor. They must also report honestly where video tracking (CountVid) or sensor depth (DG-Net) wins.
 
 ---
@@ -149,6 +266,9 @@ Everything is labeled with a tier. **Core must be finished before Strong starts;
 6. **Stop at gates.** If a gate (§21) fails, write it up in `docs/GATES.md` and wait for a decision.
 7. **Track experiments.** Every training run and benchmark run logs config, git commit, data version and metrics (§10.6).
 8. **Commits:** clear normal messages, one logical change per commit.
+9. **Recovery mode (v5.0):** follow §28.4 in order. No new modules outside the current recovery step; bug fixes, evaluation and docs only.
+10. **Real-data check required:** a feature tested only on synthetic or tmp fixtures stays open, not done.
+11. **No scaffolding for a tier that hasn't started** (§3.1).
 
 ### 4.1 Repo decision
 Use a **new repo `countonce`**. The VGGT benchmark is a finished project with its own results and README; keeping it separate means both projects stand on their own on GitHub and LinkedIn. Port the reusable code (env check, VGGT wrapper, memory guard, frame extraction, COLMAP wrapper, plotting style) into `countonce`, credit the source in comments, and link the two READMEs to each other. This plan file can live in the VGGT folder until the new repo exists, then moves to `countonce/docs/PLAN.md`.
@@ -476,6 +596,8 @@ Claude Code must check availability, license and format for each in Phase 0 and 
 **Fuji-SfM ground-truth matching:** project each GT 3D apple into every image using the dataset's cameras (or align VGGT's reconstruction to the GT point cloud with Sim(3)), then assign each detection to the nearest GT apple within a threshold. That yields per-detection identity labels, so duplicate rate and miss rate can be measured exactly.
 
 ### 9.2 Own capture protocol
+- **What is being counted (definition, fixed before capturing):** the ground truth is the number of target objects **visible in at least one submitted photo**, not every object physically present (fully hidden objects are out of scope, §3.3). Each `gt.json` records this definition, and the hand count is done from the photos, not from the physical scene.
+- **Size:** **20–30 independently captured static scenes** (up from 10–20), including clutter, occlusion, near-identical objects and **at least 3 zero-target scenes**. Train/validation/test splits are **by physical scene** (never two captures of the same scene across splits).
 - **Tiers:** easy (bike racks, chairs, shelf items, small car lot), medium (nursery plants, bins/cones), hard (fruit on trees or vines, dense similar objects)
 - **Per scene:** a 30–60 s video along an arc, plus 20 stills along the same arc; note lighting and problems
 - **Ground truth:** count by hand twice (two people if possible), and a third time if they disagree; save `gt.json`
@@ -489,14 +611,17 @@ Claude Code must check availability, license and format for each in Phase 0 and 
 5. **C-DOG** geometric association (if code runs), on the same detections + cameras
 6. **CountVid** on video versions of scenes and on VideoCount
 7. **DG-Net** on RGBD-VideoCount (it uses sensor depth; CountOnce uses RGB only, so state the difference clearly)
-8. **Frontier VLMs (Strong tier):** send the same photos (≤ the provider's image limit) to 2–3 frontier multimodal models (for example Claude, Gemini and GPT) plus one open-weight model (for example Qwen-VL), with a fixed, documented prompt asking for the number of unique objects. Also try a "locate and label each object first" prompt, since published work shows explicit enumeration prompts improve VLM counting. Run on a subset (e.g., 30 scenes × 3 view counts), record model versions, dates, cost and refusals. Answers the interview question "why not just ask a VLM?" with numbers.
+8. **Frontier VLMs (Strong tier):** send the same photos (≤ the provider's image limit) to 2–3 frontier multimodal models (for example Claude, Gemini and GPT) plus one open-weight model (for example Qwen-VL), with a fixed, documented prompt asking for the number of unique objects. Also try a "locate and label each object first" prompt, since published work shows explicit enumeration prompts improve VLM counting. Run on a subset (e.g., 30 scenes × 3 view counts), record model versions, dates, cost and refusals. **$0 budget:** use free API tiers where they exist (within their rate limits), run the open-weight model locally on the laptop, and skip any paid model rather than paying. Answers the interview question "why not just ask a VLM?" with numbers.
 9. **Cycle-consistent synchronization baseline:** spectral permutation synchronization / CLEAR applied to v2's pairwise matches
 10. **Human baseline (Strong tier):** 3–5 people count from the same photo sets (no 3D view). Record time taken and accuracy. This measures the real-world value: "CountOnce matches careful humans at X× less time" (or doesn't).
 
 If a baseline can't run, document why in `docs/DEVIATIONS.md`.
 
 ### 9.4 Metrics
-- **MAE**, **MAPE**, **within-10%** rate
+**Headline metrics are count metrics, not association F1.** F1 explains *why* a count is wrong; it is never reported as the main result, and 0.96 F1 is never described as "96% accurate".
+- **Count MAE**, **signed count bias** (over- vs under-counting), **MAPE**, **within-10%** rate, and **false count on zero-target scenes**
+- **Count error decomposition** per scene: missed objects + duplicate instances (one object counted twice) + false positives (not a target) − wrong merges (two objects counted once) = predicted − true. Reported as a stacked bar per method; it says whether the next fix belongs in detection, geometry or association
+- **MAE**, **MAPE**, **within-10%** rate (by view count and tier)
 - **Duplicate rate** and **miss rate** (scenes with identity labels; Fuji-SfM)
 - **Association metrics** on labeled data: pairwise precision/recall/F1 of "same object" decisions; cluster purity
 - **Coverage:** truth inside `[count_low, count_high]`
@@ -510,6 +635,14 @@ If a baseline can't run, document why in `docs/DEVIATIONS.md`.
 - Results to `results/bench.csv`, one row per run
 
 ### 9.6 Ablations
+**Controlled failure-source experiments (Core, run on Fuji-SfM and own captures with identity labels):**
+1. **Oracle detections + estimated geometry** (GT boxes projected into each photo, VGGT geometry): isolates reconstruction and association errors
+2. **Real detections + oracle geometry** (dataset cameras / GT-aligned points): isolates detector errors
+3. **Full real pipeline**
+4. Every association method (v1, v2, sync, v3) on **identical upstream inputs**, each with settings **tuned on the validation split** (not defaults) before it's compared on the test split
+
+**True order invariance:** permute the actual photo-to-frame assignment (reassign frame ids and reorder the camera arrays to match), not just the input list, and measure how much counts and partitions change across ≥10 permutations. If v2 depends on order, either add a global refinement step, use sync/v3 as the default for unordered photos, or narrow the "unordered photos" claim.
+
 Merge radius `k`; cannot-link on/off; v1 vs v2 vs v3; v2 ± appearance; ± hallucination filter; box-center vs mask lifting; detector choice; backbone choice; synthetic-only vs synthetic + Fuji-SfM fine-tune for v3.
 
 ### 9.7 Figures
@@ -724,8 +857,28 @@ Migrations with Alembic. Postgres holds live app data and the job queue only; an
 ### 14.6 Observability
 Structured logs; per-job stage timings, VRAM and errors in the DB; admin page with jobs/day, success rate, p50/p90 time, feedback accuracy, cost per job.
 
-### 14.7 Deployment
-Frontend on Vercel; API on Render/Fly.io/Railway; Postgres on Neon/Supabase; storage on R2; worker on the laptop (WSL2 service). Config in repo, `.env.example` for every variable, **no secrets in git**. GitHub Actions deploys API and frontend on merge to main.
+### 14.7 Deployment ($0 budget)
+**Constraint: the project must run at $0.** Every service below has a free tier. Verify current limits before deploying, since free tiers change.
+
+| Part | Free option | Limits to design around |
+|---|---|---|
+| Frontend | **Vercel Hobby** (or Cloudflare Pages) | Personal/non-commercial use; fine for a free pilot |
+| API | **Render free web service** (no card) | Sleeps after 15 min without traffic and takes ~1 min to wake; filesystem is wiped on restart, so nothing is stored on the API server |
+| Database | **Neon Free** (no card, no expiry) | 1 GB storage and 100 CU-hours per project per month; scales to zero when idle. **Don't use Render's free Postgres**: it expires after 30 days |
+| File storage | **Cloudflare R2 free tier** (10 GB/month, free egress) | May need a card or PayPal on file to activate, even though usage under the free tier isn't charged. Without one: Neon Object Storage (free during beta) or Azure Blob Storage under Azure for Students |
+| GPU worker | **The laptop** | Jobs only run while the laptop is on; the "processing paused" banner covers this |
+| CI | **GitHub Actions** (free for public repos) + the self-hosted laptop runner | — |
+| Auth | Google sign-in | Free |
+| Big-name cloud (optional) | **Azure for Students:** $100 credit for 12 months, **no credit card**, renewable yearly while a student | Use it to host the API on Azure Container Apps and files on Azure Blob if "Azure" on the resume is wanted. When credits run out, the subscription is disabled (no surprise bill) |
+
+**Designing around the free limits:**
+- **API cold starts:** the frontend shows a "waking up the server" state if the API takes more than a few seconds to answer. The worker polls Neon directly (not through the API), so jobs still run while the API sleeps.
+- **Storage cap:** the 30-day upload deletion (§14.5) plus a per-user storage limit keeps usage under 10 GB. Store downsampled point clouds and compressed overlays, not raw high-resolution renders.
+- **Database cap:** big results (`result.json`, match evidence) live in object storage; Postgres stores only metadata and a pointer.
+- **No paid cloud GPU:** the scale-to-zero cloud GPU worker (§14.4, §13 item 9) becomes optional, and is only done if free credits (Azure for Students, AWS Student Rewards credits) cover a short experiment.
+- **Usage alerts:** check each provider's usage page weekly during the pilot; set spending limits to $0 wherever a provider allows it.
+
+Config in repo, `.env.example` for every variable, **no secrets in git**. GitHub Actions deploys API and frontend on merge to main.
 
 ### 14.8 Product upgrades (Strong unless marked)
 - **Resumable uploads:** S3-compatible multipart uploads to R2 (or the TUS protocol) so flaky phone connections on farms resume instead of restarting.
@@ -803,15 +956,124 @@ Frontend on Vercel; API on Render/Fly.io/Railway; Postgres on Neon/Supabase; sto
 
 ---
 
-## 17. UI and design requirements
+## 17. Product and frontend spec
 
-The last site looked bad, so design is a gated step.
-- **Mockups first:** upload, progress, results, history, plus empty/loading/error states. Shreev approves before frontend code.
-- **Style:** clean and modern, generous whitespace, one accent color, 16 px+ body text, light and dark modes; the count card is the visual focus
-- **3D viewer:** three.js point cloud + numbered instance markers, orbit controls, reset view; two-way highlighting with the photo strip
-- **Overlays:** consistent colors (new green, duplicate blue, rejected gray) with labels and a legend; never color alone
-- **Responsive:** works well on phones (pilot users upload from phones)
-- **Accessibility:** keyboard navigation, alt text, sufficient contrast
+**Goal:** CountOnce looks and works like a real product, not a research repo with a JSON endpoint. A stranger (a recruiter, a farm manager, a researcher) can open one link and, within 30 seconds and without signing in or waiting for a GPU, see what it does, try it on a real example, and understand why the result is trustworthy.
+
+### 17.1 Status of the current mockups (`docs/mockups/`, reviewed 2026-11-25)
+- **Good:** accessible structure (skip link, labels, legend that doesn't rely on color, focus states), the right sections on the results page, honest "MOCKUP" labelling, light/dark modes, phone layout.
+- **Not good enough yet:** they're wireframes. There's no landing page, no way to try it without uploading, the 3D viewer is a placeholder box with four dots, the result page has no "why" (no match explanation, no method summary), and nothing shows the benchmark evidence. Visually it reads as a form, not a product.
+- **Verdict:** keep them as the information-architecture reference. Don't approve them as the visual design. The approval gate (§17.11) applies to the new design below.
+
+### 17.2 Product positioning (what the front page says)
+- **One line:** "Count anything from a few photos, without counting it twice."
+- **Three proof points** under it, each filled only with real numbers (`TODO: fill from results` until then): accuracy vs. adding up per-photo counts; works from 3–40 photos with no depth sensor; open benchmark with confidence intervals.
+- **Primary action:** "Try a live example" (demo mode, no sign-in). **Secondary:** "Count your own photos" (sign-in).
+
+### 17.3 Information architecture (all pages)
+| Route | Page | Sign-in | Tier |
+|---|---|---|---|
+| `/` | Landing page: pitch, interactive hero (a real example result spinning in 3D), proof points, how it works in 4 steps, demo gallery, benchmark teaser, links | No | Strong |
+| `/demo` | Demo gallery: 6–10 precomputed real scenes (Fuji-SfM trees where the license allows showing derived results, own captures: bike racks, chairs, shelves, an orchard row) | No | Strong |
+| `/demo/[scene]` | Full results experience on a precomputed scene (same UI as a real job, labelled "Example") | No | Strong |
+| `/new` | New count: capture guide, upload, prompt, optional example box, pre-flight checks | Yes | Strong |
+| `/jobs/[id]` | Live progress, then the results experience | Yes (or share token) | Strong |
+| `/history` | Past counts with thumbnails, counts, status, filters | Yes | Strong |
+| `/s/[token]` | Read-only shared result, with a rich link preview (Open Graph image) | No | Strong |
+| `/benchmark` | Benchmark explorer: interactive figures and tables from `results/`, method filters, CIs, failure gallery, leaderboard | No | Strong |
+| `/how-it-works` | Interactive explainer: pipeline walk-through with a live example at each stage (detections → 3D lift → merging → count) | No | Strong |
+| `/sites`, `/sites/[id]` | Sites and visits over time (Track G, Moon) | Yes | Moon |
+| `/docs` | Developer docs: REST API, Python package, MCP tool, with copy-paste examples | No | Moon |
+| `/status` | Worker online/offline, queue length, recent job times (public, read-only) | No | Strong |
+| `/about` | Who built it, links to repo, paper, VGGT benchmark project, contact | No | Strong |
+| `/privacy` | What's stored, for how long, blurring and EXIF stripping, opt-in for training | No | Strong |
+
+### 17.4 Demo mode (the single most important frontend feature)
+- **Why:** the GPU worker is a laptop that is often off, and the API on free hosting sleeps. A recruiter who clicks the link must still see a working product instantly.
+- **How:** `scripts/build_demo.py` runs the real pipeline on the demo scenes and exports, per scene, `result.json`, downsampled `scene.ply` (converted to a compact binary point format for the browser), `markers.json`, overlay images, thumbnails and the match evidence. These are static files served from the frontend's CDN (or R2). The demo pages need **no backend at all**.
+- **Honesty:** every demo page shows "Precomputed example. Results produced by CountOnce v[version] on [date]" and links to the exact commit and config. Demo outputs must come from real runs; never hand-edited.
+- **Regenerate** whenever the pipeline version changes (a CI job checks that demo files' `schema_version` and model versions match the current release).
+
+### 17.5 The results experience (`/jobs/[id]`, `/demo/[scene]`, `/s/[token]`)
+Layout (desktop): count card across the top; left 60% the 3D viewer; right 40% a tabbed panel (Photos, Explain, Warnings, Details); photo strip along the bottom. On phones these stack, with the count card first.
+
+**Count card:** the count in large type, the object name, the interval ("likely 44–51, 90% range, split conformal, n = 18 calibration scenes"), a confidence badge (High / Medium / Low with the reason), and buttons for Report, CSV, Share.
+
+**3D viewer (react-three-fiber):**
+- Point cloud rendered with level of detail (≤ 300k points on phones, ≤ 1M on desktop), colored from the photos
+- One numbered marker per counted object (sphere sized by its estimated size), plus faint markers for rejected detections (toggle)
+- **Camera frusta** for every photo; clicking one **flies the view to that camera** and fades the photo in over the 3D scene, so the user sees exactly what that photo saw (this is the "wow" moment)
+- **Match lines:** selecting an object draws lines from its 3D marker to the camera of every photo where it was detected
+- Two-way linking: hover a marker → its boxes highlight in every photo; hover a box → its marker pulses in 3D
+- Controls: orbit, zoom, reset, "top view", screenshot (PNG), fullscreen; keyboard accessible (arrow keys to step through objects)
+- Optional Gaussian splat view (Moon) via a toggle, for scenes that have one
+
+**Photos tab:** every photo with boxes labelled NEW #n / DUPLICATE of #n / REJECTED (reason); filter by status; click a box to select its object everywhere.
+
+**Explain tab ("Explain this match"):** pick any two detections (or select one object to list its members). Shows 3D distance in object sizes, reprojection error, appearance similarity, calibrated match probability, the decision and the rule or model that made it ("same photo, can't be the same object", "below the 0.5 match threshold", "merged by the learned matcher"). A short plain-English sentence on top, numbers below.
+
+**Warnings tab:** each warning with what it means and how to fix it ("Photos 5 and 6 barely overlap: take one more photo between them").
+
+**Details tab:** model versions, settings, timings per stage, cache hit, interval method, schema version, link to the raw `result.json`.
+
+**Corrections (signed-in owner only):** Split / Merge / Reject on a selected object, with undo. The count updates instantly in the UI, and the correction is saved (Track L). Merging two detections from the same photo is blocked with an explanation.
+
+**Feedback:** "Looks right" / "Off by about ___", one tap.
+
+### 17.6 New count flow (`/new`)
+1. **Capture guide** (dismissible, shown first time): a short animated diagram of walking an arc around the objects, plus three rules (overlap, steady, good light). Includes "Use my camera" on phones (`<input capture>`), so users can shoot directly from the page.
+2. **Upload:** drag-and-drop or camera; thumbnails appear immediately; **resumable multipart upload** with per-file progress (§14.8).
+3. **Pre-flight checks in the browser** (§14.8): blur score and near-duplicate detection per photo, shown as inline badges with "remove" and "retake" actions, before anything is uploaded.
+4. **What to count:** a text field with suggestions ("apples", "grape clusters", "bikes"), an optional "not this" field (negative prompt), and an optional "draw a box around one example" step.
+5. **Submit:** idempotent; goes straight to the progress page.
+
+### 17.7 Progress page
+Live stages over SSE (with polling fallback): queued → checking files → detecting → reconstructing in 3D → matching → done, each with elapsed time. Shows queue position, the "processing paused, your job will run when the GPU is back online" banner when no worker is online, and an email-me-when-done toggle (Moon). On completion it transitions straight into the results experience.
+
+### 17.8 Benchmark explorer (`/benchmark`)
+- Interactive versions of the headline figures (§9.7): count error vs. number of views per method with CI bands; ordered vs. shuffled; by scene type; association F1 for v1/v2/v3; VLM comparison
+- Filters by dataset, method, view count; hover for exact values and CIs
+- The failure gallery with each case's overlay, 3D view and one-line cause
+- Leaderboard table (CountOnce-Bench, Track I) with a "submit your method" link
+- Every number pulled from `results/*.csv` at build time; a footer shows the commit and date
+- Empty state while results are missing: "Benchmark in progress", never placeholder numbers
+
+### 17.9 Tech stack
+| Concern | Choice | Why |
+|---|---|---|
+| Framework | **Next.js (App Router) + TypeScript (strict)** | Static demo pages + dynamic job pages in one app; first-class on Vercel |
+| Styling | **Tailwind CSS** + **shadcn/ui** (Radix primitives) | Accessible components, consistent design tokens |
+| 3D | **three.js via react-three-fiber + drei** | Declarative scene, picking, camera animation |
+| Data fetching | **TanStack Query** | Caching, polling fallback, retries |
+| API types | **OpenAPI → TypeScript** generated from the FastAPI schema (`openapi-typescript`), plus **Zod** validation of `result.json` by `schema_version` | Frontend and backend can't silently drift |
+| Charts | Observable Plot or Recharts | Benchmark figures with CI bands |
+| Uploads | S3-compatible multipart (Uppy or a small custom client) | Resumable uploads |
+| Auth | Google sign-in (Auth.js) | Free; matches §14 |
+| Testing | **Vitest** + React Testing Library (components), **Playwright** (end-to-end, including a demo-mode smoke test on every PR), **axe** accessibility checks in Playwright | |
+| Quality gates | Lighthouse CI on `/`, `/demo/[scene]`, `/benchmark` | See budgets below |
+| Hosting | Vercel (frontend) as its own project; demo assets on the CDN or R2 | $0 (§14.7) |
+| Repo layout | `web/` folder in the same repo (monorepo), with its own CI job | One place for code, shared schemas |
+
+### 17.10 Design system
+- **Tokens:** one accent color, neutrals, status colors (new / duplicate / rejected) that also differ by outline style and label; 4 px spacing scale; radius and shadow scale; light and dark themes from the same tokens.
+- **Type:** a clean sans-serif (e.g., Inter or Geist) with tabular numbers for counts; 16 px+ body; the count uses a large display size.
+- **Motion:** short, purposeful transitions (camera fly-to, count card reveal); respect `prefers-reduced-motion`.
+- **Components:** count card, confidence badge, warning card, photo tile with overlays, 3D viewer frame, stage list, evidence table, empty/loading/error states, toasts.
+- **Accessibility target:** WCAG 2.2 AA; keyboard-only use of every feature, including selecting objects in 3D; screen-reader text for the count, interval and warnings.
+- **Performance budgets:** landing page Largest Contentful Paint < 2.5 s on a mid-range phone; JS < 200 KB gzipped before the 3D viewer loads; the viewer and point cloud load lazily with a progress bar; Lighthouse ≥ 90 for performance, accessibility and best practices.
+
+### 17.11 Design process and approval gate
+1. **High-fidelity designs** of: landing, demo gallery, results (desktop + phone), new count, progress, benchmark, empty/error states. Use the existing mockups for structure only.
+2. Shreev reviews (checklist in `docs/mockups/README.md`, updated for the new pages). **For the v6.0 finishing pass, review happens after the build (§0.1 rule 5)**; requested changes become follow-up tasks.
+3. Build **demo mode first** (landing, demo gallery, results experience on precomputed scenes). That alone is a shippable product link.
+4. Then the signed-in flow (new count, progress, history, sharing), wired to the API.
+5. Then benchmark explorer, how-it-works, status, docs.
+
+### 17.12 Definition of done for the frontend
+- A stranger can open the link on a phone, tap "Try a live example", spin the 3D scene, tap an object and see why it was counted once, in under 30 seconds, with the laptop worker turned off
+- Every number on every page traces to a real result file (no placeholders in production builds; a build check fails on `TODO: fill from results` strings outside clearly marked empty states)
+- Playwright end-to-end tests pass for demo mode and the signed-in flow; axe reports no serious accessibility issues; Lighthouse budgets met
+- A 2-minute demo video (Track M) recorded from the real product
 
 ---
 
@@ -918,7 +1180,7 @@ GitHub Actions: lint + type check + unit + API tests + the CPU synthetic-geometr
 ### Phase 5: Product + pilot (~3–4 weeks build + 2–4 weeks pilot) — Strong
 - [ ] Mockups → approval
 - [ ] API, DB, storage, queue, worker, auth, SSE progress
-- [ ] Frontend: upload, progress, results (viewer + overlays + feedback), history, sharing
+- [ ] Frontend per §17: demo mode first (landing, demo gallery, results experience on precomputed real scenes), then new count, progress, history, sharing, benchmark explorer, how-it-works, status
 - [ ] Product upgrades (§14.8): resumable uploads, idempotency keys, browser pre-flight check, "Explain this match", correction tools, face/plate blurring, EXIF/GPS stripping + ffprobe validation, inspection report
 - [ ] Typed error taxonomy + dead-letter status (§14.4); schema versioning (§8.10); drift monitoring (§16B.2)
 - [ ] Load test; metrics and alerts (§16B.2)
@@ -1183,6 +1445,105 @@ If CountOnce runs over budget two weeks in a row, cut the current tier's optiona
 - **OLTP / OLAP:** live transactional database work / analytics queries over history
 - **FP8 / NVFP4:** 8-bit and 4-bit floating-point number formats for faster, smaller models
 - **EXIF:** metadata stored inside photos, which can include GPS location
+
+---
+
+## 28. Brutal audit (2026-11-25) and recovery plan
+
+An honest review of the repo as it stands after the overnight agent runs (114 of 115 tasks checked off).
+
+### 28.1 What exists
+- About **48,000 lines of Python** in `countonce/`, `bench/`, `synth/` and `scripts/`, plus about **15,000 lines of tests**, nearly all written by unattended agents over about two days
+- Pipeline modules for every track: ingest, detection (GroundingDINO-tiny via Hugging Face works; **CountGD is still a stub**), VGGT reconstruction, lifting, v1/v2/sync/v3 association, sensitivity and conformal intervals, warnings, exports, reports
+- Infrastructure far beyond Core: API (FastAPI, live on Vercel returning a JSON root), job store and worker, uploads, MCP server, model routing, shadow deployment, cold-start serving, sites, LLM router, golden GPU gate, DVC/DAG configs, paper draft (`paper/main.tex`), static mockups
+- **Real runs so far:** VGGT-1B + GroundingDINO-tiny on the RTX 5070 for profiling; a 10-frame Fuji-SfM window (count 42, interval 14–120); the bundled 5-object tiny scene, where the real detector + VGGT path **counts 7, not 5**
+- v3 matcher trained on **numpy geometry episodes** (not rendered images): association F1 0.964 vs. 0.741 for v2 on held-out synthetic episodes
+- **Real-data benchmark rows: zero.** Every results table is `TODO: fill from results`. No interviews, no own captures, no pilot.
+
+### 28.2 Scores (out of 10)
+| Area | Score | Why |
+|---|---|---|
+| Engineering breadth / scaffolding | **8** | Almost every planned subsystem has a module, tests and docs |
+| Honesty of claims | **9** | No fabricated numbers; limitations are stated plainly. Keep this. |
+| Core result (does it count correctly?) | **1** | No real benchmark numbers. The two real runs show over-counting (7 vs. 5) and a very wide interval (14–120) |
+| ML novelty demonstrated | **3** | v3 beats v2 only on synthetic geometry episodes, with no rendering, no real detector noise and no real data |
+| Product / frontend | **1** | No frontend app. The live URL returns JSON. Mockups are wireframes |
+| Code you can defend in an interview | **2–3** | 48k lines written by agents in two days. No one can explain all of it, and interviewers will pick any file |
+| Scope discipline | **2** | The plan's own rule ("Core before Strong before Moon") was broken: MCP, shadow routing, cold-start serving, sites and a paper draft exist before the pipeline has a single real result |
+| Public repo presentation | **4** | Agent instructions (`CLAUDE.md`, a 111 KB `TASKS_OVERNIGHT.md`) and personal Windows paths are public; no license; README is mostly TODO tables |
+| **Overall, as a recruiter would see it today** | **3** | Impressive volume, no evidence it works, nothing to click |
+| **Ceiling if the recovery plan is done** | **9** | The design is genuinely strong; it needs results, a product and ownership |
+
+### 28.3 The core problem in one sentence
+**A skyscraper of scaffolding on a foundation that hasn't been poured:** everything around the counter exists, but the counter itself hasn't been shown to count correctly on real data.
+
+A 48k-line repo where nothing is proven is weaker than an 8k-line repo with one strong, real result and a working demo. Volume without evidence also invites the question "did you write this?", and the answer has to survive follow-up questions.
+
+### 28.4 Recovery order (do these in order; don't start a step until the previous one is done)
+**Step 1: Freeze features (now).** No new modules, tracks or infrastructure until Step 4 is done. The overnight orchestrator only gets bug-fix and evaluation tasks.
+
+**Step 2: Make the counter correct on the easy case (1–3 days).**
+- Debug the tiny scene (7 vs. 5) with the real detector + VGGT path: check per-frame detections (duplicate boxes on one object → per-frame NMS), lifting (background pixels in the box → mask or tighter region), and the merge radius. Add the tiny scene with the real path as a regression test once it's fixed.
+- Decide the Core detector: either get real CountGD weights working, or **commit to GroundingDINO for Core** and document it. Don't leave a stub on the main path. **Make the working detector the config default** (today it defaults to the CountGD stub).
+- **One reliable path:** one detector, one backbone (VGGT), one associator. Everything else is marked "planned" in `docs/STATUS.md`.
+
+**Step 3: Real numbers on Fuji-SfM (1 week).** Finish task 115: download Fuji-SfM, run the Core sweep on the frozen test trees, and fill `docs/RESULTS_FUJI.md` and the README from `results/bench.csv`. Whatever the result is (good, bad or mixed), it's the first real evidence. If v1/v2 don't beat Sum/Max, that's gate G3: write it up honestly and fix it before anything else. Freeze all settings on the validation trees **before** touching the test trees; report failed and missing runs, not only successful ones. Then run the controlled failure-source experiments (§9.6) and the error decomposition (§9.4), and spend the next effort wherever the biggest error source is.
+
+**Step 4: Own captures + interviews (1–2 weeks, overlapping Step 3).** 10 hand-counted scenes (at least 3 easy, including a bike rack), and the Phase 0 interviews. Run the Core benchmark on them.
+
+**Step 5: Demo mode + real frontend (2–3 weeks).** Build `web/` per §17, demo mode first, using precomputed **real** results from Steps 3–4. This turns the repo into a product link.
+
+**Step 6: Ownership pass (ongoing, ~2 hours a week).** Read and be able to explain, without notes: `lift.py`, `merge/cluster.py`, `merge/match.py`, `merge/sync.py`, `merge/v3.py`, `conformal.py`, `confidence.py`, `bench/metrics.py`, `bench/stats.py`, `pipeline.py`. That's the part interviewers will ask about. Rewrite anything you can't explain until you can.
+
+**Step 7: Then the learned matcher on rendered data.** Kubric or BlenderProc renders → real detector + VGGT on them → retrain v3 → evaluate on Fuji-SfM and own captures. Only this result can support the "learned matcher transfers to real orchards" claim.
+
+**Step 8: Then everything else** in tier order (Strong, then Moon).
+
+### 28.5 Repo hygiene (one afternoon, before sharing the link anywhere)
+- **License:** add one for the code (Apache-2.0 or MIT). State separately that model weights (VGGT non-commercial) and datasets keep their own licenses.
+- **Agent files:** move `TASKS_OVERNIGHT.md`, the orchestrator scripts and the agent rules in `CLAUDE.md` out of the public repo (a private repo or a gitignored folder), and remove personal paths (e.g., `/mnt/c/Users/...`). Using AI agents is fine and worth discussing in interviews; a 111 KB task log in the repo root isn't the thing to lead with.
+- **Quarantine unproven scaffolding:** move Moon-tier modules that aren't on the working path (shadow routing, cold-start serving, sites, LLM router, MCP server, paper draft) into `experimental/` or a branch, so a reviewer opening the repo sees a small, legible core first. Bring each back when its tier starts.
+- **README:** results first. Until real results exist, replace the giant TODO tables with one short "Status: benchmark in progress" section and the tiny-scene demo. A wall of TODO cells reads as unfinished.
+- **Commit history:** small, meaningful commits from here on. Make sure the public history isn't a single squashed commit for 48k lines.
+- **CI:** make sure the badge is green on `main`; a red badge on the first screen hurts.
+- **Live URL:** point the main link at the frontend once Step 5 exists; move the API to an `api.` address or a separate Vercel project.
+
+### 28.6 What would make it top 1% (after recovery)
+1. **One headline result with a CI:** "cut counting error from X% to Y% on N real orchard trees and M own scenes"
+2. **A demo link that works instantly on a phone**, with the camera fly-to and "explain this match"
+3. **The learned matcher beating geometric rules on real data** after training on rendered synthetic scenes
+4. **A clear, honest comparison** with CountVid and frontier VLMs
+5. **Real users** in a pilot, with numbers
+6. **Being able to explain every line of the core** in an interview
+
+Everything else in this plan is supporting detail for those six.
+
+### 28.6b External review (ChatGPT, 2026-11-25): verified findings
+Each item was checked against commit `63d8e9b`.
+
+| Finding | Verified? | Action | Recovery step |
+|---|---|---|---|
+| Default detector is `countgd`, whose load and forward pass raise `NotImplementedError` (`countonce/config.py`, `detect/countgd.py`) | **Confirmed** | Make GroundingDINO (HF) the default; mark CountGD/CountGD++ "planned"; test the exact README quickstart from a clean environment | Step 2 |
+| Association F1 isn't the product metric; v3's 0.964 F1 still leaves a mean count error of 19.1 | **Confirmed** (`docs/RESULTS_V3_SYNTH.md`) | Lead with count MAE, signed bias, within-10% and zero-scene false counts; add the error decomposition (§9.4) | Step 3 |
+| Pairwise F1 ignores unlabelled detections, so injected false positives don't hurt it | **Confirmed** (`bench/metrics.py` docstring: "Unlabelled detections are ignored") | Count FPs explicitly in the decomposition; report FP rate next to F1 | Step 3 |
+| The synthetic stand-in reconstruction uses NaN depth, so the occlusion/visibility check never fires | **Confirmed** (`bench/synth_assoc.py`) | Label the v3 synthetic result a component test; add a variant with finite noisy depth; real evidence comes from Step 7 | Step 7 |
+| v1/v2 baselines run with default settings in the v3 comparison | **Confirmed** | Tune every method on the validation split before comparing (§9.6) | Step 3 |
+| v2 processes frames in sorted frame-id order; the invariance test reorders input lists but keeps frame ids, so it doesn't test real photo-order invariance | **Confirmed** (`merge/match.py`, `tests/test_associators.py`) | Real permutation test (§9.6); fix or narrow the claim | Step 3 |
+| CI installs a `db` extra that `pyproject.toml` doesn't define | **Confirmed** (`ci.yml` line 65) | Add the extra or remove it from CI; keep the badge green | Hygiene |
+| README says real detector adapters haven't been run, but `docs/PROFILE.md` reports a GroundingDINO sanity run on real images | **Confirmed** | One authoritative status table (below) | Hygiene |
+| Real detector + VGGT counts 7 on the 5-object tiny scene | **Confirmed** (already Step 2) | Correctness investigation before more performance work | Step 2 |
+| A VGGT smoke check deduplicated five views down to one | Not found in the docs reviewed | Check during Step 2; if true, it means that check never tested multi-view merging | Step 2 |
+| `docs/RELATED_WORK.md` says no paper was read in full, yet makes "does not do X" claims | **Confirmed** | Read the closest papers fully; state the hypothesis in §2.4 instead of a novelty claim | Step 3 |
+| The README front page is placeholders and TODO tables | **Confirmed** (also §28.5) | Replace with a short honest demo (below) | Step 5 |
+
+**Authoritative status table (`docs/STATUS.md`, replaces scattered status notes):** one row per component (each detector, backbone, associator, interval method, API piece) with four columns: implemented · tested on synthetic/fixtures · run with real models · benchmarked on held-out real data. The README links to it and never contradicts it. Small evaluation CSVs and artifact references (commit, config, data version) are published next to each report.
+
+**README front page (until the full product exists):** input photos, predicted count vs. the hand count, the same object IDs drawn across views, one measured results table, one representative failure, and one command someone else can run. Planned experiments move to a "Roadmap" section further down.
+
+### 28.7 Rules added for the agents (§4)
+9. **No new modules outside the current recovery step (§28.4).** Bug fixes, evaluation and docs only.
+10. **Every new feature needs a real-data check** before it's marked done; "tested on synthetic or tmp fixtures only" means the task stays open.
+11. **No more scaffolding for a tier that hasn't started.**
 
 ---
 
