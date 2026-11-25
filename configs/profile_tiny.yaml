@@ -1,0 +1,31 @@
+# Variant + cache profile on the bundled tiny scene (GPU). Run:
+#   timeout 1500 .venv-gpu/bin/python -m countonce.cli profile --config configs/profile_tiny.yaml
+#   timeout 1500 .venv-gpu/bin/python -m countonce.cli profile --config configs/profile_tiny.yaml --variant cache
+# then: python scripts/make_profile_report.py --csv results/profile_variants.csv \
+#         --profile-csv results/profile_tiny.csv --doc docs/PROFILE.md
+# Nothing here is a result.
+inputs: examples/tiny_scene
+prompt: red sphere
+warmup: 1
+repeats: 3
+out_csv: results/profile_tiny.csv
+run:
+  detector: gdino
+  backbone: vggt
+  assoc: v1
+  max_frames: 5
+  backbone_options: {weights_dtype: fp32}
+variants_csv: results/profile_variants.csv
+variants:
+  - name: baseline_fp32_sdpa
+  - name: sdpa_check
+    run: {sdpa_check: true}
+  - name: bf16
+    run: {backbone_options: {weights_dtype: bf16}}
+  - name: compile_default
+    run: {compile_reconstructor: default, compile_detector: default}
+  - name: compile_reduce_overhead
+    run: {compile_reconstructor: reduce-overhead, compile_detector: reduce-overhead}
+cache:
+  new_prompt: green sphere
+  dir: results/profile_cache

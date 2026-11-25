@@ -630,3 +630,20 @@ One entry per decision: date, what the plan said, what was done, why.
   comparison (integrity check only), so this promotion is not evidence of quality; the synthetic eval
   is in `docs/RESULTS_V3_SYNTH.md`.
 - `scripts/eval_v3_synth.py` needs `PYTHONPATH=.` when run directly.
+
+## PROFILE.md fix and variant/cache tables (2026-11-25)
+- `scripts/make_profile_report.py` now rewrites a doc only when `--doc` is passed (the old `--out`
+  defaulted to `docs/PROFILE.md`, which is how throwaway `/nonexistent*.csv` text got committed).
+  Without `--doc` it prints to stdout. Tests pass a `tmp_path` doc; a test asserts the committed doc has no
+  `nonexistent`.
+- Measured with `configs/profile_tiny.yaml` (tiny scene, 5 frames, GroundingDINO-tiny + VGGT-1B, RTX
+  5070 Laptop, 1 warm-up + 3 repeats, `results/*.csv` are gitignored so the numbers live in
+  `docs/PROFILE.md`). Baseline is fp32 weights; the tiny scene counts 7 vs ground truth 5 in every variant
+  (count delta vs baseline 0), so these runs say nothing about accuracy.
+- `compile_default`: no speedup. First repeat 52.5 s (compile), later repeats 17.0 s and 20.2 s;
+  p50 is 0.87x of baseline. `compile_reduce_overhead` failed with the exact error
+  `reconstruction failed: cuda_error: CUDA driver error: device not ready` (CUDA graphs), recorded in
+  the table, not a number. Not confirmed to be an `sm_120` compiler limit; not investigated further.
+- bf16 weights cut peak VRAM from 7298 MB to 3833 MB at about the same time; SDPA check has no
+  measurable cost. Differences of about 5% between variants are inside the repeat-to-repeat noise
+  (baseline totals 16.3 to 22.3 s).

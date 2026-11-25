@@ -189,7 +189,7 @@ def test_report_missing_csv_is_todo(tmp_path):
     mod = _script()
     out = tmp_path / "PROFILE.md"
     out.write_text("# Profiling report\n\nkeep me\n")
-    assert mod.main(["--csv", str(tmp_path / "none.csv"), "--out", str(out)]) == 0
+    assert mod.main(["--csv", str(tmp_path / "none.csv"), "--doc", str(out)]) == 0
     text = out.read_text()
     assert "keep me" in text and "TODO: fill from results" in text and mod.START in text
 
@@ -204,7 +204,7 @@ def test_report_table_and_idempotent(tmp_path):
     )
     out = tmp_path / "PROFILE.md"
     out.write_text("# T\n\nintro\n")
-    args = ["--csv", str(tmp_path / "v.csv"), "--out", str(out)]
+    args = ["--csv", str(tmp_path / "v.csv"), "--doc", str(out)]
     mod.main(args)
     first = out.read_text()
     assert "2.00x" in first and "| fast | 3 |" in first and "(baseline)" in first
@@ -217,3 +217,18 @@ def test_percentile():
     mod = _script()
     assert mod.percentile([1, 2, 3, 4, 5], 50) == 3
     assert mod.percentile([1, 2, 3, 4, 5], 90) == pytest.approx(4.6)
+
+
+def test_report_without_doc_prints_and_never_writes_the_real_doc(tmp_path, capsys):
+    mod = _script()
+    real = ROOT / "docs" / "PROFILE.md"
+    before = real.read_text()
+    csvs = ["--csv", str(tmp_path / "none.csv"), "--profile-csv", str(tmp_path / "none2.csv")]
+    assert mod.main(csvs) == 0
+    assert mod.START in capsys.readouterr().out
+    assert real.read_text() == before
+
+
+def test_committed_profile_doc_has_no_throwaway_paths():
+    text = (ROOT / "docs" / "PROFILE.md").read_text()
+    assert "nonexistent" not in text

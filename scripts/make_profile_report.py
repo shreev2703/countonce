@@ -1,9 +1,12 @@
 """Render the optimization and repeat-job caching tables in docs/PROFILE.md.
 
-    python scripts/make_profile_report.py [--csv CSV] [--profile-csv CSV] [--out docs/PROFILE.md]
+    python scripts/make_profile_report.py [--csv CSV] [--profile-csv CSV] [--doc docs/PROFILE.md]
 
 ``--csv`` is results/profile_variants.csv; ``--profile-csv`` is results/profile.csv, whose rows with
 a ``cache_state`` feed the "Repeat-job caching" table (``countonce profile --variant cache``).
+
+The committed doc is rewritten only when ``--doc`` is passed explicitly; without it the rendered
+blocks are printed to stdout, so a throwaway run can never overwrite ``docs/PROFILE.md``.
 
 The table sits between ``<!-- profile-variants:start -->`` and ``<!-- profile-variants:end -->``;
 the rest of the file is left alone. If the markers are absent the block is appended; if the
@@ -248,14 +251,18 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--csv", type=Path, default=Path("results/profile_variants.csv"))
     ap.add_argument("--profile-csv", type=Path, default=Path("results/profile.csv"))
-    ap.add_argument("--out", type=Path, default=Path("docs/PROFILE.md"))
-    args = ap.parse_args(argv)
-    doc = args.out.read_text() if args.out.exists() else None
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(
-        update_doc(doc, render_block(args.csv), render_cache_block(args.profile_csv))
+    ap.add_argument(
+        "--doc", type=Path, default=None, help="markdown file to update; omit to print to stdout"
     )
-    print(f"wrote {args.out}", file=sys.stderr)
+    args = ap.parse_args(argv)
+    block, cache_block = render_block(args.csv), render_cache_block(args.profile_csv)
+    if args.doc is None:
+        print(f"{block}\n\n{cache_block}")
+        return 0
+    doc = args.doc.read_text() if args.doc.exists() else None
+    args.doc.parent.mkdir(parents=True, exist_ok=True)
+    args.doc.write_text(update_doc(doc, block, cache_block))
+    print(f"wrote {args.doc}", file=sys.stderr)
     return 0
 
 
