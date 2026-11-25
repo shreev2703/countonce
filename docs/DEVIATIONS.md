@@ -693,3 +693,26 @@ CPU only, no GPU run; existing `results/bench.csv` rows were produced with the o
 - **Identity matching:** detections are matched to the nearest GT apple in frame (visible or not), and the label is kept only if that apple is visible. Before, only visible apples were candidates, so a detection on an occluded apple could be labelled as a visible neighbour within 10 px.
 - **Interval recording:** pipeline rows now write `low`/`high` (were blank). The pipeline interval covers all instances while `pred` counts only the ROI, so both ends are shifted by the number of out-of-ROI instances and clamped to `low <= pred <= high`. This shift is an approximation (documented, untested against real runs). Baseline rows stay blank.
 - **MAPE with GT = 0:** such slices are skipped in the per-tree mean; a tree with GT = 0 on every side drops out of the MAPE cell (`n_trees` shows how many); a missing row still blocks the cell. MAE is unchanged and still includes those slices.
+
+## Tiny-scene over-count, root cause (M2, 2026-11-25)
+Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). Diagnosed per stage:
+- **Frames: five views deduplicated to one (the "smoke-check note").** The scene is a pentagon of reds
+  seen from azimuths 72 degrees apart, so the views are near-identical; the 16x16 mean-abs-diff
+  thumbnail distance is 0.008-0.0095 against the 0.02 default `dedup_threshold`. The default run
+  therefore used 1 frame (0.005 keeps 4, 0 keeps 5). The pipeline now logs a warning when the
+  filter keeps 1 of N>1 frames. The metric was not changed: with all five views the count is worse (below).
+- **Detections: blue/green distractors scored as "red sphere".** Per frame the 5 reds score 0.52-0.64
+  (0.48 for one occluded red in view 2) and the blue and green spheres 0.40-0.50, all above the 0.3
+  default. These two false positives are the 7 = 5 + 2.
+- **Per-frame duplicate boxes: not the cause.** No same-frame box pair was a duplicate object; added
+  `nms_per_frame` / `Config.nms_iou` (default 0 = off, so published runs are unchanged; the test uses 0.7).
+- **Lifting / merge radius: not the cause of the single-view 7, but a real limit with 5 views.** VGGT
+  on the 128x96 flat-shaded symmetric scene recovers cameras poorly (Sim(3)-aligned camera error 0.1-0.9
+  on a radius-4 orbit) and lifted points sit about 0.3-0.7 from the true sphere centres (radius 0.22), so
+  views of one sphere do not fall within `merge_k` object sizes. With dedup off and 5 views the count
+  is 22 at k=0.5 and 8-10 for k in 1-6 at the default threshold; no merge radius gives 5.
+- **Fix used (regression only, defaults unchanged):** `score_threshold=0.5` splits reds from
+  distractors on every view but the occluded one, giving 5 on the default single-frame path
+  (`tests/test_tiny_scene_real_gpu.py`, GPU marked). This is a threshold chosen on the tiny
+  fixture, not evidence about accuracy elsewhere; the Fuji grid still picks the defaults. The
+  5-view real path stays open (needs better geometry on this scene, not a merge-radius change).

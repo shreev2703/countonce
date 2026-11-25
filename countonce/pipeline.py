@@ -14,7 +14,7 @@ import numpy as np
 from countonce.confidence import k_grid, sensitivity_range, threshold_grid
 from countonce.config import Config
 from countonce.conformal import CalibrationArtifact, interval_from_artifact, resolve_method
-from countonce.detect.base import Detector, filter_by_score
+from countonce.detect.base import Detector, filter_by_score, nms_per_frame
 from countonce.detect.cache import CachedDetector, DetectionCache
 from countonce.detect.masks import MaskCache, SamMaskProducer, attach_masks, build_mask_producer
 from countonce.detect.prompts import (
@@ -395,7 +395,14 @@ def _run(
     if config.blur_threshold > 0:
         paths, _ = drop_blurry(paths, config.blur_threshold)
     if config.dedup_threshold > 0:
+        n_before = len(paths)
         paths, _ = drop_near_duplicates(paths, config.dedup_threshold)
+        if n_before > 1 and len(paths) == 1:
+            log.warning(
+                "near-duplicate filter kept 1 of %d frames; multi-view geometry is unused "
+                "(lower dedup_threshold, or 0 to disable, if the views differ)",
+                n_before,
+            )
     if config.max_frames > 0:
         paths = cap_frames(paths, config.max_frames)
     if not paths:
@@ -465,6 +472,7 @@ def _run(
             raw_detections = attach_masks(
                 raw_detections, frames, producer, f"{det.name}@{det.version}", mask_cache
             )
+    raw_detections = nms_per_frame(raw_detections, config.nms_iou)
     detections = filter_by_score(raw_detections, config.score_threshold)
     marks.mark("detect", t)
 

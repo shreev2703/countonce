@@ -66,6 +66,8 @@ class Config(BaseModel):
 
     # Detect / lift / associate
     score_threshold: float = Field(0.3, ge=0, le=1)
+    # Per-frame box NMS on raw detections (IoU above this drops the lower score); 0 = off.
+    nms_iou: float = Field(0.0, ge=0, le=1)
     merge_k: float = Field(0.5, gt=0)  # v1 distance threshold, in object sizes
     # Lift rules; None = dense defaults (5 pixels, 30th percentile) or, for the sparse COLMAP
     # backbone, 3 pixels and no percentile cut.

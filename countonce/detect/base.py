@@ -47,6 +47,40 @@ def filter_by_score(dets: Sequence[Detection], threshold: float) -> list[Detecti
     return [d for d in dets if d.score >= threshold]
 
 
+def _iou(a: np.ndarray, b: np.ndarray) -> float:
+    iw = min(a[2], b[2]) - max(a[0], b[0])
+    ih = min(a[3], b[3]) - max(a[1], b[1])
+    if iw <= 0 or ih <= 0:
+        return 0.0
+    inter = float(iw * ih)
+    union = float((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1])) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def nms_per_frame(dets: Sequence[Detection], iou_threshold: float) -> list[Detection]:
+    """Greedy per-frame NMS on boxes: drop a box overlapping a higher-scored one by > threshold.
+
+    ``iou_threshold <= 0`` is off (input returned unchanged). Detections without a box are
+    kept. Output keeps the input order.
+    """
+    if iou_threshold <= 0:
+        return list(dets)
+    drop: set[str] = set()
+    by_frame: dict[int, list[Detection]] = {}
+    for d in dets:
+        if d.box_xyxy is not None:
+            by_frame.setdefault(d.frame_id, []).append(d)
+    for group in by_frame.values():
+        kept: list[np.ndarray] = []
+        for d in sorted(group, key=lambda x: (-x.score, x.id)):
+            assert d.box_xyxy is not None
+            if any(_iou(d.box_xyxy, k) > iou_threshold for k in kept):
+                drop.add(d.id)
+            else:
+                kept.append(d.box_xyxy)
+    return [d for d in dets if d.id not in drop]
+
+
 def cxcywh_norm_to_xyxy(boxes: np.ndarray, width: int, height: int) -> np.ndarray:
     """Normalized (cx, cy, w, h) -> pixel xyxy, clipped to the image."""
     b = np.asarray(boxes, dtype=np.float64).reshape(-1, 4)

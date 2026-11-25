@@ -59,6 +59,8 @@ the message and exits non-zero. It never silently falls back to another detector
 
 ## Known open problem
 
-The real detector + VGGT path over-counts the tiny scene (7 vs truth 5); it is tracked as task M2
-in `TASKS_OVERNIGHT.md`. The synthetic-fixture path counts 5. Do not read the synthetic rows as
+The real detector + VGGT path counts the tiny scene correctly (5) only with `score_threshold=0.5`
+on the single frame the default near-duplicate filter keeps; at the 0.3 default it counts 7 (blue and
+green distractors), and with all five views VGGT geometry is too poor to merge (root cause in
+`docs/DEVIATIONS.md`, task M2). The synthetic-fixture path counts 5. Do not read the synthetic rows as
 evidence about real-model accuracy.

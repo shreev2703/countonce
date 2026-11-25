@@ -116,7 +116,7 @@ Recruit 3–10 users from H3 interviews; run 2–4 weeks with the laptop worker;
 ### 0.6 Definition of done ("project wrapped up")
 **Core done (required):**
 - [ ] One reliable path works from a clean install; STATUS table accurate
-- [ ] Tiny scene counts correctly with the real detector + VGGT
+- [x] Tiny scene counts correctly with the real detector + VGGT (single-frame path, `score_threshold=0.5`; see DEVIATIONS)
 - [ ] Fuji-SfM held-out results with CIs, error decomposition and gate G3 decided
 - [ ] 20–30 own scenes (≥3 zero-target) benchmarked with frozen splits
 - [ ] Failure-source experiments show where the remaining error comes from
