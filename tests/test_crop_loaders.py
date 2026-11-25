@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import io
 import json
 from pathlib import Path
 
@@ -175,7 +176,7 @@ def test_sanity_harness_and_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     out = tmp_path / "r" / "s.csv"
     s = run(root, "train", None, "color_blob", out, dataset="wgisd")
     assert s.n == 2 and s.mae == 2.5  # FakeDetector predicts 0; GT 3 and 2
-    rows = list(csv.DictReader(out.open()))
+    rows = list(csv.DictReader(io.StringIO(out.read_text())))
     assert rows[0]["dataset"] == "wgisd" and rows[0]["prompt"] == "grape cluster"
     out2 = tmp_path / "s2.csv"
     mroot = _minneapple(tmp_path / "m")

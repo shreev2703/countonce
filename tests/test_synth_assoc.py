@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import io
 from pathlib import Path
 
 import numpy as np
@@ -109,7 +110,7 @@ def test_ablation_smoke(splits: Path) -> None:
         "group:3d", "group:3d_rays", "group:full",
     ]  # fmt: skip
     summary, per_seed = run_ablation(cfg)
-    rows = list(csv.DictReader(summary.open()))
+    rows = list(csv.DictReader(io.StringIO(summary.read_text())))
     assert len(rows) == 7
     for r in rows:
         assert int(r["n_seeds"]) == 3
@@ -118,7 +119,7 @@ def test_ablation_smoke(splits: Path) -> None:
         lo, mean, hi = (float(r[f"assoc_f1_{k}"]) for k in ("ci_low", "mean", "ci_high"))
         assert lo <= hi
         assert 0.0 <= mean <= 1.0
-    assert len(list(csv.DictReader(per_seed.open()))) == 7 * 3
+    assert len(list(csv.DictReader(io.StringIO(per_seed.read_text())))) == 7 * 3
     # arm:pairwise and group:full share one trained model and inference mode
     by = {r["variant"]: r for r in rows}
     assert by["arm:pairwise"]["assoc_f1_mean"] == by["group:full"]["assoc_f1_mean"]

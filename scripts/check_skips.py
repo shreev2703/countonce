@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import sys
+from pathlib import Path
 
 ALLOWED = ("pycolmap", "mcp", "cuda", "gpu", "countonce_pg_url")
 _LINE = re.compile(r"^SKIPPED \[(\d+)\] (\S+): (.*)$")
@@ -30,7 +31,7 @@ def check(text: str) -> tuple[int, list[str]]:
 
 
 def main(argv: list[str]) -> int:
-    text = open(argv[1]).read() if len(argv) > 1 else sys.stdin.read()
+    text = Path(argv[1]).read_text() if len(argv) > 1 else sys.stdin.read()
     total, bad = check(text)
     print(f"{total} skipped; {len(bad)} outside allow-list {ALLOWED}")
     for b in bad:

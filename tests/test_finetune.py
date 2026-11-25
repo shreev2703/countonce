@@ -77,7 +77,9 @@ def test_only_adapters_train_and_base_unchanged() -> None:
             "fusion.v_proj.", "fusion.v_proj.base."
         )
         assert torch.equal(m.state_dict()[key], v), k
-    assert any(float(p.abs().sum()) > 0 for p in (mod.lora_B for mod in ft.lora_modules(m)))
+    assert any(
+        float(p.detach().abs().sum()) > 0 for p in (mod.lora_B for mod in ft.lora_modules(m))
+    )
 
 
 def test_merge_matches_unmerged_and_unmerge_restores() -> None:

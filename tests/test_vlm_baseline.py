@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import io
 
 import numpy as np
 import pytest
@@ -112,7 +113,7 @@ def test_paid_run_with_fake_logs_call(tmp_path):
     row = read_rows(cfg.csv)[0]
     assert row["status"] == "ok" and float(row["pred"]) == 6 and float(row["gt"]) == 7
     assert len(fake.calls[0][1]) == 3
-    (call,) = list(csv.DictReader(log.open()))
+    (call,) = list(csv.DictReader(io.StringIO(log.read_text())))
     assert call["provider"] == "fake" and call["model"] == "fake-1" and call["answer"] == "6"
     assert call["prompt_version"] == "count.v1" and call["n_images"] == "3"
     assert call["input_tokens"] == "100" and float(call["est_cost_usd"]) > 0 and call["date"]
@@ -128,7 +129,7 @@ def test_image_count_capped_at_provider_limit(tmp_path, monkeypatch):
     log = tmp_path / "calls.csv"
     fn = make_vlm_executor(cfg, scenes, client_factory=lambda p, m: fake, call_log=log)
     run_jobs(build_jobs(cfg, scenes), fn, cfg.csv)
-    (call,) = list(csv.DictReader(log.open()))
+    (call,) = list(csv.DictReader(io.StringIO(log.read_text())))
     assert call["n_images"] == "2" and call["n_images_requested"] == "3"
 
 
@@ -140,7 +141,7 @@ def test_refusal_is_logged_and_skipped(tmp_path):
     fn = make_vlm_executor(cfg, scenes, client_factory=lambda p, m: fake, call_log=log)
     assert run_jobs(build_jobs(cfg, scenes), fn, cfg.csv) == (0, 1, 0)
     assert read_rows(cfg.csv)[0]["status"] == "refused"
-    (call,) = list(csv.DictReader(log.open()))
+    (call,) = list(csv.DictReader(io.StringIO(log.read_text())))
     assert call["refusal"] == "1" and call["answer"] == ""
 
 

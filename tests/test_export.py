@@ -1,6 +1,7 @@
 """Export: schema round-trip, versioning, CSV totals, overlays."""
 
 import csv
+import io
 import json
 
 import numpy as np
@@ -24,6 +25,13 @@ from countonce.types import (
     MatchEvidence,
     ModelVersions,
 )
+
+
+def _size(path):
+    from PIL import Image
+
+    with Image.open(path) as im:
+        return im.size
 
 
 def make_result() -> CountResult:
@@ -66,7 +74,7 @@ def test_markers_json(tmp_path):
 
 def test_counts_csv_new_sums_to_count(tmp_path):
     p = write_counts_csv(make_result(), tmp_path / "counts.csv")
-    rows = list(csv.DictReader(p.open()))
+    rows = list(csv.DictReader(io.StringIO(p.read_text())))
     assert rows[-1]["frame_id"] == "total"
     assert int(rows[-1]["new"]) == 2
     assert int(rows[-1]["duplicate"]) == 1 and int(rows[-1]["rejected"]) == 1
@@ -144,7 +152,7 @@ def test_overlay_draws_in_original_coordinates_on_non_square_image(tmp_path):
     Image.new("RGB", (1000, 400), (220, 220, 220)).save(orig)
     (grid_path,), (pm,) = resize_to_grid_mapped([orig], tmp_path / "grid")
     gw, gh = vggt_grid_size(1000, 400)
-    assert (gw, gh) == (518, 210) and Image.open(grid_path).size == (gw, gh)
+    assert (gw, gh) == (518, 210) and _size(grid_path) == (gw, gh)
     assert (pm.orig_width, pm.orig_height) == (1000, 400)
     # height is rounded to the 14 px patch grid (207.2 -> 210), so sy is not exactly sx
     assert pm.sx == pytest.approx(1000 / 518) and pm.sy == pytest.approx(400 / 210) and pm.oy == 0
@@ -170,7 +178,7 @@ def test_grid_pixel_map_accounts_for_centre_crop_of_tall_frames(tmp_path):
     orig = tmp_path / "tall.png"
     Image.new("RGB", (300, 900)).save(orig)
     (grid_path,), (pm,) = resize_to_grid_mapped([orig], tmp_path / "grid")
-    assert Image.open(grid_path).size == (518, 518)
+    assert _size(grid_path) == (518, 518)
     assert pm == grid_pixel_map(300, 900)
     cx, cy = pm.to_original(259, 259)  # grid centre is the original centre
     assert (cx, cy) == (pytest.approx(150, abs=1), pytest.approx(450, abs=1))

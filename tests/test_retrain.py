@@ -1,6 +1,7 @@
 """Retrain + promotion loop on CPU: consent filtering, gate outcomes, log row."""
 
 import csv
+import io
 import json
 from pathlib import Path
 
@@ -83,7 +84,7 @@ def setup(tmp_path):
 
 
 def _read(cfg):
-    return list(csv.DictReader(Path(cfg.log_csv).open()))
+    return list(csv.DictReader(io.StringIO(Path(cfg.log_csv).read_text())))
 
 
 def test_eligibility_excludes_opted_out_unconsented_and_anonymous():
@@ -191,7 +192,7 @@ def test_log_appends_rows_and_extends_columns(tmp_path):
     p = tmp_path / "l.csv"
     append_log_row(p, {"incumbent": "v1", "val_before_mae": 1.0})
     append_log_row(p, {"incumbent": "v2", "golden_after_mape": 0.1})
-    rows = list(csv.DictReader(p.open()))
+    rows = list(csv.DictReader(io.StringIO(p.read_text())))
     assert [r["incumbent"] for r in rows] == ["v1", "v2"]
     assert rows[0]["golden_after_mape"] == "" and rows[1]["val_before_mae"] == ""
 

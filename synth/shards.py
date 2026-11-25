@@ -108,23 +108,31 @@ def pack_shards(
         cur["sha256"] = _sha256(path)
         shards.append(dict(cur))
 
-    for s in samples:
-        if s.key in seen or not s.key or "/" in s.key or "." in s.key:
-            raise ShardError(f"invalid or duplicate sample key {s.key!r}")
-        seen.add(s.key)
-        meta = json.dumps(s.metadata, sort_keys=True, default=str).encode()
-        blob = encode_npz(s.arrays)
-        need = len(meta) + len(blob) + 2048  # two 512 B headers plus block padding
-        if tar is not None and cur["bytes_est"] + need > max_bytes and cur["keys"]:
-            close()
-        if tar is None:
-            cur = {"name": f"{prefix}-{len(shards):05d}.tar", "keys": [], "bytes_est": 1024}
-            tar = tarfile.open(out / cur["name"], "w", format=tarfile.USTAR_FORMAT)
-        _add(tar, f"{s.key}.json", meta)
-        _add(tar, f"{s.key}.npz", blob)
-        cur["keys"].append(s.key)
-        cur["bytes_est"] += need
-    close()
+    try:
+        for s in samples:
+            if s.key in seen or not s.key or "/" in s.key or "." in s.key:
+                raise ShardError(f"invalid or duplicate sample key {s.key!r}")
+            seen.add(s.key)
+            meta = json.dumps(s.metadata, sort_keys=True, default=str).encode()
+            blob = encode_npz(s.arrays)
+            need = len(meta) + len(blob) + 2048  # two 512 B headers plus block padding
+            if tar is not None and cur["bytes_est"] + need > max_bytes and cur["keys"]:
+                close()
+            if tar is None:
+                cur = {"name": f"{prefix}-{len(shards):05d}.tar", "keys": [], "bytes_est": 1024}
+                tar = tarfile.open(out / cur["name"], "w", format=tarfile.USTAR_FORMAT)
+            _add(tar, f"{s.key}.json", meta)
+            _add(tar, f"{s.key}.npz", blob)
+            cur["keys"].append(s.key)
+            cur["bytes_est"] += need
+        close()
+    except BaseException:
+        if tar is not None:
+            tar.close()
+            (out / cur["name"]).unlink(missing_ok=True)
+        for sh in shards:  # no index.json is written, so earlier shards would be orphans
+            (out / sh["name"]).unlink(missing_ok=True)
+        raise
     for sh in shards:
         sh.pop("bytes_est", None)
     index = {

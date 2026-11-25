@@ -2,6 +2,7 @@
 
 import csv
 import importlib.util
+import io
 from pathlib import Path
 
 import pytest
@@ -58,7 +59,7 @@ def test_append_only_schema(tmp_path: Path) -> None:
     p = tmp_path / "r" / "coldstart.csv"
     append_rows(_rows(Clock()), p)
     append_rows(_rows(Clock()), p)
-    lines = list(csv.reader(p.open()))
+    lines = list(csv.reader(io.StringIO(p.read_text())))
     assert tuple(lines[0]) == SCHEMA
     assert sum(1 for ln in lines if ln[0] == "run_id") == 1
     assert len(lines) == 1 + 2 * 7

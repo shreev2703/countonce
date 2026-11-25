@@ -55,6 +55,13 @@ def test_shards_are_deterministic_and_tamper_detected(tmp_path: Path) -> None:
         shards.pack_shards(_samples(1) * 2, tmp_path / "c")
 
 
+def test_failed_pack_leaves_no_partial_shards(tmp_path: Path) -> None:
+    out = tmp_path / "d"
+    with pytest.raises(shards.ShardError, match="duplicate"):
+        shards.pack_shards([*_samples(3), *_samples(1)], out, max_bytes=8000)
+    assert not list(out.glob("*.tar")) and not (out / shards.INDEX_NAME).exists()
+
+
 def test_feature_schema_and_row_count(tmp_path: Path) -> None:
     eps = []
     for seed in (1, 2):

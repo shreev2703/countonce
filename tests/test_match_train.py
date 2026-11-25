@@ -1,6 +1,7 @@
 """Matcher training, cycle loss, calibration (PLAN §10.3-10.6). CPU, tiny episodes."""
 
 import csv
+import io
 import json
 
 import numpy as np
@@ -82,7 +83,7 @@ def test_two_epoch_cpu_run_lowers_loss_and_logs(tmp_path):
     lines = [json.loads(x) for x in (tmp_path / "run" / "log.jsonl").read_text().splitlines()]
     assert lines[0]["event"] == "run" and "data_version" in lines[0] and "git_commit" in lines[0]
     assert [x["event"] for x in lines[1:]] == ["epoch", "epoch"]
-    rows = list(csv.DictReader((tmp_path / "results" / "r.csv").open()))
+    rows = list(csv.DictReader(io.StringIO((tmp_path / "results" / "r.csv").read_text())))
     assert len(rows) == 2
     assert (tmp_path / "run" / "calibration.json").exists()
     assert load_checkpoint(tmp_path / "run" / "best.pt") is not None

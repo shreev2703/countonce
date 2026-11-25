@@ -92,6 +92,10 @@ select = ["E", "F", "I", "UP", "B", "W"]
 testpaths = ["tests"]
 python_files = ["test_*.py", "jobs_contract.py"]
 addopts = "-ra"
+filterwarnings = [
+    "error::ResourceWarning",
+    "error::pytest.PytestUnraisableExceptionWarning",
+]
 markers = [
     "slow: long-running tests (excluded from hosted CI)",
     "gpu: tests that need a CUDA GPU (self-hosted runner or local)",

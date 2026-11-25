@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import io
 import json
 from pathlib import Path
 
@@ -64,7 +65,7 @@ def test_color_blob_end_to_end(tmp_path: Path) -> None:
     out = tmp_path / "r" / "detector_sanity.csv"
     s = run(root, "val", None, "color_blob", out)
     assert s.n == 3 and s.mae == 0.0 and s.rmse == 0.0
-    rows = list(csv.DictReader(out.open()))
+    rows = list(csv.DictReader(io.StringIO(out.read_text())))
     assert [r["kind"] for r in rows] == ["image"] * 3 + ["summary"]
     assert rows[0]["pred_count"] == rows[0]["gt_count"] == "5"
 
@@ -85,7 +86,7 @@ def test_csv_schema_stable_and_append_only(tmp_path: Path) -> None:
     out = tmp_path / "o.csv"
     run_detector_sanity(ColorBlobDetector(), items, out_csv=out)
     run_detector_sanity(ColorBlobDetector(), items, out_csv=out)
-    lines = list(csv.reader(out.open()))
+    lines = list(csv.reader(io.StringIO(out.read_text())))
     assert tuple(lines[0]) == SCHEMA
     assert sum(1 for r in lines if tuple(r) == SCHEMA) == 1  # header written once
     assert len(lines) == 1 + 2 * 3
