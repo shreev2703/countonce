@@ -766,3 +766,8 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - Only CountVid, DG-Net and OneScene-Bench were read in full (the task's scope). Other works are tagged abstract/search/repo level and described only by what they state.
 - §2.4 does not define the two sides of "geometry-aware vs simpler geometric matching"; read as v2/sync/v3 vs v1/C-DOG.
 - Also updated where the full read contradicted them: PLAN §2.3 rows and §2.4 note, MODEL_SURVEY (DG-Net accepts estimated depth; venue), DATASETS (OneScene-Bench release has no images; loader layout assumption is wrong), EXPLAINER Q2, README license table, `paper/refs.bib`. The OneScene loader code was not changed (no images to test against).
+
+## M11 capture kit
+- `scripts/ingest_captures.py` re-encodes pixels to JPEG (q95, orientation applied, long side <= 2048, no EXIF/ICC) and renames to `img_NNN.jpg`; original filenames are not kept (they can carry dates). HEIC is rejected with a message rather than adding a plugin dependency.
+- Hand counts are required (`--counts A B [C]`, or `hand_counts` in the scene list); two must agree. A count of 0 needs `--zero` (and `--zero` needs count 0), so zero scenes are deliberate. `gt.json` adds `prompt`, `physical_scene`, `zero_target`, `hand_counts`, `count_definition`, per-image sha256; extra keys are ignored by `bench.sweep`.
+- Template `configs/capture_scenes.template.yaml` lists 20 scenes (16 positive across tiers, 4 zero-target); PLAN asks for 20-30, so add more as places are found. Video is not ingested.

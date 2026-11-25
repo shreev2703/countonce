@@ -1,0 +1,153 @@
+# Capture scene list (PLAN §9.2). Copy to configs/capture_scenes.yaml and edit.
+# Target 20-30 independently captured static scenes, >= 3 zero-target scenes (flagged
+# `zero_target: true`; they need look-alike distractors or a wrong prompt, count must be 0).
+# `physical_scene` is the split unit: two captures of the same place share one id so they
+# never land in different train/val/test splits.
+# Fill `hand_counts` AFTER shooting, counting from the photos (two counts, a third if they
+# disagree; see docs/CAPTURE_GUIDE.md). Leave it empty until then.
+# Ingest one scene:
+#   python scripts/ingest_captures.py --scene-list configs/capture_scenes.yaml \
+#       --src <phone folder> --scene-id <id> --counts 12 12
+# Tiers: easy = bike racks, chairs, shelf items; medium = plants, bins, cones;
+# hard = fruit on trees, dense similar objects.
+scenes:
+  - id: bikes_rack
+    prompt: bicycle
+    tier: easy
+    physical_scene: bikes_rack
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "bike rack outdoors"
+  - id: chairs_classroom
+    prompt: chair
+    tier: easy
+    physical_scene: chairs_classroom
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "classroom or lecture hall"
+  - id: shelf_cans
+    prompt: can
+    tier: easy
+    physical_scene: shelf_cans
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "shop shelf or pantry"
+  - id: cars_lot_small
+    prompt: car
+    tier: easy
+    physical_scene: cars_lot_small
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "small car lot"
+  - id: mugs_table
+    prompt: mug
+    tier: easy
+    physical_scene: mugs_table
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "table, mugs of one design"
+  - id: books_shelf
+    prompt: book
+    tier: easy
+    physical_scene: books_shelf
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "bookshelf"
+  - id: plants_nursery
+    prompt: potted plant
+    tier: medium
+    physical_scene: plants_nursery
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "nursery or garden centre"
+  - id: cones_bins
+    prompt: traffic cone
+    tier: medium
+    physical_scene: cones_bins
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "cones or bins on pavement"
+  - id: bottles_clutter
+    prompt: bottle
+    tier: medium
+    physical_scene: bottles_clutter
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "cluttered desk or kitchen counter"
+  - id: boxes_stack
+    prompt: cardboard box
+    tier: medium
+    physical_scene: boxes_stack
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "stacked boxes with occlusion"
+  - id: shoes_rack
+    prompt: shoe
+    tier: medium
+    physical_scene: shoes_rack
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "shoe rack, pairs of near-identical shoes"
+  - id: bikes_dense
+    prompt: bicycle
+    tier: hard
+    physical_scene: bikes_dense
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "densely parked bikes, heavy occlusion"
+  - id: fruit_tree
+    prompt: apple
+    tier: hard
+    physical_scene: fruit_tree
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "fruit on a tree or vine"
+  - id: fruit_bowl_similar
+    prompt: orange
+    tier: hard
+    physical_scene: fruit_bowl_similar
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "near-identical fruit piled up"
+  - id: pens_dense
+    prompt: pen
+    tier: hard
+    physical_scene: pens_dense
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "dense similar small objects"
+  - id: cups_stacked
+    prompt: paper cup
+    tier: hard
+    physical_scene: cups_stacked
+    zero_target: false
+    hand_counts: []   # TODO: fill after hand count
+    notes: "stacked cups, partial views"
+  - id: zero_empty_rack
+    prompt: bicycle
+    tier: easy
+    physical_scene: zero_empty_rack
+    zero_target: true
+    hand_counts: []   # TODO: fill after hand count
+    notes: "ZERO: empty bike rack, no bicycles in view"
+  - id: zero_distractor_chairs
+    prompt: chair
+    tier: medium
+    physical_scene: zero_distractor_chairs
+    zero_target: true
+    hand_counts: []   # TODO: fill after hand count
+    notes: "ZERO: stools and benches only, no chairs (look-alikes)"
+  - id: zero_wrong_prompt_kitchen
+    prompt: bicycle
+    tier: easy
+    physical_scene: zero_wrong_prompt_kitchen
+    zero_target: true
+    hand_counts: []   # TODO: fill after hand count
+    notes: "ZERO: ordinary room with no bicycles"
+  - id: zero_distractor_fruit
+    prompt: apple
+    tier: medium
+    physical_scene: zero_distractor_fruit
+    zero_target: true
+    hand_counts: []   # TODO: fill after hand count
+    notes: "ZERO: oranges and tomatoes only, no apples"
