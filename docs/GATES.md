@@ -263,3 +263,6 @@ so `scripts/render_mockups.py` skips; open the HTML files directly or install pl
 
 ## 2026-11-24: Fuji Core report re-run still blocked (third attempt)
 - `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled, and the DEVIATIONS "assoc_f1 not filled" TODO stays. Task left `[ ]`; re-queue after step 2 writes rows.
+
+## 2026-11-24: Fuji Core report re-run still blocked (fourth attempt)
+- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled, and the DEVIATIONS "assoc_f1 not filled" TODO stays. Task left `[ ]`; re-queue after step 2 writes rows.
