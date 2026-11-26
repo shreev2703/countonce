@@ -24,17 +24,17 @@
   "oom_fallback_rung": 0,
   "peak_vram_mb": 0.0,
   "timings": {
-    "ingest": 0.013439422997180372,
-    "detect": 0.014130175986792892,
-    "recon": 0.006899289001012221,
-    "associate": 0.02143418201012537,
-    "confidence": 0.02033310499973595,
-    "total": 1.4519408350170124
+    "ingest": 0.014080770983127877,
+    "detect": 0.015337682998506352,
+    "recon": 0.007684424985200167,
+    "associate": 0.028204071015352383,
+    "confidence": 0.031197915988741443,
+    "total": 1.5958628819789737
   },
   "config": {
-    "git_commit": "28824077900225f795ae403ef476f42b0ad04a4b",
-    "git_dirty": false,
-    "timestamp_utc": "2026-11-25T23:00:47+00:00",
+    "git_commit": "ca2fa6b4e21c2f6023f63b1ef1fdc82d13e328ff",
+    "git_dirty": true,
+    "timestamp_utc": "2026-11-26T01:18:25+00:00",
     "config": {
       "detector": "color_blob",
       "backbone": "fixture",
@@ -79,7 +79,7 @@
       "privacy_blur_sigma": 12.0,
       "detector_options": {},
       "backbone_options": {
-        "scene": "/home/shreev2703/countonce/examples/tiny_scene/scene.json"
+        "scene": "<repo>/examples/tiny_scene/scene.json"
       },
       "compile_reconstructor": "off",
       "compile_detector": "off",
@@ -87,7 +87,7 @@
       "preload_workers": 0,
       "pin_memory": false,
       "sdpa_check": false,
-      "out_dir": "/home/shreev2703/countonce/web/public/demo/tiny/_run",
+      "out_dir": "<repo>/web/public/demo/tiny/_run",
       "cache_dir": null
     },
     "torch": "2.15.0+cpu",

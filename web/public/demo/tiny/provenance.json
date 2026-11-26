@@ -10,9 +10,9 @@
     "view_4.png": "fac5fa20616b0b0f65c37643bb4df51cc0d4a9e683e083b4ffc5e505050a4b62"
   },
   "run": {
-    "git_commit": "28824077900225f795ae403ef476f42b0ad04a4b",
-    "git_dirty": false,
-    "timestamp_utc": "2026-11-25T23:00:48+00:00",
+    "git_commit": "ca2fa6b4e21c2f6023f63b1ef1fdc82d13e328ff",
+    "git_dirty": true,
+    "timestamp_utc": "2026-11-26T01:18:26+00:00",
     "config": {
       "detector": "color_blob",
       "backbone": "fixture",
@@ -57,7 +57,7 @@
       "privacy_blur_sigma": 12.0,
       "detector_options": {},
       "backbone_options": {
-        "scene": "/home/shreev2703/countonce/examples/tiny_scene/scene.json"
+        "scene": "<repo>/examples/tiny_scene/scene.json"
       },
       "compile_reconstructor": "off",
       "compile_detector": "off",
@@ -65,7 +65,7 @@
       "preload_workers": 0,
       "pin_memory": false,
       "sdpa_check": false,
-      "out_dir": "/home/shreev2703/countonce/web/public/demo/tiny/_run",
+      "out_dir": "<repo>/web/public/demo/tiny/_run",
       "cache_dir": null
     },
     "torch": "2.15.0+cpu"

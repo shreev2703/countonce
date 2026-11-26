@@ -7,7 +7,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 ## 2026-11-24: Human actions needed (logged by tech-lead audit, not overnight tasks)
 
 - **Dev environment:** countonce has no venv. `ruff`/`pytest` currently run from the read-only
-  `~/vggtProject/.venv`, and mypy has never been run. Needed: create `countonce/.venv` (Python 3.11) and
+  the sibling VGGT benchmark repo venv, and mypy has never been run. Needed: create `countonce/.venv` (Python 3.11) and
   `pip install -e .[dev,recon]`, then run `mypy` once.
 - **Gates G0 / G1 (PLAN §21):** need the niche interviews and professor meeting (PLAN §20) before they
   can be decided. `docs/RELATED_WORK.md` has `TODO: verify` items that need a full-paper read.
@@ -30,7 +30,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 
 ## 2026-11-24: Third tech-lead audit (human actions, not queued as overnight tasks)
 - All 22 earlier overnight tasks are checked. `pytest` passes (157 tests) and `ruff check .` is clean, both
-  still run from `~/vggtProject/.venv`. mypy is still not installed anywhere, so the countonce venv item above stays open.
+  still run from the sibling VGGT benchmark repo venv. mypy is still not installed anywhere, so the countonce venv item above stays open.
 - **Frontier VLM baseline (PLAN §9.3 item 8):** needs API keys (Anthropic, Google, OpenAI), a spending cap
   and your approval of the prompt and the scene subset before any paid call. The harness can be built with a fake
   client later, but no real run happens without you.
@@ -45,7 +45,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 
 ## 2026-11-24: Fourth tech-lead audit (human actions, not queued as overnight tasks)
 - Audit state: all 26 earlier overnight tasks are checked. `pytest` passes 229 tests and `ruff check .` is clean, both still run from
-  `~/vggtProject/.venv`. mypy is still not installed in any environment, so the countonce venv item stays open.
+  the sibling VGGT benchmark repo venv. mypy is still not installed in any environment, so the countonce venv item stays open.
 - **Track J dependencies (PLAN §16B.1):** `pyarrow`, `duckdb`, `webdataset` and `dvc` are not installed anywhere, so the
   Parquet feature store, DuckDB catalog, WebDataset shards and DVC versioning are not queued yet (their tests would only skip).
   Needed: add them to the countonce venv, `dvc init`, and choose a remote (local disk or R2 credentials).
@@ -58,7 +58,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 
 ## 2026-11-24: Fifth tech-lead audit (human actions, not queued as overnight tasks)
 - Audit state: all 35 earlier overnight tasks are checked. `pytest` passes 345 tests and `ruff check .` is clean, both still run from
-  `~/vggtProject/.venv`. mypy is still not installed anywhere (`~/vggtProject/.venv/bin/mypy` is missing), so the pre-commit mypy hook
+  the sibling VGGT benchmark repo venv. mypy is still not installed anywhere (its `bin/mypy` is missing), so the pre-commit mypy hook
   has never run. The countonce venv item stays open.
 - **Privacy region detector weights:** the installed `cv2` (5.1.0) has no bundled Haar cascades. For face/plate blurring to run for real,
   download a face model (e.g. OpenCV YuNet ONNX or `haarcascade_frontalface_default.xml`) and a plate cascade, and set their paths
@@ -72,7 +72,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 
 ## 2026-11-24: Sixth tech-lead audit (human actions, not queued as overnight tasks)
 - Audit state: all 47 earlier overnight tasks are checked. `pytest` passes 402 tests (1 skipped) and `ruff check .` is clean, both
-  still run from `~/vggtProject/.venv`. mypy is still not installed, so the countonce venv item stays open.
+  still run from the sibling VGGT benchmark repo venv. mypy is still not installed, so the countonce venv item stays open.
 - **Web product deps (PLAN §14.2-14.4, §14.8 idempotency/resumable uploads):** `fastapi`, `httpx`, `sqlalchemy` and a Postgres instance
   are not available, and the frontend still waits for mockup approval. The API, idempotency keys and load test stay unqueued until you
   approve mockups and add those deps. The correction tools are queued as a backend only.
@@ -85,7 +85,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 
 ## 2026-11-24: Seventh tech-lead audit (human actions, not queued as overnight tasks)
 - Audit state: all 54 earlier overnight tasks are checked. `pytest` passes 477 tests (2 skipped) and `ruff check .` is clean in
-  `~/vggtProject/.venv`. A countonce `.venv` now exists (uv, **Python 3.12.3**, dev extra only). In it, 5 test modules fail to collect
+  the sibling VGGT benchmark repo venv. A countonce `.venv` now exists (uv, **Python 3.12.3**, dev extra only). In it, 5 test modules fail to collect
   (matplotlib/torch missing) and `mypy countonce` reports 65 errors. Both are queued as fixes. Human items: decide whether the venv should be
   3.11 to match CI (`setup-python 3.11`), then `uv pip install -e .[dev,recon,mcp]` (torch for `sm_120` needs the CUDA 12.8+ wheel index).
 - **SAM/SAM2 weights** (RESOLVED 2026-11-24 through Hugging Face: `facebook/sam2.1-hiera-small`, public, ungated, Apache-2.0, used by `Sam2HfMaskProducer`; only the `sam2`-package path still needs a manual checkpoint): download a checkpoint (e.g. `sam2_hiera_small.pt`) on a networked session and set its path
@@ -107,7 +107,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 ## 2026-11-24: Eighth tech-lead audit (human actions, not queued as overnight tasks)
 - Audit state: all 61 earlier overnight tasks are checked. In the countonce `.venv` (Python 3.12, dev extra only), `pytest` gives 480 passed and
   22 skipped, `ruff check .` is clean and `mypy countonce` reports no issues (70 files). The 22 skips are missing torch, matplotlib, cv2, mcp and
-  pycolmap. The 69 skipped-module tests pass in `~/vggtProject/.venv`. CI has the same blind spot, so a `full-cpu` CI job is queued.
+  pycolmap. The 69 skipped-module tests pass in the sibling VGGT benchmark repo venv. CI has the same blind spot, so a `full-cpu` CI job is queued.
 - **License choice (PLAN §16, §24):** the repo has no LICENSE. Pick the code license yourself (e.g. MIT or Apache-2.0 for the code).
   Several dependencies and weights are non-commercial (VGGT, VGGT-Ω, possibly Fuji-SfM; see `docs/DATASETS.md`, `docs/MODEL_SURVEY.md`),
   so the README needs a note on that whatever you choose. The queued hygiene task deliberately skips the LICENSE file.
@@ -207,7 +207,7 @@ R2 bucket, then `dvc remote add -d r2 s3://<bucket>/dvc`, set the endpoint URL a
   (3) `bench/vlm/parse` reads "Confidence: 80%" as a count of 80 and "No apples are visible." as a parse failure instead of 0.
 - **The GPU is not human-gated:** this machine has an RTX 5070 Laptop GPU (8 GB) and the public `facebook/VGGT-1B` weights cached under `~/.cache/huggingface`.
   So this batch queues the first real-VGGT run and baseline profile (color-blob detector, tiny scene, capped at 20 minutes, its own `.venv-gpu`, leaving
-  `~/vggtProject` untouched). Earlier audits listed "GPU runs" as yours. If you'd rather watch GPU runs yourself, delete that task before the orchestrator reaches it.
+  the VGGT benchmark repo untouched). Earlier audits listed "GPU runs" as yours. If you'd rather watch GPU runs yourself, delete that task before the orchestrator reaches it.
 - **Mockups:** the queued task only *produces* static mockups in `docs/mockups/`. **Your approval** is still required before any `frontend/` code, and the
   frontend, 3D viewer and Google sign-in stay unqueued until you approve.
 - **Still yours (unchanged):** a real Postgres (Neon/Supabase) and R2 bucket and credentials, the DVC remote, deploys (Vercel/Render), the OTLP endpoint, HF uploads,
@@ -355,3 +355,17 @@ No hosted frontend exists (see M18 above). After deploying, replace the "Live de
 
 ## M20: five-view VGGT run fails through the CLI on WSL2 8 GB (open bug)
 `countonce run examples/tiny_scene --prompt "red sphere" --assoc v2 --config configs/readme_real_failure.yaml` gives `reconstruction failed: cuda_error: CUDA driver error: device not ready` (3 of 3 attempts, including with `PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512`). `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False` works. Suspect: `configure_allocator()` in `countonce/oom.py`. Peak VRAM is at the 8 GB limit. The worker may be affected; check before the M19 GPU run.
+
+## M21: one step left for a human (2026-11-25)
+`CLAUDE.md` is still tracked and still contains personal paths, so M21 is not done. The user-level
+`guard_commit.py` PreToolUse hook rejects any agent commit whose staged paths include `CLAUDE.md`,
+including its removal from the index. The hook was not bypassed. Everything else in M21 is committed.
+
+To finish, from your own shell in the repo: `git rm --cached CLAUDE.md`, then
+`git commit -m "chore(repo): untrack agent rules file (M21)"`, then tick M21 in the local task file.
+The file stays on disk and is already in `.gitignore`. Then remove the `xfail` marker and the
+`CLAUDE.md` exemption in `tests/test_repo_hygiene.py`.
+
+Before merging into `main` (which still tracks the agent files): back up the local copies. Checking out
+`main` and then merging this branch deletes them from the working tree. Git history also still holds
+them and their personal paths; history was not rewritten.

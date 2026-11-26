@@ -1,4 +1,4 @@
-# Ported from ~/vggtProject (vggt-sparse-recon): vggt_bench/env_check.py. Adapted for countonce.
+# Ported from vggt-sparse-recon: vggt_bench/env_check.py. Adapted for countonce.
 """Phase 0 environment check: GPU, VRAM, CUDA arch support, package versions."""
 
 from __future__ import annotations

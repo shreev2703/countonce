@@ -251,7 +251,9 @@ This repo ships download scripts, not datasets or model weights. Verify each lic
 | Pachauri et al., NeurIPS 2013 | Spectral permutation synchronization (`countonce/merge/sync.py`) | Paper |
 
 Reconstruction wrapper, memory guard, frame extraction, COLMAP wrapper and plotting style are
-ported from the author's VGGT benchmark repo (not public yet). This repository does not have a
-license file yet.
+ported from the author's VGGT benchmark repo (not public yet).
+
+**License.** The code is Apache-2.0 ([LICENSE](LICENSE)). Model weights (for example VGGT, which is
+non-commercial) and datasets are not covered by it and keep their own licenses.
 
 Related work and the hypothesis under test: [docs/RELATED_WORK.md](docs/RELATED_WORK.md).

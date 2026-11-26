@@ -55,3 +55,12 @@ runs/
 # Stray job logs
 *.out
 .env*
+
+# Agent / orchestrator files (local only, never published)
+TASKS_OVERNIGHT.md
+CLAUDE.md
+scripts/hud.py
+scripts/dashboard.sh
+scripts/morning_review.sh
+scripts/overnight_orchestrator.sh
+*handoff*.md

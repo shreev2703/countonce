@@ -12,7 +12,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - **Subpackages:** created `ingest`, `detect`, `recon`, `merge`, `export`, `schemas`, `match`
   (names from PLAN §8 and §10) as empty packages; `py.typed` added for mypy consumers.
 - **Lint rules:** ruff `E,F,I,UP,B,W`, line length 100. mypy runs in strict mode with the pydantic plugin.
-- **Tooling check:** ruff and pytest verified via the read-only `~/vggtProject/.venv`; mypy is not installed there and the system Python lacks venv/pip, so mypy config is unverified. Install with `pip install -e .[dev]` once a venv exists.
+- **Tooling check:** ruff and pytest verified via the read-only the sibling VGGT benchmark repo venv; mypy is not installed there and the system Python lacks venv/pip, so mypy config is unverified. Install with `pip install -e .[dev]` once a venv exists.
 
 ## 2026-11-24: Port from vggtProject
 - `Recon` from vggt-sparse-recon lives in `countonce/recon/result.py` (the ported, method-level reconstruction result). The §7 data-model `Recon` in `countonce/types.py` is a separate task and may wrap or replace it.
@@ -20,7 +20,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - Plotting: ported only generic helpers (style, `save`, `depth_to_rgb`, `point_cloud_preview`, `vram_vs_frames`). Benchmark-specific plots (`band_lines`, `scene_type_bars`) were left behind; they belong to Track B.
 - Env check: Python pin relaxed from `==3.11` to `>=3.11` to match `pyproject.toml`.
 - Frame extraction: dropped the unused `EXAMPLES` constant. `countonce/configs/colmap.yaml` copied verbatim.
-- Added `recon` optional-dependency extra and `pythonpath = ["."]` for pytest. `ruff`/`pytest` were run from `~/vggtProject/.venv` (3.11, has torch/pycolmap) since countonce has no venv yet.
+- Added `recon` optional-dependency extra and `pythonpath = ["."]` for pytest. `ruff`/`pytest` were run from the sibling VGGT benchmark repo venv (3.11, has torch/pycolmap) since countonce has no venv yet.
 - Video-clip helper (`clip.py`) was not ported: it is demo-site specific and not in the task list.
 
 ## types.py (2026-11-24)
@@ -186,7 +186,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - OOM is detected by class name `OutOfMemoryError` or a "out of memory" RuntimeError, so no torch import is needed.
 - `configure_allocator()` runs at `countonce.cli` import and in `main()`. It keeps other `PYTORCH_CUDA_ALLOC_CONF` options and respects an explicit `expandable_segments` setting. Python entry points that skip the CLI must call it themselves.
 - Profile CSV: one row per (repeat, stage) from the pipeline's `timings`. VRAM is filled only for `recon` (run peak) and `total`, and empty without CUDA. `docs/PROFILE.md` is a skeleton; `torch.profiler`/Nsight traces are not wired.
-- Tests ran with `~/vggtProject/.venv` (countonce still has no venv, see GATES.md).
+- Tests ran with the sibling VGGT benchmark repo venv (countonce still has no venv, see GATES.md).
 
 ## §9.6 ablation grid
 - `cannot_link: false` for v2 only lets *unassigned* same-frame detections join their cheapest admissible existing track (no tracks exist in the first frame, so same-frame pairs there stay separate). v1 skips both cannot-link checks.
@@ -244,7 +244,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - `result.json` does not record resolution or mean depth confidence, so they are read from optional `mean_depth_conf` / `config.image_width|image_height` keys, with depth confidence otherwise parsed from the `low_depth_confidence` warning text (only present when that warning fired). Features absent on either side are listed under `skipped`, never scored.
 - `lift_failure_rate` = `config.lift_fallbacks` / detections; `detection_density` = detections per frame (the bench CSV `density` column is per megapixel; the two are not mixed unless both sides come from the same source).
 - Categorical drift is flagged on PSI; the chi-square statistic is reported but not used for flagging (no p-value; scipy not assumed). Min 2 rows per side, else a ValueError / CLI exit 2.
-- Ran with the shared venv `~/vggtProject/.venv` since the repo has none.
+- Ran with the shared venv the sibling VGGT benchmark repo venv since the repo has none.
 
 ## "Explain this match" and schema 1.1
 - `result.json` 1.0 had no per-detection geometry, so 1.1 appends `detections` (id, frame, recon view, xyz, size, box-centre uv in recon pixels, optional feature) and `cameras` (K, world->camera extrinsics). `UPGRADERS["1.0"]` bumps the version and adds empty lists (markers only change version). `ResultV11` subclasses `ResultV1`; `tests/fixtures/schemas/v1.1/` is new and `v1.0/` is untouched. Existing tests that asserted `"1.0"` for freshly written files now assert `"1.1"`.
@@ -259,7 +259,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - `kind: zero_suite` is a `MethodSpec` kind skipped by `build_jobs`; `run_bench` runs it afterwards and writes `zero_suite.md` beside the CSV. Its `config` holds `options` (countonce overrides), `n_synthetic`, `seed`, `n_views`, `scenes_dir`.
 - Synthetic scenes are written to `results/zero_suite/scenes`; a distractor's scores go up to 0.45, so at the default 0.3 threshold some are intentional false positives. Negative prompts (CountGD++) are not covered here (no detector support yet).
 - `ghost_duplicate_rate` is an append-only column; the default executor leaves it blank (no moving GT ids on real scenes). NaN is written as blank.
-- Tests ran via `~/vggtProject/.venv` again (no repo venv).
+- Tests ran via the sibling VGGT benchmark repo venv again (no repo venv).
 
 ## Golden benchmark gate
 - The real-scene (GPU) half of `configs/golden.yaml` is empty: no datasets are on disk, so no scenes or hashes were invented. `bench.golden run` without `--cpu-synthetic` refuses unpinned scenes; `freeze` pins them. `configs/golden_gpu_baseline.json` does not exist yet (`TODO: fill from results`), so `golden-gpu.yml` fails until the owner adds it.
@@ -271,7 +271,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - Idempotence uses a content key (job id + action + sorted detection ids); already-recorded keys are skipped. Interval low/high shift by the count change (clamped at 0), method unchanged: not re-calibrated.
 - Split with several source instances puts all moved detections in one new instance; splitting an instance's entire membership is refused (`ERR_INVALID_CORRECTION`). Merge of detections already in one instance is a no-op. Cannot-link violations raise `CorrectionError` with `ERR_CANNOT_LINK`.
 - Merge hard positives are all cross pairs between the two instances' members; Split hard negatives are moved-vs-remaining members. Pass the ORIGINAL results to `export_training_pairs`. Corrections whose job id has no result are skipped. CLI maps every job id in the file to the one `out_dir` result.
-- Tests ran with `~/vggtProject/.venv` (project `.venv` lacks torch/matplotlib).
+- Tests ran with the sibling VGGT benchmark repo venv (project `.venv` lacks torch/matplotlib).
 
 ## Negative prompts (natural-language prompts)
 - Suppression runs the negative phrases as a second detector call and matches boxes by IoU >= 0.5 (same frame) rather than adding tokens to one caption, because `Detection` carries only the max-token score. Works for any detector whose scores depend on the caption; opt-in via `supports_negatives` (GroundingDINO only). `Config.negative_margin` default 0.0, untuned. Detectors without the flag keep the original prompt and get a `negative_prompts_ignored` warning. `Config.negative_prompts=False` sends the raw prompt untouched (ablation row).
@@ -841,3 +841,10 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **One measured table is MAE only**, copied from `results/benchmark_summary.csv`; `tests/test_readme.py` fails if they diverge. `bench.fuji_report` no longer writes a block into the README (it would bring the TODO cells back); the full table stays in `docs/RESULTS_FUJI.md`.
 - **Live demo link:** none exists, so the README says "not hosted yet" (see `docs/GATES.md`).
 - **Found, not fixed (outside M20):** the CLI's `expandable_segments:True` (`countonce/oom.py`) made the five-view VGGT run fail with `CUDA driver error: device not ready` on WSL2 + RTX 5070 8 GB (3 of 3 CLI attempts); with `expandable_segments:False` it succeeded, as did the Python API path, which does not set it. The README command sets the override.
+
+## M21 repo hygiene (2026-11-25)
+- Apache-2.0 covers the code only; model weights and datasets keep their own licenses (README note).
+- Agent files are untracked and gitignored but stay on disk. `CLAUDE.md` is still pending (see GATES.md).
+- The demo exporter rewrites the absolute repo root to `<repo>` in exported JSON; the tiny demo was re-exported.
+- Author name and GitHub URLs stay: they are attribution, not personal paths. History was not rewritten.
+

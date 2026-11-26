@@ -61,7 +61,7 @@ Related: [[PLAN]] §24, [[DEVIATIONS]].
 - Already ported (`countonce/recon/vggt.py`). Predicts cameras, depth, point maps, tracks from 1..hundreds of views.
 - License is a custom "VGGT License" (2025-07-29): commercial use allowed excluding military, but **only** the `VGGT-1B-Commercial` checkpoint (gated, form-based) is commercial; the original `VGGT-1B` stays non-commercial.
 - README (2026-05-15) notes a fix that lets the same GPU memory run roughly 2-3x more frames; our earlier VGGT-project numbers
-  predate/may not include that. VRAM figures from our own run (RTX 5070 Laptop 8 GB, WSL2, `~/vggtProject/README.md`): 3.1 GB at 1 frame, 6.9 GB at 70 frames; 3.4 to 5.6 GB for 3 to 40 views. **TODO: re-measure on current upstream.**
+  predate/may not include that. VRAM figures from our own run (RTX 5070 Laptop 8 GB, WSL2, the VGGT benchmark repo README): 3.1 GB at 1 frame, 6.9 GB at 70 frames; 3.4 to 5.6 GB for 3 to 40 views. **TODO: re-measure on current upstream.**
 
 ### VGGT-Ω (CVPR 2026 oral, arXiv 2605.15195)
 - DINOv3 (patch 16) backbone. Checkpoints (gated on HF, automated approval): `VGGT-Omega-1B-512` (recommended in-the-wild), `-1B-416-Reproduction`, `-1B-256-Text-Alignment`.

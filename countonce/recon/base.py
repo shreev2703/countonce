@@ -1,4 +1,4 @@
-# Ported from ~/vggtProject (vggt-sparse-recon): vggt_bench/methods/base.py. Adapted for countonce.
+# Ported from vggt-sparse-recon: vggt_bench/methods/base.py. Adapted for countonce.
 """Common interface so the benchmark can swap reconstruction methods."""
 
 from __future__ import annotations

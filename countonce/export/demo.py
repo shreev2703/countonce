@@ -208,6 +208,13 @@ def build_scene(
         },
     )
 
+    # Keep personal absolute paths out of committed assets (PLAN 28.5).
+    root_str = str(Path(repo_root).resolve())
+    for jf in out.rglob("*.json"):
+        text = jf.read_text()
+        if root_str in text:
+            jf.write_text(text.replace(root_str, "<repo>"))
+
     files = sorted(p.relative_to(out).as_posix() for p in out.rglob("*") if p.is_file())
     files = [f for f in files if f != "manifest.json"]
     _write_json(

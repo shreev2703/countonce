@@ -1,4 +1,4 @@
-# Ported from ~/vggtProject (vggt-sparse-recon): vggt_bench/methods/colmap_method.py. Adapted.
+# Ported from vggt-sparse-recon: vggt_bench/methods/colmap_method.py. Adapted.
 """COLMAP wrapped behind the ReconMethod interface.
 
 Uses pycolmap 4.2, whose options API differs from older releases: SIFT settings

@@ -7,6 +7,7 @@ name = "countonce"
 version = "0.1.0"
 description = "Count anything in 3D from a few photos, without counting it twice."
 readme = "README.md"
+license = { text = "Apache-2.0" }
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",

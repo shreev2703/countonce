@@ -1,4 +1,4 @@
-# Ported from ~/vggtProject (vggt-sparse-recon): vggt_bench/provenance.py. Adapted for countonce.
+# Ported from vggt-sparse-recon: vggt_bench/provenance.py. Adapted for countonce.
 """Run metadata (git commit, time, config) attached to every result file."""
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-# Ported from ~/vggtProject (vggt-sparse-recon): vggt_bench/recon.py. Adapted for countonce.
+# Ported from vggt-sparse-recon: vggt_bench/recon.py. Adapted for countonce.
 """Method-agnostic reconstruction result shared by VGGT and COLMAP."""
 
 from __future__ import annotations
