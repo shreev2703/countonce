@@ -410,3 +410,28 @@ Items from the resolved snapshots that no other open section above lists.
   M5b-1 and M5b-2. Sync and v3 on Fuji held-out trees is finished (see G4 below).
 - Orchestrator settings suggested by earlier audits: skip a task after 2 consecutive gate logs, and raise the
   turn cap for GPU tasks or split them.
+
+## 2026-11-25: Nineteenth tech-lead audit — open (owner: Shreev)
+- Audit state at `5d08ec8`: `ruff check .` clean; `pytest -m "not slow and not gpu"` gives 1097 passed, 26 skipped
+  (Postgres without `COUNTONCE_PG_URL`, `pycolmap` not in `.venv`), 1 xfail (the M21 `CLAUDE.md` test), 16 warnings.
+- **Bug found:** the 16 warnings are `DeprecationWarning: ... multi-threaded, use of fork() may lead to deadlocks`
+  from `bench/synth_component.py:406`, which builds its pool with `mp.get_context("fork")`. Queued first.
+- **Correction to the eighteenth audit's "no autonomous work left":** several PLAN items run on Fuji-SfM and public
+  weights without photos or accounts. Queued in order: COLMAP-lifting baseline (§9.3 #4; `pycolmap` 4.2.1 is in
+  `.venv-gpu`), a re-implemented C-DOG baseline and experiment E4 (§9.3 #5; no repo licence, so from the paper),
+  real-data ablations on Fuji (§9.6 list; only synthetic ablations exist), order-invariance on the test trees and
+  for v3 plus a re-run-VGGT-per-permutation variant (§0.6 row note), full reads of the six related-work papers
+  still marked "not read in full" (§0.6 row), experiment E1 tracker side with SAM 2.1 and ByteTrack on Fuji, and
+  Lighthouse on `/jobs/[id]` and `/s/[token]` (§0.6 product row note).
+- **Checked and not queued:** oracle-geometry failure sources on Fuji (no dataset cameras or depth; a COLMAP
+  reference would be another estimate, not an oracle); Strong-tier scaffolding (PLAN §4 rules 9-11 and §0.1 rule 2
+  until the Core rows are done); the v3 fine-tune ablation from the G4 fallback (owner's call, below).
+- **GPU tasks and the 25-minute session cap:** every queued GPU run must launch detached and resumable and leave a
+  GATES note with PID and row count if still running, so a cap hit is not mistaken for a gate.
+- **`TASKS_OVERNIGHT.md` stays gitignored** (M21, §0.1 rule 6). The audit updated it locally and did not
+  force-add it; only this file is committed.
+- **Still yours (human only), unchanged:** G3 decision; G4 decision and whether to fund the v3 fine-tune ablation
+  (≥ 3 seeds); the M21 `CLAUDE.md` untrack, then push and check hosted CI; H1 capture day, then P1-P5; H5 accounts
+  and the M18/M19 deploy plus the live URL in the README; H2, H3, H4, H6 and the demo video; Docker builds, gated
+  weights (CountGD/CountGD++, VGGT-Ω, VGG-T³), CountVid/DG-Net and the video datasets (E2, E3), OneScene-Bench
+  images (E5), frontier-VLM API spend.
