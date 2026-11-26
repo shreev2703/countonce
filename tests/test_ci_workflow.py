@@ -35,6 +35,7 @@ MODULE_EXTRAS: dict[str, tuple[str, ...]] = {
     "uvicorn": ("api",),
     "scipy": ("test",),
     "cv2": ("test",),
+    "transformers": ("hf",),
 }
 BASE = {"torch"}  # installed by its own step in full-cpu
 

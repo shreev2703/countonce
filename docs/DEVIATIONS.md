@@ -1080,3 +1080,14 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
   comparison uses the same prepared GT for both, so it is paired, but absolute errors are not.
 - **Rows:** `results/e1_tracker.csv`, not `results/bench.csv`, because the Core CSV's protocol/staleness
   machinery assumes pipeline rows.
+
+## CI `full-cpu` installs `hf` (twentieth audit fast-test fix)
+
+- `transformers` maps to the `hf` extra in `tests/test_ci_workflow.py`; `full-cpu` now installs
+  `.[dev,test,data,api,db,dvc,hf]`. `scripts/check_skips.py` `ALLOWED` is unchanged. The only
+  `importorskip("transformers")` is in a `gpu`+`slow` test, which CI deselects.
+- **Open, not fixed here:** the `full-cpu` mypy step is expected to fail. Locally `mypy` reports 6 errors:
+  3 do not depend on `transformers` (`bench/synth_component.py` x2, `bench/track_e1.py`) and 3 in
+  `bench/baselines_track.py` appear only when `transformers` is installed, so installing `hf` exposes
+  them in CI. `tests/test_typing_regressions.py` skips locally without `pycolmap`, so the fast suite
+  does not catch this. Hosted CI was not run.

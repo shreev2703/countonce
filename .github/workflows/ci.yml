@@ -70,7 +70,7 @@ jobs:
       - name: Install CPU torch
         run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Install
-        run: pip install -e .[dev,test,data,api,db,dvc]
+        run: pip install -e .[dev,test,data,api,db,dvc,hf]
       # type checking needs every typed dependency installed, so it runs here only
       - name: Type check
         run: mypy
