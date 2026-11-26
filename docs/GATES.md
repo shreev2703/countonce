@@ -714,3 +714,17 @@ Not started; no code changed, no rows added. Task left unticked.
   `configs/fuji_core.yaml` header), rewrite that file, record old (0.2, 0.3) vs new in DEVIATIONS,
   `touch runs/fuji_core/freeze_v3.ok`. Then wait for `test_v3.done`, check 64 `countonce_v2` rows with
   protocol `fuji_core_v3`, run `bench.fuji_report`, write the DEVIATIONS movement note, tick the task.
+
+### Joint Fuji v3 rerun, part 1: progress (2026-11-26 05:43), test run still going
+
+- Tuning done, `configs/fuji_core.yaml` refrozen (0.2, 0.5), `freeze_v3.ok` touched (DEVIATIONS).
+- Test run is live under `scripts/tune_fuji_v3.sh` (setsid; log `runs/fuji_core/test_v3.log`), about
+  50 s per window, 6 of 64 v2 windows at 05:41. Do not start a second writer.
+- **Remaining:** wait for `runs/fuji_core/test_v3.done`; check 64 `countonce_v2` rows (ok or failed)
+  with protocol `fuji_core_v3`; `python -m bench.fuji_report` (it rewrites docs/RESULTS_FUJI.md from v3
+  rows only, so sync/v3/COLMAP cells become TODO until part 2; mark `docs/RESULTS_FUJI_ANALYSIS.md` as
+  describing v2 rows and keep the 'unreliable' wording); add test-tree old vs new to DEVIATIONS; commit
+  `results/bench.csv`; tick the task.
+- **Check before trusting or running part 2:** the GT frame looks suspect. 7 of 12 val windows have
+  GT = 0, and test window Tree01 east k=5 has GT 0 with 85 predicted apples. Compare GT=0 counts across
+  all 64 windows against the v2 rows and inspect the overview registration.

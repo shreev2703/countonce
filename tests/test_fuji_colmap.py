@@ -111,7 +111,7 @@ def test_cmd_bench_colmap_switch(tmp_path: Path, monkeypatch: Any, fails: bool) 
 
     def fake_run(paths: Any, prompt: str, cfg: Any, *, reconstructor: Any, **kw: Any) -> Any:
         used.append(reconstructor.name)
-        assert (cfg.assoc, cfg.score_threshold, cfg.merge_k) == ("v2", 0.2, 0.3)
+        assert (cfg.assoc, cfg.score_threshold, cfg.merge_k) == ("v2", 0.2, 0.5)
         if fails and reconstructor.name == "colmap":
             raise ReconAdaptError("reconstruction failed: no_model")
         return SimpleNamespace(

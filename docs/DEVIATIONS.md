@@ -1091,3 +1091,16 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
   `bench/baselines_track.py` appear only when `transformers` is installed, so installing `hf` exposes
   them in CI. `tests/test_typing_regressions.py` skips locally without `pycolmap`, so the fast suite
   does not catch this. Hosted CI was not run.
+
+## Fuji v3: thresholds refrozen (2026-11-26)
+
+- **Rule (as before, training trees only):** lowest v1 count MAE over 12 complete windows; ties (new)
+  broken by higher mean association F1. Evidence `results/fuji_tune3_*.csv`.
+- **Old -> new:** score_threshold 0.2 -> 0.2; merge_k 0.3 -> 0.5. At score 0.2, v1 MAE was 41.08 /
+  39.17 / 39.17 for merge_k 0.3 / 0.5 / 0.8; F1 0.561 (0.5) vs 0.527 (0.8), F1 defined in only 3
+  windows. v2 MAE was 39.75 at all three: v2 did not respond to merge_k.
+- **Movement on val, same cell (0.2, 0.3), v2 protocol -> v3:** v1 MAE 54.75 -> 41.08, v2 61.25 -> 39.75.
+  **Not an accuracy gain:** the GT frame changed, mean GT per window fell 92.6 -> 45.8 and windows with
+  GT = 0 rose from 3 to 7 of 12. The two MAEs are not on the same ground truth.
+- **Warning:** west overview `cam_y_monotonic_frac` fell 0.86 -> 0.54 and overview inlier fractions are
+  low (east 0.27, west 0.18). The v3 GT frame may still be wrong; treat v3 errors as unverified.
