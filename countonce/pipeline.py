@@ -226,6 +226,19 @@ def _make_base_associator(config: Config, k: float) -> Associator:
         return V3Associator(model=load_cached(config.v3_checkpoint), threshold=thr)
     if config.assoc == "sync":
         return SyncAssociator(v2_config=v2cfg)
+    if config.assoc == "cdog":
+        # comparison baseline kept under bench/ (re-implemented from the paper; the original has
+        # no licence), imported only when selected. Like the other gates, tau scales with k.
+        from bench.baselines_cdog import CDOGAssociator, CDOGConfig
+
+        return CDOGAssociator(
+            CDOGConfig(
+                tau_px=config.cdog_tau_px * k / config.merge_k,
+                delta=config.cdog_delta,
+                iqr_alpha=config.cdog_iqr_alpha,
+            ),
+            v2_config=v2cfg,
+        )
     return V2Associator(v2cfg)
 
 
@@ -379,7 +392,7 @@ def _run(
     export: bool,
     privacy_detector: PrivacyRegionDetector | None,
 ) -> CountResult:
-    if config.assoc not in ("v1", "v2", "v3", "sync"):
+    if config.assoc not in ("v1", "v2", "v3", "sync", "cdog"):
         raise NotImplementedError(f"associator {config.assoc!r} is not implemented yet")
     if config.assoc == "v3":
         from countonce.merge.v3 import require_checkpoint

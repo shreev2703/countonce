@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 DetectorName = Literal["countgd", "gdino", "groundingdino", "countgdpp", "color_blob"]
 BackboneName = Literal["vggt", "vggt_omega", "vggt_t3", "colmap", "fixture"]
-AssocName = Literal["v1", "v2", "v3", "sync"]
+AssocName = Literal["v1", "v2", "v3", "sync", "cdog"]
 HallucinationMode = Literal["off", "downweight", "drop"]
 LiftRegion = Literal["mask", "box"]
 MasksMode = Literal["none", "box_fill", "sam"]
@@ -52,6 +52,11 @@ class Config(BaseModel):
     motion_min_agree: float = Field(0.5, ge=0, le=1)  # flag if agreeing share of views is below
     motion_min_views: int = Field(2, ge=1)  # checked views needed before flagging
     motion_conf_factor: float = Field(0.5, ge=0, le=1)  # conf multiplier, fully flagged instance
+    # C-DOG comparison baseline (assoc: cdog, bench/baselines_cdog.py): epipolar distance gate in
+    # recon-grid pixels, neighbourhood-overlap threshold, IQR multiplier of the outlier filter.
+    cdog_tau_px: float = Field(4.0, gt=0)
+    cdog_delta: float = Field(0.5, ge=0, lt=1)
+    cdog_iqr_alpha: float = Field(2.0, gt=0)
 
     # Ingest
     fps: float = Field(2.0, gt=0)  # video sampling rate

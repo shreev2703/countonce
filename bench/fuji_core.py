@@ -447,6 +447,7 @@ ASSOC_METHODS: dict[str, str] = {
     "v2": "countonce_v2",
     "sync": "countonce_sync",
     "v3": "countonce_v3",
+    "cdog": "countonce_cdog",  # C-DOG re-implementation, bench/baselines_cdog.py
 }
 BACKBONES = ("vggt", "colmap")
 METHOD_ASSOC: dict[str, str] = {m: a for a, m in ASSOC_METHODS.items()}

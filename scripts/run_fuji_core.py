@@ -136,7 +136,13 @@ def load_frozen(path: Path, split: str) -> tuple[dict[str, Any], str]:
 
 
 def _mk(args: argparse.Namespace) -> dict[str, Any]:
-    return {} if args.merge_k is None else {"merge_k": args.merge_k}
+    out: dict[str, Any] = {} if args.merge_k is None else {"merge_k": args.merge_k}
+    # C-DOG settings; only read by assoc "cdog" (frozen in configs/fuji_core_cdog.yaml)
+    if args.cdog_tau_px is not None:
+        out["cdog_tau_px"] = args.cdog_tau_px
+    if args.cdog_delta is not None:
+        out["cdog_delta"] = args.cdog_delta
+    return out
 
 
 def _v3_meta(args: argparse.Namespace) -> dict[str, Any]:
@@ -169,6 +175,9 @@ def cmd_bench(args: argparse.Namespace) -> None:
         args.score_threshold = float(frozen["score_threshold"])
     if "merge_k" in frozen:
         args.merge_k = float(frozen["merge_k"])
+    for key in ("cdog_tau_px", "cdog_delta"):
+        if key in frozen:
+            setattr(args, key, float(frozen[key]))
     scene = load_fuji_sfm("data/fuji_sfm", validate=False)
     imgs = fc.prepare_images(scene, WORK / "img")
     ov = {}
@@ -329,6 +338,8 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--backbone", choices=fc.BACKBONES, default="vggt")
     b.add_argument("--score-threshold", type=float, default=0.3)
     b.add_argument("--merge-k", type=float, default=None, help="v1 association distance (x size)")
+    b.add_argument("--cdog-tau-px", type=float, default=None, help="C-DOG epipolar gate (px)")
+    b.add_argument("--cdog-delta", type=float, default=None, help="C-DOG overlap threshold")
     b.add_argument(
         "--assocs",
         nargs="+",

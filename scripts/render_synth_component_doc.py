@@ -17,8 +17,16 @@ from bench.metrics import within_rate
 ROWS = Path("results/synth_component_rows.csv")
 JSON = Path("results/synth_component.json")
 OUT = Path("docs/RESULTS_V3_SYNTH.md")
-ORDER = ["v1 (default)", "v1 (tuned)", "v2 (default)", "v2 (tuned)", "sync (default)",
-         "sync (tuned)", "v3", "v3+sync"]
+ORDER = [
+    "v1 (default)",
+    "v1 (tuned)",
+    "v2 (default)",
+    "v2 (tuned)",
+    "sync (default)",
+    "sync (tuned)",
+    "v3",
+    "v3+sync",
+]
 
 
 def boot(x: np.ndarray, fn, n: int = 2000, seed: int = 0) -> tuple[float, float, float]:
@@ -49,12 +57,16 @@ def table(rows: list[dict], variant: str, zero: bool) -> list[str]:
 
 
 def explain(summary: dict) -> list[str]:
-    out = ["| method | assoc F1 | missed | duplicates | false positives | wrong merges |",
-           "|---|---|---|---|---|---|"]
+    out = [
+        "| method | assoc F1 | missed | duplicates | false positives | wrong merges |",
+        "|---|---|---|---|---|---|",
+    ]
     for m in ORDER:
         s = summary[m]
-        out.append(f"| {m} | {s['assoc_f1']:.3f} | {s['missed']:.2f} | {s['duplicates']:.2f} | "
-                   f"{s['false_positives']:.2f} | {s['wrong_merges']:.2f} |")
+        out.append(
+            f"| {m} | {s['assoc_f1']:.3f} | {s['missed']:.2f} | {s['duplicates']:.2f} | "
+            f"{s['false_positives']:.2f} | {s['wrong_merges']:.2f} |"
+        )
     return out
 
 
@@ -81,7 +93,7 @@ def main() -> None:
         "unchanged.",
         "- v1, v2 and sync were tuned on the validation split only (grids in "
         "`results/synth_component_tuning.csv`), frozen, then run once on test. "
-        "\"default\" rows are the untuned settings from the first comparison.",
+        '"default" rows are the untuned settings from the first comparison.',
         "- Depth variants: `nan_depth` (NaN depth, the v2/sync visibility check never "
         "rejects) and `finite_depth` (z-buffered depth with multiplicative noise, occlusion "
         "check active). v1 and v3 do not read depth, so their rows are identical in both.",
@@ -92,37 +104,60 @@ def main() -> None:
         f"{res['finite_depth']['summary']['v3']['injected_fp_dets']:.1f} on average.",
         "",
     ]
-    for variant, title in (("finite_depth", "Finite noisy depth (occlusion check active)"),
-                           ("nan_depth", "NaN depth (occlusion check inactive)")):
-        L += [f"## {title}", "", "Count metrics (lower MAE is better; bias is predicted minus "
-              "true):", ""]
+    for variant, title in (
+        ("finite_depth", "Finite noisy depth (occlusion check active)"),
+        ("nan_depth", "NaN depth (occlusion check inactive)"),
+    ):
+        L += [
+            f"## {title}",
+            "",
+            "Count metrics (lower MAE is better; bias is predicted minus true):",
+            "",
+        ]
         L += table(rows, variant, n_zero > 0)
-        L += ["", "Error decomposition per episode (explanation only; association F1 is not "
-              "the headline):", ""]
+        L += [
+            "",
+            "Error decomposition per episode (explanation only; association F1 is not "
+            "the headline):",
+            "",
+        ]
         L += explain(res[variant]["summary"])
         pm = res[variant]["v3_minus"]
-        L += ["", "Paired v3 minus method, count MAE difference (negative: v3 better):", "",
-              "| vs | difference | 95% CI |", "|---|---|---|"]
+        L += [
+            "",
+            "Paired v3 minus method, count MAE difference (negative: v3 better):",
+            "",
+            "| vs | difference | 95% CI |",
+            "|---|---|---|",
+        ]
         for m in ORDER:
             if m != "v3":
                 d = pm[m]
                 L.append(f"| {m} | {d['diff']:+.2f} | [{d['lo']:.2f}, {d['hi']:.2f}] |")
         t = res[variant]["tuned"]
-        L += ["", "Tuned values (chosen on validation): "
-              f"v1 `{json.dumps(t['v1'])}`, v2 `{json.dumps(t['v2'])}`, "
-              f"sync `{json.dumps(t['sync'])}`.", ""]
-    L += ["## Reading", "",
-          "- Once tuned on validation, v1 has the lowest count MAE on this test split and beats "
-          "v3 (paired difference above). The earlier \"v3 beats v1/v2/sync\" result held only "
-          "against untuned defaults. v3 keeps most of its false-positive detections (about "
-          "17 per episode injected), which is where its count error comes from.",
-          "- Tuned v2 and sync have the lower MAE but a lower association F1 than their "
-          "defaults: they trade F1 for a count that lands closer, by dropping detections (missed "
-          "and no false positives). F1 and count error disagree, so count is the headline.",
-          "- v3+sync is the best of the v3 arms on count MAE but is still behind tuned v1.",
-          "- One synthetic generator, one seed of v3; tuned thresholds were chosen on 100 "
-          "validation episodes from the same generator, so tuned numbers are likely optimistic "
-          "for new data.", ""]
+        L += [
+            "",
+            "Tuned values (chosen on validation): "
+            f"v1 `{json.dumps(t['v1'])}`, v2 `{json.dumps(t['v2'])}`, "
+            f"sync `{json.dumps(t['sync'])}`.",
+            "",
+        ]
+    L += [
+        "## Reading",
+        "",
+        "- Once tuned on validation, v1 has the lowest count MAE on this test split and beats "
+        'v3 (paired difference above). The earlier "v3 beats v1/v2/sync" result held only '
+        "against untuned defaults. v3 keeps most of its false-positive detections (about "
+        "17 per episode injected), which is where its count error comes from.",
+        "- Tuned v2 and sync have the lower MAE but a lower association F1 than their "
+        "defaults: they trade F1 for a count that lands closer, by dropping detections (missed "
+        "and no false positives). F1 and count error disagree, so count is the headline.",
+        "- v3+sync is the best of the v3 arms on count MAE but is still behind tuned v1.",
+        "- One synthetic generator, one seed of v3; tuned thresholds were chosen on 100 "
+        "validation episodes from the same generator, so tuned numbers are likely optimistic "
+        "for new data.",
+        "",
+    ]
     OUT.write_text("\n".join(L) + "\n")
 
 
