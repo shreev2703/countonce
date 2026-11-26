@@ -178,7 +178,7 @@ def test_script_writes_count_first_csv(tmp_path, monkeypatch):
     mod = importlib.util.module_from_spec(spec)
     monkeypatch.setattr(sys, "path", list(sys.path))
     spec.loader.exec_module(mod)
-    monkeypatch.setattr(mod, "V3Associator", lambda _: make_v1({"k": 0.5}))
+    monkeypatch.setattr(mod, "V3Associator", lambda *_a, **_k: make_v1({"k": 0.5}))
     for name in ("V1_GRID", "V2_GRID", "SYNC_GRID"):
         monkeypatch.setattr(mod, name, {k: v[:1] for k, v in getattr(mod, name).items()})
     cfg = GeometryConfig(n_instances=(5, 6), n_views=(3, 3))

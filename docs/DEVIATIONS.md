@@ -884,3 +884,9 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
   none were added.
 - **CSV layout:** `--out-csv` is now the count-first summary (one row per variant and method);
   per-episode rows moved to `--out-rows-csv`.
+
+## Worker image extra (2026-11-25)
+- Added `worker` extra (recon + hf + torchvision + huggingface_hub + data + `vggt` pinned to commit a288dd0, same pin as README). Dockerfile installs `.[worker]` and apt-installs `git` (needed for the vggt git URL). Image not built (Docker is a human gate).
+- `uv lock` re-resolved other packages (e.g. opencv-python-headless 5.1 -> 4.11, as vggt constrains it); `uv lock --check` passes.
+- README setup now says `uv pip install -e ".[dev,worker]"`, the verified path; plain pip not run.
+- Fixed a broken M5b-WIP test (`tests/test_synth_component.py` lambda lacked `device` kwarg).

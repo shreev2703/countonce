@@ -35,6 +35,23 @@ hf = [
     "transformers>=4.45",
     "safetensors",
 ]
+# Everything the default gdino + vggt + v2 path imports, plus the data stack; used by docker/worker.Dockerfile.
+# torch itself comes from the cu128 index in the Dockerfile, so the plain "torch" requirement is already met.
+worker = [
+    "torch",
+    "torchvision",
+    "pillow",
+    "scipy",
+    "matplotlib",
+    "pyyaml",
+    "pycolmap",
+    "transformers>=4.45",
+    "huggingface_hub",
+    "safetensors",
+    "pyarrow>=15",
+    "duckdb>=1.0",
+    "vggt @ git+https://github.com/facebookresearch/vggt.git@a288dd0f14786c93483e45524328726ab7b1b4ce",
+]
 mcp = [
     "mcp>=1.0",
 ]

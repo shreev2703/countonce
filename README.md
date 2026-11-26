@@ -141,12 +141,11 @@ A longer walk-through is in [docs/EXPLAINER.md](docs/EXPLAINER.md). The full pla
 
 ## Reproduce
 
-Setup (Python ≥ 3.11; the reconstruction backbone needs a GPU):
+Setup (Python ≥ 3.11; the reconstruction backbone needs a GPU). Verified with `uv pip` (it resolved torch 2.15.0+cu132); plain `pip install -e ".[dev,worker]"` is the same requirement set but was not run:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,recon,hf]" torchvision
-pip install "vggt @ git+https://github.com/facebookresearch/vggt.git@a288dd0f14786c93483e45524328726ab7b1b4ce"
+uv venv && source .venv/bin/activate
+uv pip install -e ".[dev,worker]"        # worker = recon + hf + torchvision + pinned vggt + data (what docker/worker.Dockerfile installs)
 countonce env --out results/env.json     # check Python / torch / CUDA / VRAM
 ```
 

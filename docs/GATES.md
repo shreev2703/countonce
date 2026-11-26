@@ -381,7 +381,7 @@ README rows could honestly be ticked. M22 is left unchecked. What each other no-
 - **Failure sources:** separating geometry from association needs data with oracle geometry.
 - **Related work:** run experiments E1-E5 and read the remaining works (`docs/RELATED_WORK.md`).
 
-Also found, not fixed: `docker/worker.Dockerfile` installs `.[recon,data]` without `transformers` or the
+Also found (fixed later via the `worker` extra): `docker/worker.Dockerfile` installs `.[recon,data]` without `transformers` or the
 `vggt` package, so that image cannot run the default pipeline (the image has never been built). The
 README setup was verified with `uv pip`, not plain `pip`, and resolved torch 2.15.0+cu132.
 
