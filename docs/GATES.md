@@ -628,3 +628,9 @@ Not started; no code changed, no rows added. Task left unticked.
   `len(frames) <= chunk_size`), so their cached reconstructions do not depend on the alignment
   fix. The overview reconstructions are stitched, so `overview --force` is needed to rebuild the
   pseudo-poses. k=20 windows are also single-chunk.
+
+### Retry 2 (2026-11-26 ~02:00): still BLOCKED, 0 of 64 rows, nothing changed
+
+- `fc.PROTOCOL` is still `fuji_core_v2` (in `STALE_PROTOCOLS`); v2 has not been rerun under the alignment-fix protocol, so paired deltas would be invalid.
+- C-DOG tuning (PID 2130274, child `run_fuji_core.py` on val) is still using the GPU and the shared `runs/fuji_core/cache`.
+- Appearance ablation still needs DINOv2 wired into the pipeline. Resume order above is unchanged.
