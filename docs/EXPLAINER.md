@@ -299,7 +299,9 @@ Both count in video by tracking: CountVid propagates SAM 2.1 masks; DG-Net adds 
 estimated in some of its results) to detection and to the matching cost, so "RGB only" is not a
 difference. CountOnce targets a static scene from a few unordered photos, associates through
 estimated camera geometry, and keeps the evidence inspectable (`MatchEvidence` per pair). Whether
-that counts better is a hypothesis: neither system has been run here. See `RELATED_WORK.md`.
+that counts better is a hypothesis: neither system has been run here. Open-vocabulary multi-view 3D
+detectors (See and Detect, SMOV3D, OpenM3D, VGGT-Det) also merge or fuse boxes across views, but they report
+detection mAP, not unique-object counts, so they neither support nor refute it. See `RELATED_WORK.md` §3.
 
 **3. Why can't same-photo detections merge?**
 One object projects to one region of an image, so two separate detections in one photo are two

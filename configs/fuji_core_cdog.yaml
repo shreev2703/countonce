@@ -1,0 +1,18 @@
+# Frozen Fuji-SfM Core settings for the C-DOG association (assoc: cdog), chosen on
+# the TRAINING-split trees only (Tree09, Tree10, Tree11; `val` in
+# bench/splits_fuji_sfm.json),
+# windows of 5 and 10 views (12 rows), GroundingDINO-tiny "apple" + VGGT-1B, protocol
+# fuji_core_v2. Same procedure as configs/fuji_core.yaml: lowest mean absolute count
+# error
+# with all 12 window rows complete. score_threshold and merge_k are the frozen v1/v2
+# values
+# (identical detections); only the C-DOG settings were swept.
+# Grid: cdog_tau_px [2.0, 4.0, 8.0, 16.0, 32.0] x cdog_delta [0.3, 0.5, 0.55, 0.7]. cdog_iqr_alpha=2 (paper) and
+# bpe_floor_px=0.5 (DEVIATIONS) are fixed.
+# MAE by (tau, delta): (2, 0.3) -> 51.75; (2, 0.5) -> 53.67; (2, 0.55) -> 53.67; (2, 0.7) -> 50.33; (4, 0.3) -> 53.50; (4, 0.5) -> 55.25; (4, 0.55) -> 55.25; (4, 0.7) -> 50.67; (8, 0.3) -> 54.92; (8, 0.5) -> 54.17; (8, 0.55) -> 54.08; (8, 0.7) -> 50.17; (16, 0.3) -> 56.00; (16, 0.5) -> 53.75; (16, 0.55) -> 53.42; (16, 0.7) -> 50.25; (32, 0.3) -> 55.42; (32, 0.5) -> 52.75; (32, 0.55) -> 52.33; (32, 0.7) -> 50.50
+# Evidence: results/fuji_tune_cdog_t*_d*.csv, results/fuji_tune_cdog_summary.json.
+# Never edit after looking at test-split numbers.
+score_threshold: 0.2
+merge_k: 0.3
+cdog_tau_px: 8
+cdog_delta: 0.7

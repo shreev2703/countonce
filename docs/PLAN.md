@@ -124,7 +124,7 @@ Checked in the M22 consistency pass (2026-11-25). A box is ticked only where the
 - [ ] Failure-source experiments show where the remaining error comes from — *Fuji: detector, then duplicates; geometry is not separated from association (no oracle geometry)*
 - [x] Order-invariance measured on real data; the "unordered photos" claim matches the evidence — *Fuji validation windows (`results/order_invariance_fuji_merging.csv`, 12 windows x 10 permutations): v2 and sync, with merges present at the frozen gate (v2 15/93 merges at k=5/10, sync 4/81), have count range 0 and unchanged partitions; v1 likewise (`results/order_invariance_fuji.csv`). One recon per window; v3 and test trees not run. The earlier "vacuous" reading was a harness bug (frames not passed), see DEVIATIONS*
 - [x] README front page with a real result, a real failure and a runnable command — *the real result is the Fuji-SfM table; the picture example is synthetic*
-- [ ] Related work read in full; one tested hypothesis instead of a novelty claim — *three closest works read in full, others not; the hypothesis is untested*
+- [ ] Related work read in full; one tested hypothesis instead of a novelty claim — *nine works read in full (coverage gaps noted per paper), four peripheral abstract-only; the hypothesis is untested*
 - [ ] Repo hygiene done (license, no agent files or personal paths, green CI) — *license done; `CLAUDE.md` still tracked (GATES, M21); hosted CI not run on this branch*
 
 **Product done (required):**
@@ -218,7 +218,7 @@ The related work shows that **video counting with de-duplication exists** (Count
 
 > **Open-vocabulary object counting from a few unordered RGB photos, with de-duplication in a 3D frame recovered by feed-forward reconstruction (no depth sensor, no SfM), and a multi-view learned association model trained on synthetic data that transfers to real orchards.**
 
-**Primary hypothesis (v5.1, tested before any novelty claim is made):** *geometry-aware association improves unique-object counting from sparse views compared with video tracking and with simpler geometric matching.* CountVid, DG-Net and OneScene-Bench were read in full on 2026-11-25; `docs/RELATED_WORK.md` tags the evidence level of every other work and makes no "does not do X" claim about them.
+**Primary hypothesis (v5.1, tested before any novelty claim is made):** *geometry-aware association improves unique-object counting from sparse views compared with video tracking and with simpler geometric matching.* CountVid, DG-Net and OneScene-Bench were read in full on 2026-11-25, and See and Detect, SMOV3D, OpenM3D, VGGT-Det, ROM and C-DOG on 2026-11-26 (coverage per paper in `docs/RELATED_WORK.md` §3). None of the six reports a unique-object count; they evaluate boxes or groupings. The remaining peripheral works are abstract-only and carry no "does not do X" claim.
 
 The experiments must show where this beats the closest work: few views, unordered photos, large viewpoint changes, no depth sensor. They must also report honestly where video tracking (CountVid) or sensor depth (DG-Net) wins.
 

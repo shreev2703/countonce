@@ -142,8 +142,13 @@ def permute_rows(
             row.update(roi_count_min="", roi_count_max="", roi_count_range="")
         base = associator(name).associate(list(cap.lifted), cap.recon, cap.frames)
         n_ok = sum(ld.ok for ld in cap.lifted)
-        row.update(variant="permute", n_merges=merges(partition(base)), roi_gt_frame_failures=len(sigmas) + 1 if sim is None else 0,
-                   n_dets_min=n_ok, n_dets_max=n_ok)  # fmt: skip
+        row.update(
+            variant="permute",
+            n_merges=merges(partition(base)),
+            roi_gt_frame_failures=len(sigmas) + 1 if sim is None else 0,
+            n_dets_min=n_ok,
+            n_dets_max=n_ok,
+        )
         rows.append(row)
     return rows
 
