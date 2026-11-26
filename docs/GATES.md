@@ -728,3 +728,10 @@ Not started; no code changed, no rows added. Task left unticked.
 - **Check before trusting or running part 2:** the GT frame looks suspect. 7 of 12 val windows have
   GT = 0, and test window Tree01 east k=5 has GT 0 with 85 predicted apples. Compare GT=0 counts across
   all 64 windows against the v2 rows and inspect the overview registration.
+
+### Joint Fuji v3 rerun, part 1: status (2026-11-26 05:52)
+
+- Re-entered; the test run (`run_fuji_core.py bench --split test`, started 05:36 under `tune_fuji_v3.sh`) is
+  still live and `test_v3.done` does not exist. Not starting a second writer; task left UNTICKED.
+- Progress: Tree04 west reached in `runs/fuji_core/test_v3.log`. Follow the "Remaining" list in the 05:43
+  entry once `test_v3.done` appears.
