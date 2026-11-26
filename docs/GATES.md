@@ -657,3 +657,17 @@ Not started; no code changed, no rows added. Task left unticked.
   `TASKS_OVERNIGHT.md` or in `results/bench.csv`. `--ablation` refuses to run, correctly.
 - No code or rows changed. Queue the joint rerun (resume steps 1-4 plus `overview --force`) before
   re-queuing this task.
+
+### Fifth attempt (2026-11-26 ~02:05): still BLOCKED, 0 of 64 rows
+
+- Same block: `fc.PROTOCOL` is `fuji_core_v2`, no newer-protocol rows exist, and no open task does
+  the joint rerun. The C-DOG tuning job was still using the shared `runs/fuji_core` cache and
+  overview poses, which `overview --force` would overwrite.
+- New: `DinoV2Extractor` ran on CPU with the real `dinov2_vits14` weights (now in the torch hub
+  cache) on two crops of one Fuji image, output shape (2, 384), finite. The ablation run path
+  itself has still never executed.
+- **Proposed line for `TASKS_OVERNIGHT.md`, above the ablation task (owner decides; not added):**
+  "Joint Fuji v2 rerun after the window-alignment fix: after any running Fuji job ends, bump
+  `fc.PROTOCOL`, run `overview --force`, re-choose thresholds on the training-split trees, rerun
+  every Fuji test method (v1, v2, baselines, sync, v3, COLMAP) detached and resumable across
+  sessions, rebuild the reports and remove the 'unreliable' note only for rerun tables."
