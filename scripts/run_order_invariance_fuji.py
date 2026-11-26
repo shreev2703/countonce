@@ -78,6 +78,8 @@ def main(argv: list[str] | None = None) -> None:
 
                 def patched(cfg: Any, mk: float, _o: Any = orig) -> Any:
                     nonlocal cap
+                    if cap is not None:  # later calls are sensitivity-sweep cells
+                        return _o(cfg, mk)
                     cap = _Capture(_o(cfg, mk))
                     return cap
 

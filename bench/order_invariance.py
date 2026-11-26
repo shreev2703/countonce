@@ -11,6 +11,7 @@ photo, so partitions are comparable across permutations.
 from __future__ import annotations
 
 import dataclasses
+import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
@@ -119,6 +120,51 @@ def sweep(
     }
 
 
+# --------------------------------------------------------------------- reordering helpers
+
+
+def reorder_by_frame(lifted: Sequence[LiftedDetection]) -> list[LiftedDetection]:
+    """Detection list in frame-id order (stable), as the pipeline would emit it for that upload."""
+    return sorted(lifted, key=lambda ld: ld.det.frame_id)
+
+
+def distinct_permutations(n: int, count: int, seed: int = 0) -> list[np.ndarray]:
+    """``count`` different non-identity permutations of ``n`` items (fewer if n! is smaller)."""
+    want = min(count, math.factorial(n) - 1)
+    rng = np.random.default_rng(seed)
+    seen = {tuple(range(n))}
+    out: list[np.ndarray] = []
+    while len(out) < want:
+        sigma = rng.permutation(n)
+        if tuple(sigma.tolist()) not in seen:
+            seen.add(tuple(sigma.tolist()))
+            out.append(sigma)
+    return out
+
+
+def to_photo_ids(part: frozenset[frozenset[str]], inv: np.ndarray) -> frozenset[frozenset[str]]:
+    """Rename ``"<position>:<k>"`` ids of a reordered upload back to ``"<photo>:<k>"``.
+
+    ``inv[q]`` is the photo uploaded at position ``q``.
+    """
+
+    def back(det_id: str) -> str:
+        pos, k = det_id.split(":", 1)
+        return f"{int(inv[int(pos)])}:{k}"
+
+    return frozenset(frozenset(back(m) for m in g) for g in part)
+
+
+def common_agreement(a: frozenset[frozenset[str]], b: frozenset[frozenset[str]]) -> float:
+    """Rand index over the detections both partitions cluster (lifting may drop different ones)."""
+    common = {m for g in a for m in g} & {m for g in b for m in g}
+
+    def cut(p: frozenset[frozenset[str]]) -> frozenset[frozenset[str]]:
+        return frozenset(frozenset(g & common) for g in p if g & common)
+
+    return pair_agreement(cut(a), cut(b))
+
+
 # ----------------------------------------------------------------------------- Fuji adapter
 
 FUJI_CSV_FIELDS = (
@@ -142,6 +188,8 @@ def fuji_window_row(
     to_gt: Callable[[np.ndarray], np.ndarray] | None = None,
     in_roi: Callable[[np.ndarray], np.ndarray] | None = None,
     frames: Mapping[int, Frame] | None = None,
+    sigmas: Sequence[np.ndarray] | None = None,
+    reorder_list: bool = False,
 ) -> dict[str, object]:
     """Photo-order invariance of one Fuji window: count range and partition variation.
 
@@ -163,9 +211,12 @@ def fuji_window_row(
     base_part = partition(base)
     counts, rois, changed, worst = [len(base.instances)], [roi_count(base)], 0, 1.0
     rng = np.random.default_rng(seed)
-    for _ in range(n_perms):
-        sig = rng.permutation(recon.n_views)
+    if sigmas is None:
+        sigmas = [rng.permutation(recon.n_views) for _ in range(n_perms)]
+    for sig in sigmas:
         lf, rc = permute_photos(lifted, recon, sig)
+        if reorder_list:
+            lf = reorder_by_frame(lf)
         res = assoc.associate(lf, rc, permute_frames(frames, sig) if frames else None)
         counts.append(len(res.instances))
         rois.append(roi_count(res))
@@ -174,7 +225,7 @@ def fuji_window_row(
             changed += 1
             worst = min(worst, pair_agreement(base_part, part))
     return {
-        "assoc": name, "tree": tree, "side": side, "k": k, "n_perms": n_perms,
+        "assoc": name, "tree": tree, "side": side, "k": k, "n_perms": len(sigmas),
         "n_dets": len(lifted), "base_count": counts[0],
         "count_min": min(counts), "count_max": max(counts),
         "count_range": max(counts) - min(counts),
