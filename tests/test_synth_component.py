@@ -188,7 +188,9 @@ def test_script_writes_count_first_csv(tmp_path, monkeypatch):
     argv = ["--data", str(tmp_path), "--n-boot", "20", "--out-csv", str(out)]
     argv += ["--out-json", str(tmp_path / "out" / "r.json")]
     argv += ["--out-rows-csv", str(tmp_path / "out" / "rows.csv")]
+    argv += ["--out-tuning-csv", str(tmp_path / "out" / "tuning.csv")]
     assert mod.main(argv) == 0
+    assert (tmp_path / "out" / "tuning.csv").is_file()
     with out.open() as f:
         rows = list(csv.DictReader(f))
     assert {r["variant"] for r in rows} == {"nan_depth", "finite_depth"}

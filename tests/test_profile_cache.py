@@ -137,7 +137,7 @@ def test_columns_append_only_and_old_csv_loads(tmp_path):
     assert "TODO: fill from results" in mod.render_cache_block(old)
 
 
-def test_cli_variant_cache_writes_columns(tmp_path, capsys):
+def test_cli_variant_cache_writes_columns(tmp_path, monkeypatch, capsys):
     cfg = tmp_path / "p.yaml"
     cfg.write_text(
         f"inputs: {SCENE}\nprompt: red sphere\nwarmup: 0\nrepeats: 1\nout_csv: {tmp_path}/p.csv\n"
@@ -149,6 +149,8 @@ def test_cli_variant_cache_writes_columns(tmp_path, capsys):
     with (tmp_path / "p.csv").open() as fh:
         rows = list(csv.DictReader(fh))
     assert {r["cache_state"] for r in rows} == {"cold", "new_prompt", "repeat"}
+    # The shipped config has relative results/ outputs: run it from tmp_path.
+    monkeypatch.chdir(tmp_path)
     assert main(["profile", "--config", str(ROOT / "configs" / "profile.yaml")]) in (0, 2)  # parses
 
 

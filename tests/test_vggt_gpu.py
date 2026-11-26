@@ -23,7 +23,10 @@ def test_vggt_color_blob_matches_fixture_count(tmp_path: Path) -> None:
     from countonce.config import Config
     from countonce.pipeline import run
 
-    real = run(SCENE, "red ball", Config(backbone="vggt", detector="color_blob"), export=False)
+    # out_dir defaults to results/ and run() writes sanitized copies there even without export.
+    out = str(tmp_path / "out")
+    real_cfg = Config(backbone="vggt", detector="color_blob", out_dir=out)
+    real = run(SCENE, "red ball", real_cfg, export=False)
     ref = run(
         SCENE,
         "red ball",
@@ -31,6 +34,7 @@ def test_vggt_color_blob_matches_fixture_count(tmp_path: Path) -> None:
             backbone="fixture",
             detector="color_blob",
             backbone_options={"scene": str(SCENE / "scene.json")},
+            out_dir=out,
         ),
         export=False,
     )

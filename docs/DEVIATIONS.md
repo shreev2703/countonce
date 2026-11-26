@@ -929,3 +929,9 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **Stayed, because `cli.py` imports them lazily:** `countonce/sites.py` (`countonce sites`), `countonce/routing.py` (`countonce routing-report`; also used by `tests/test_planned_detectors.py`), `countonce/serving/` (`countonce coldstart`). Quarantining them would need removing those CLI commands, which the task forbids (cli.py must not depend on quarantined code). Candidates for a later task that drops the commands.
 - **Import names:** quarantined code imports as top-level `llm` / `integrations`, set up by `experimental/conftest.py`; they are not part of the installed package. `make paper` and `scripts/make_paper_tables.py` now write to `experimental/paper/`.
 - **CI:** added a `pytest experimental` step. `tests/test_paper_site.py` keeps the table and site generator tests.
+
+## Test write guard for results/ and docs/ (2026-11-25)
+- **Guard:** `tests/conftest.py` fails the session if any file under `results/` or `docs/` changed, appeared or was removed (removal added to the task's two cases). It compares mtime and size. The baseline is taken at conftest import, not at first fixture setup, so writes during collection count too.
+- **Leaks fixed:** `test_synth_component.py` (`results/synth_component_tuning.csv`); `test_profile_cache.py` (the shipped `configs/profile.yaml` rewrote `results/profile_variants.csv`; now run from `tmp_path`); `test_vggt_gpu.py` (default `out_dir="results"` would write `results/sanitized/`; found by reading, as the test is skipped without vggt).
+- **No bypass switch:** the guard cannot tell which process wrote a file, so it also fails while a benchmark is appending to `results/` in the same checkout. The failure message says so. Verify in a copy of the checkout, or rerun when the benchmark is idle.
+- **Not covered:** `pytest experimental` (separate rootdir conftest) and writes outside `results/` and `docs/`.
