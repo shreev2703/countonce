@@ -1110,3 +1110,29 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - v3 test numbers are **not** compared with v2 or reported: the rebuilt west overview maps west
   Tree01-Tree06 to one shared window (docs/GATES.md, 06:07 status). The test-tree movement note is
   deferred until a rerun with a valid frame.
+
+## Fuji v3 test rows: how the v2 numbers moved (2026-11-26, diagnostic only)
+
+64 `countonce_v2` test rows exist under `fuji_core_v3` (53 ok, 11 failed, all k=3 `ChunkAlignmentError`).
+**West is invalid and east is unverified; none of this is an accuracy result.** Means over the slices
+that are ok under both protocols; the GT set differs between protocols, so the MAEs are not like for like.
+
+| side | k | slices | MAE v2 -> v3 | mean GT v2 -> v3 | mean pred v2 -> v3 |
+|---|---|---|---|---|---|
+| east | 3 | 3 | 5.67 -> 19.67 | 26.3 -> 22.7 | 20.7 -> 28.3 |
+| east | 5 | 8 | 56.88 -> 42.12 | 38.9 -> 32.5 | 30.0 -> 49.1 |
+| east | 10 | 8 | 37.88 -> 82.62 | 30.4 -> 131.2 | 68.2 -> 76.6 |
+| east | 20 | 8 | 68.25 -> 130.25 | 168.1 -> 238.0 | 138.9 -> 107.8 |
+| west | 3 | 2 | 2.00 -> 27.00 | 0.0 -> 34.5 | 2.0 -> 60.5 |
+| west | 5 | 8 | 74.50 -> 46.38 | 75.8 -> 0.5 | 12.0 -> 46.9 |
+| west | 10 | 8 | 42.38 -> 54.62 | 75.4 -> 10.9 | 71.2 -> 65.5 |
+| west | 20 | 8 | 135.38 -> 65.00 | 226.2 -> 7.8 | 141.1 -> 72.8 |
+
+- West Tree01-Tree06 give the same prediction with GT = 0 at k=5/10/20 (52 / 64 / 53): one shared
+  window, as in the 06:07 GATES entry.
+- **Choice:** `bench.fuji_report` was run on the rows into a scratch root (`--root <tmpdir>`: 320 v3
+  rows, 45 cells filled), so `docs/RESULTS_FUJI.md`, the paper table and the web summary are NOT
+  overwritten with invalid numbers. They keep the v2 numbers and their existing warning. Do not run the
+  report with the default root until the west frame is fixed (`fc.PROTOCOL` is now v3).
+- **Choice:** part 1 is ticked because its stated done criteria are met; part 2 and the ablation re-run
+  are marked `[!]`, since their `.done`/row-count preconditions would pass on the broken frame.

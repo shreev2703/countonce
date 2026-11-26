@@ -758,3 +758,13 @@ Not started; no code changed, no rows added. Task left unticked.
   write guard because the benchmark was appending to `results/bench.csv`.
 
 - Re-entered 2026-11-26 06:10: the Fuji test run (PID 2266684, Tree07 east k=20 in `test_v3.log`) is still live and `test_v3.done` is absent. No second writer started; task left UNTICKED. See the 06:07 entry for the west-frame blocker.
+
+### Joint Fuji v3 rerun, part 1: finished, results NOT usable (2026-11-26 06:19)
+
+- `test_v3.done` written; 64 `countonce_v2` rows under `fuji_core_v3` (53 ok, 11 failed). Report runs on
+  them (scratch root only; see DEVIATIONS). Part 1 ticked as specified.
+- **Still blocked:** the west overview frame is degenerate (06:07 entry, confirmed on the full run).
+  Part 2 and the ablation re-run are marked `[!]` in `TASKS_OVERNIGHT.md`.
+- **Proposed next task:** diagnose the west `overview` registration; add an a-priori validity gate
+  (fail if trees collapse onto one window or camera y is far from monotonic); bump to `fuji_core_v4`,
+  rebuild both overviews, re-tune on training trees, rerun v2. Keep v2 and v3 rows. Then re-queue part 2.
