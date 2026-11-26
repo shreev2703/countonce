@@ -583,3 +583,8 @@ when `test_colmap.done` says `exit=0`, follow "Resume" above (report, commit, ti
 started. ruff clean; fast tests in a clone: 1101 passed, 31 skipped, 1 xfailed. All 28 failed rows so far
 are `ReconAdaptError: ... no_model`. Task left unticked; follow "Resume" above once `test_colmap.done`
 says `exit=0`.
+
+**Status check (2026-11-26 01:26, fourteenth session on this task):** run still going, PID 2086810, 60 of 64
+`countonce_v2_colmap` rows (only k=20 windows left), no `.done` file; no second copy started, no code
+changed. Task left unticked; when `test_colmap.done` says `exit=0`, follow "Resume" above
+(report, commit, tick, remove the worktree).
