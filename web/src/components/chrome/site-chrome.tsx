@@ -6,13 +6,19 @@ import { AuthNav } from "./auth-nav";
 export function SiteHeader() {
   return (
     <header className="border-b border-border">
-      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+      <div className="mx-auto flex min-h-14 max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2">
         <Link href="/" className="text-lg font-semibold">
           CountOnce
         </Link>
-        <nav aria-label="Main" className="flex items-center gap-5 text-sm">
+        <nav aria-label="Main" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
           <Link href="/demo" className="underline-offset-4 hover:underline">
             Demo gallery
+          </Link>
+          <Link href="/how-it-works" className="underline-offset-4 hover:underline">
+            How it works
+          </Link>
+          <Link href="/benchmark" className="underline-offset-4 hover:underline">
+            Benchmark
           </Link>
           <AuthNav />
         </nav>
@@ -27,6 +33,17 @@ export function SiteFooter() {
       <div className="mx-auto max-w-5xl px-4 py-8 text-sm text-muted-foreground">
         CountOnce is a research project. Demo scenes are precomputed and labelled as such; numbers
         shown on this site come from real runs.
+        <nav aria-label="Footer" className="mt-3 flex flex-wrap gap-4">
+          {[
+            ["/status", "Status"],
+            ["/about", "About"],
+            ["/privacy", "Privacy"],
+          ].map(([href, label]) => (
+            <Link key={href} href={href!} className="underline underline-offset-4">
+              {label}
+            </Link>
+          ))}
+        </nav>
       </div>
     </footer>
   );

@@ -17,6 +17,14 @@ npm run test:e2e     # Playwright + axe (needs: npx playwright install chromium)
   versions). Tested against the backend's `tests/fixtures/schemas/v*/` fixtures.
 - **Design tokens:** `src/app/globals.css` (PLAN 17.10).
 
+## Information pages
+
+- `/benchmark` reads `results/benchmark_summary.csv` and `results/v3_capped_synth_eval.csv` at
+  build time (`COUNTONCE_RESULTS_DIR` overrides the folder); missing files show an empty state.
+  Refresh the summary with `python -m bench.web_summary` from the repo root.
+- `npm run build` ends with `scripts/check-no-todo.mjs`, which fails on placeholder markers.
+- `/privacy` describes current behaviour; update it with retention, blurring or metadata changes.
+
 ## Signed-in flow
 
 Routes: `/signin`, `/new`, `/jobs/[id]`, `/history`, `/s/[token]`. The browser only calls this

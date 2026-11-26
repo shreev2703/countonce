@@ -293,6 +293,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--root", type=Path, default=Path("."))
     a = p.parse_args(argv)
     rep = build(a.csv, a.root)
+    from bench import web_summary  # lazy: web_summary imports this module
+
+    web_summary.write(a.csv, a.root / "results/benchmark_summary.csv")
     print(f"{rep['n_rows']} Fuji rows, {len(rep['cells'])} cells filled")
     return 0
 

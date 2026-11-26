@@ -586,6 +586,33 @@ def create_app(
         return out
 
     # -- health ---------------------------------------------------------------------------
+    @app.get("/status")
+    def public_status() -> dict[str, Any]:
+        """Public, read-only: worker and queue state plus timings of recently finished jobs.
+        No ids, users, prompts or worker names."""
+        rows = store._query(
+            "SELECT status, created_at, started_at, finished_at FROM jobs "
+            "WHERE status IN ('done', 'failed', 'dead_letter') AND finished_at IS NOT NULL "
+            "ORDER BY finished_at DESC LIMIT 10",
+            (),
+        )
+        recent = []
+        for r in rows:
+            start = r["started_at"]
+            recent.append(
+                {
+                    "status": r["status"],
+                    "finished_at": r["finished_at"],
+                    "wait_s": None if start is None else max(0.0, start - r["created_at"]),
+                    "run_s": None if start is None else max(0.0, r["finished_at"] - start),
+                }
+            )
+        state = health()
+        return {
+            **{k: state[k] for k in ("workers_online", "processing_paused", "queue")},
+            "recent": recent,
+        }
+
     @app.head("/health", include_in_schema=False)
     @app.get("/health")
     def health() -> dict[str, Any]:

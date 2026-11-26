@@ -806,3 +806,16 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **Test sign-in** (`COUNTONCE_DEV_AUTH=1`) exists so both end-to-end suites run without Google.
 - **CI:** the `web` job runs the mocked-API suite only. The live suite needs the Python env and is run locally (`npm run test:e2e:live`).
 - **Not done:** email-me-when-done toggle (Moon), real Google sign-in against live credentials.
+
+## M17: benchmark and information pages (2026-11-25)
+- **`/benchmark` reads a summary, not raw `bench.csv`:** `bench/web_summary.py` (also run by `bench.fuji_report`) writes `results/benchmark_summary.csv` with the same statistics as `docs/RESULTS_FUJI.md`, so the two cannot disagree. Only aggregates; no images or per-tree ground truth.
+- **That one file is committed** (`git add -f`; the rest of `results/` stays ignored) so a clean checkout builds with real numbers. `v3_capped_synth_eval.csv` stays local, so elsewhere that section shows the empty state. A deployment whose root is `web/` cannot see `../results`: M18 must include the folder in the build or set `COUNTONCE_RESULTS_DIR`.
+- **Fuji runs are marked dirty** in `bench.csv`; the page says so next to the commit.
+- **Synthetic v3 numbers predate M5** (not done: baselines untuned, no occlusion check); the page says this and labels them a component test.
+- **Chart is hand-written SVG**, not Recharts/Observable Plot: one dot-and-interval figure did not justify a dependency.
+- **Not on the page yet:** ordered vs. shuffled, scene type, VLM baseline, failure gallery, leaderboard (listed as not measured).
+- **`/how-it-works` uses the synthetic tiny scene** (colour detector, fixture geometry) and says so.
+- **New public `GET /status`:** queue state and timings of the last 10 finished jobs; no ids, users, prompts or worker names.
+- **`/privacy` states the gaps** instead of the PLAN 14.8 intent: no automatic 30-day deletion yet (M19), no automatic face/plate blurring, video metadata kept. Update the page when these change.
+- **`/about` has no email address;** contact is through GitHub issues.
+- **Build check** scans prerendered pages, browser bundles, `public/` and page sources (server-rendered pages have no prerendered output).

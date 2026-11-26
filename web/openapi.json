@@ -1437,6 +1437,27 @@
         "summary": "Get Share"
       }
     },
+    "/status": {
+      "get": {
+        "description": "Public, read-only: worker and queue state plus timings of recently finished jobs.\nNo ids, users, prompts or worker names.",
+        "operationId": "public_status_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Public Status Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Public Status"
+      }
+    },
     "/uploads": {
       "post": {
         "operationId": "create_upload_uploads_post",

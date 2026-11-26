@@ -67,6 +67,10 @@ createServer(async (req, res) => {
   if (p === "/health") {
     return send(res, 200, { status: "ok", workers_online: cfg.workerOnline ? 1 : 0, processing_paused: !cfg.workerOnline, workers: [], queue: { queued: 0, running: 0 } });
   }
+  if (p === "/status") {
+    const recent = [...jobs.values()].filter((j) => j.status === "done").map((j) => ({ status: j.status, finished_at: j.finished_at, wait_s: 1, run_s: 2 }));
+    return send(res, 200, { workers_online: cfg.workerOnline ? 1 : 0, processing_paused: !cfg.workerOnline, queue: { queued: 0, running: 0 }, recent });
+  }
   if (p === "/auth/exchange" && m === "POST") {
     if (req.headers["x-auth-secret"] !== SECRET) return err(res, 401, "ERR_UNAUTHENTICATED", "bad auth secret");
     const { provider, subject } = json();

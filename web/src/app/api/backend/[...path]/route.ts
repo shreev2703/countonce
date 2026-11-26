@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 /**
  * Same-origin proxy to the CountOnce API. It adds the signed-in user's API key from the session
  * cookie, so the browser never holds the key and no CORS is needed. Uploads and the SSE stream
- * pass through unbuffered. Only `GET /share/*` and `GET /health` are open.
+ * pass through unbuffered. Only `GET /share/*`, `GET /health` and `GET /status` are open.
  */
 const FORWARD_REQ = ["content-type", "idempotency-key", "x-chunk-sha256", "accept", "last-event-id"];
 const FORWARD_RES = ["content-type", "cache-control", "retry-after", "content-disposition", "traceparent"];
@@ -16,7 +16,7 @@ const FORWARD_RES = ["content-type", "cache-control", "retry-after", "content-di
 async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
   const rel = path.map(encodeURIComponent).join("/");
-  const open = req.method === "GET" && (rel === "health" || rel.startsWith("share/"));
+  const open = req.method === "GET" && (rel === "health" || rel === "status" || rel.startsWith("share/"));
   const headers = new Headers();
   for (const h of FORWARD_REQ) {
     const v = req.headers.get(h);

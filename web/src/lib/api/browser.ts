@@ -21,6 +21,9 @@ export type JobView = {
   files?: number;
 };
 export type Health = { status: string; workers_online: number; processing_paused: boolean; queue: { queued: number; running: number } };
+export type PublicStatus = Omit<Health, "status"> & {
+  recent: { status: string; finished_at: number; wait_s: number | null; run_s: number | null }[];
+};
 export type { components };
 
 export async function bff(path: string, init?: RequestInit): Promise<Response> {
@@ -47,6 +50,7 @@ const post = (body: unknown, headers: Record<string, string> = {}): RequestInit 
 
 export const api = {
   health: () => json<Health>("/health"),
+  status: () => json<PublicStatus>("/status"),
   listJobs: () => json<{ jobs: JobView[] }>("/jobs"),
   getJob: (id: string) => json<JobView>(`/jobs/${id}`),
   createJob: (body: { prompt: string; negative_prompts: string[]; options: Record<string, unknown> }, idempotencyKey: string) =>
