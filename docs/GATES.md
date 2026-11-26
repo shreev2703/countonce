@@ -384,3 +384,26 @@ README rows could honestly be ticked. M22 is left unchecked. What each other no-
 Also found, not fixed: `docker/worker.Dockerfile` installs `.[recon,data]` without `transformers` or the
 `vggt` package, so that image cannot run the default pipeline (the image has never been built). The
 README setup was verified with `uv pip`, not plain `pip`, and resolved torch 2.15.0+cu132.
+
+## 2026-11-25: Seventeenth tech-lead audit (human actions, not queued as overnight tasks)
+- Audit state at `f6392e3`: `ruff check .` clean; `pytest -m "not slow and not gpu"` gives 1113 passed, 27 skipped
+  (Postgres without `COUNTONCE_PG_URL`, `mcp`, `pycolmap`), 1 xfail (the M21 `CLAUDE.md` hygiene test).
+- **M5 was not a real gate:** its run stopped at the orchestrator's 40-turn cap (`error_max_turns`), leaving
+  WIP in `bd60d83`. It is re-queued as M5a (harness) and M5b (tuning + v3 re-run), sized to fit one session.
+- **Queued (autonomous, in order):** M5a, M5b, worker Docker image deps, order-invariance on Fuji (real data),
+  sync and v3 on Fuji held-out trees (G4 evidence only), `/demo/tiny` Lighthouse performance, GATES cleanup,
+  §28.5 quarantine of unproven Moon-tier modules into `experimental/`.
+- **`TASKS_OVERNIGHT.md` is gitignored (M21, §0.1 rule 6).** This audit updated it locally and did not
+  force-add it; only this file is committed.
+- **Still yours (human only):**
+  - Gate G3: confirm or reject the "not met (mixed)" recommendation above. Gate G4 when the Fuji v3 rows exist.
+  - M21: `git rm --cached CLAUDE.md` and commit from your own shell, then drop the xfail in
+    `tests/test_repo_hygiene.py`; push and check hosted CI.
+  - H1 capture day (20-30 scenes, ≥3 zero-target), then P1-P5 run as agent tasks.
+  - H5 accounts (Vercel x2, Google OAuth client, Neon, R2) and the M18 deploy; M19 GPU end-to-end from a browser;
+    put the live URL in the README.
+  - H2 frontend review, H3 interviews, H4 professor meeting, H6 ownership study, the demo video.
+  - Docker (worker image build, Kubric), gated weights (CountGD/CountGD++, VGGT-Ω, VGG-T³), CountVid/DG-Net and
+    the video datasets (E1-E3), OneScene-Bench images (E5), frontier-VLM API spend.
+- **After this batch:** remaining PLAN work needs the photos (P1-P6) or the human items above. Oracle-geometry
+  failure-source runs need a dataset with cameras (own captures with COLMAP, or rendered data in P6).
