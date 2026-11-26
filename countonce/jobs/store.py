@@ -251,6 +251,8 @@ class JobStore(Protocol):
     def register_worker(self, worker_id: str, **info: Any) -> None: ...
     def claim(self, worker_id: str) -> dict[str, Any] | None: ...
     def heartbeat(self, job_id: str, worker_id: str) -> bool: ...
+    def worker_heartbeat(self, worker_id: str) -> None: ...
+    def purge_expired(self, now: float | None = None, retention_days: float = ...) -> list[str]: ...
     def set_progress(self, job_id: str, worker_id: str, stage: str, progress: float) -> bool: ...
     def complete(self, job_id: str, worker_id: str, result: dict[str, Any]) -> bool: ...
     def fail(
@@ -559,6 +561,24 @@ class SqliteJobStore:
         with self._tx() as conn:
             row = conn.execute(self._CLAIM_SQL, (worker_id, now, now, now)).fetchone()
         return dict(row) if row else None
+
+    def worker_heartbeat(self, worker_id: str) -> None:
+        """Mark the worker alive while idle (``heartbeat`` only runs during a job)."""
+        with self._tx() as conn:
+            conn.execute(
+                "UPDATE workers SET last_heartbeat = ? WHERE id = ?", (self.clock(), worker_id)
+            )
+
+    def requeue_dead_letter(self, job_id: str) -> bool:
+        """Operator retry of a dead-lettered job: back to ``queued`` with a fresh attempt budget."""
+        with self._tx() as conn:
+            cur = conn.execute(
+                "UPDATE jobs SET status = 'queued', stage = 'queued', progress = 0, "
+                "worker_id = NULL, attempts = 0, finished_at = NULL, next_attempt_at = ? "
+                "WHERE id = ? AND status = 'dead_letter'",
+                (self.clock(), job_id),
+            )
+            return bool(cur.rowcount == 1)
 
     def heartbeat(self, job_id: str, worker_id: str) -> bool:
         now = self.clock()

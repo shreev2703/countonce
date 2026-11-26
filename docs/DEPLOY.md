@@ -69,6 +69,25 @@ with `npm run sync:results` after `python -m bench.web_summary`.
 2. Check `https://api.<domain>/health` returns 200 and `/` redirects to the site.
 3. Create the site project with root `web/`. Set `COUNTONCE_API_URL` to the API origin. Deploy.
 4. Open `/status` on the site: it should show the API as reachable.
-5. Start the worker against the same Postgres and storage, then run one job from `/new`.
+5. Start the worker against the same Postgres and storage, then run one job from `/new`:
+
+   ```bash
+   COUNTONCE_STORE=postgres COUNTONCE_PG_URL=... COUNTONCE_STORAGE=s3 scripts/start_worker.sh
+   ```
+
+   Local sqlite: `scripts/start_worker.sh` alone (`COUNTONCE_DB` picks the file). Reads `.env`.
+
+### Worker service (M19)
+
+- `scripts/start_worker.sh` runs `countonce worker --supervise`: a crash (CUDA fault, OOM kill)
+  restarts the worker with 1 s to 60 s backoff; Ctrl-C/SIGTERM finishes the current job first.
+- Boot-time start: `countonce worker --print-unit > ~/.config/systemd/user/countonce-worker.service`
+  then `systemctl --user enable --now countonce-worker`.
+- Heartbeat: running jobs beat every 15 s; an idle worker updates its `workers` row every 10 s, which
+  is what `/health` and the site's paused banner read.
+- Errors are typed (`ERR_*`); retryable ones back off, permanent ones go to `dead_letter`.
+  `countonce jobs --db jobs.db dead` lists them, `... retry <job id>` requeues one.
+- Retention: the worker purges finished jobs older than `--retention-days` (default 30, 0 disables)
+  hourly. `/privacy` says so.
 
 Local equivalent without Vercel: see `web/README.md` (fake worker + dev sign-in).

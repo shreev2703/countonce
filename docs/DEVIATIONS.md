@@ -827,3 +827,9 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **Benchmark data for a `web/`-rooted deploy:** `web/content/benchmark/benchmark_summary.csv` is committed (copy of `results/`, `npm run sync:results`). The `content/` name avoids the repo `.gitignore` entries for `data/` and `results/`.
 - **Not verified:** no real deployment was made (needs your Vercel/Neon/R2 accounts), so "frontend talks to the deployed API" is covered by the existing live Playwright run against a local API plus the proxy, not by a hosted one. Logged in `docs/GATES.md`.
 - Still open from M16: old API keys are not revoked on re-sign-in; `example_box` option rejected by `Config` in the worker (M19).
+
+## M19: worker hardening
+- **Supervisor in-process, not a systemd dependency.** `--supervise` works anywhere (WSL2 without systemd included); `--print-unit` covers boot start.
+- **Retention lives in the worker loop** (hourly, default 30 days) rather than a separate scheduler, so the one-command start covers it. No worker, no purge; `/privacy` states this.
+- **`example_box` is dropped before `Config`** (`UI_ONLY_OPTIONS` in `countonce/jobs/worker.py`): the pipeline has no use for it yet, so it is stored with the job but not applied. Fixes the M16 failure.
+- **Not verified:** the "upload from the frontend -> worker on GPU -> result page" run on real hardware was not done unattended (see `docs/GATES.md`). Covered: worker/queue logic by `tests/test_worker_hardening.py`, and the frontend-to-API path by the M16 live Playwright run with a fake worker.

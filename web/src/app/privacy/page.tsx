@@ -35,7 +35,7 @@ const SECTIONS: { title: string; points: string[] }[] = [
   {
     title: "How long it is kept",
     points: [
-      "Automatic deletion is not switched on yet: your uploads and results stay until you delete them or the owner clears old jobs. A 30-day limit is planned.",
+      "Uploads and results of finished jobs are deleted automatically after 30 days. The cleanup runs inside the processing worker, so it happens while that worker is running; if it is switched off, files stay until you delete them or the owner clears old jobs.",
       "You can delete a job from History once it is not running. This removes its uploaded files and results and stops its share links working.",
       "A record that the job existed (including what you asked to count and when), and any feedback or corrections you sent, is kept after deletion.",
     ],

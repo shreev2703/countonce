@@ -224,6 +224,18 @@ def _parser() -> argparse.ArgumentParser:
     wk.add_argument("--poll", type=float, default=1.0, help="idle poll interval, seconds")
     wk.add_argument("--tracing", choices=["none", "jsonl", "otlp"], default="none")
     wk.add_argument("--trace-dir", type=Path, default=Path("runs/traces"))
+    wk.add_argument(
+        "--retention-days",
+        type=float,
+        default=30.0,
+        help="purge finished jobs older than this every hour (0 disables; default 30)",
+    )
+    wk.add_argument(
+        "--supervise", action="store_true", help="restart the worker if it crashes (service mode)"
+    )
+    wk.add_argument(
+        "--print-unit", action="store_true", help="print a systemd user unit for this worker"
+    )
 
     sj = sub.add_parser("submit", help="queue a counting job in a job database")
     sj.add_argument("--db", type=Path, required=True)
@@ -258,6 +270,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     jp = jsub.add_parser("purge", help="delete files of jobs older than the retention window")
     jp.add_argument("--retention-days", type=float, default=30.0)
+    jsub.add_parser("dead", help="list dead-lettered jobs with their error codes")
+    jsub.add_parser("retry", help="requeue a dead-lettered job").add_argument("job_id")
     jsub.add_parser("share", help="create a read-only share token").add_argument("job_id")
     jsub.add_parser("revoke-share", help="revoke a share token").add_argument("token")
     jk = jsub.add_parser("apikey", help="create or revoke API keys").add_subparsers(
@@ -727,7 +741,35 @@ def _worker_blobs(args: argparse.Namespace) -> Any:
     return open_blobstore(kind)
 
 
-def _worker(args: argparse.Namespace) -> int:
+def _worker_argv(raw: list[str]) -> list[str]:
+    """The worker's own arguments, minus the service flags (the child must not supervise)."""
+    return [a for a in raw if a not in ("--supervise", "--print-unit")]
+
+
+def _worker_info() -> dict[str, Any]:
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            p = torch.cuda.get_device_properties(0)
+            return {"gpu_name": p.name, "vram_mb": round(p.total_memory / 2**20)}
+    except Exception:
+        pass
+    return {}
+
+
+def _worker(args: argparse.Namespace, raw: list[str] | None = None) -> int:
+    if args.print_unit or args.supervise:
+        from countonce.jobs.service import supervise, systemd_unit, worker_command
+
+        child = _worker_argv(raw if raw is not None else sys.argv[2:])
+        if args.print_unit:
+            print(systemd_unit(child, Path.cwd()), end="")
+            return 0
+        return supervise(worker_command(child))
+    import signal
+    import threading
+
     from countonce.jobs.store import open_store
     from countonce.jobs.worker import Worker, pipeline_runner
 
@@ -742,10 +784,18 @@ def _worker(args: argparse.Namespace) -> int:
 
     tcfg = TracingConfig(args.tracing, args.trace_dir)
     worker = Worker(
-        store, pipeline_runner(out), tracing_cfg=tcfg, blobs=blobs, out_root=out if blobs else None
+        store,
+        pipeline_runner(out),
+        tracing_cfg=tcfg,
+        blobs=blobs,
+        out_root=out if blobs else None,
+        retention_days=args.retention_days,
+        info=_worker_info(),
     )
+    stop = threading.Event()
+    signal.signal(signal.SIGTERM, lambda *_: stop.set())  # finish the current job, then exit
     try:
-        n = worker.run_loop(until_idle=args.once, poll_s=args.poll)
+        n = worker.run_loop(stop=stop, until_idle=args.once, poll_s=args.poll)
     except KeyboardInterrupt:
         return 0
     print(f"worker {worker.worker_id}: processed {n} job(s); {store.counts()}")
@@ -889,6 +939,15 @@ def _jobs(args: argparse.Namespace) -> int:
         if args.jobs_cmd == "purge":
             ids = store.purge_expired(retention_days=args.retention_days)
             print(f"jobs: purged {len(ids)} job(s) older than {args.retention_days:g} days")
+        elif args.jobs_cmd == "dead":
+            dead = store.list_jobs("dead_letter")
+            for j in dead:
+                print(f"{j['id']}  {j['error_code']}  {j['error_message']}")
+            print(f"jobs: {len(dead)} dead-lettered")
+        elif args.jobs_cmd == "retry":
+            ok = store.requeue_dead_letter(args.job_id)
+            print(f"jobs: {'requeued' if ok else 'not a dead-lettered job'} {args.job_id}")
+            return 0 if ok else 1
         elif args.jobs_cmd == "share":
             print(store.create_share_token(args.job_id))
         elif args.jobs_cmd == "revoke-share":
@@ -1355,7 +1414,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "sites":
         return _sites(args)
     if args.cmd == "worker":
-        return _worker(args)
+        return _worker(args, (argv if argv is not None else sys.argv[1:])[1:])
     if args.cmd == "serve-api":
         return _serve_api(args)
     if args.cmd == "coldstart":

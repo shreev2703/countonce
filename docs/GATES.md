@@ -346,3 +346,6 @@ so `scripts/render_mockups.py` skips; open the HTML files directly or install pl
 
 ## M18: hosted deployment (yours)
 Create the two Vercel projects, Neon Postgres and the R2 bucket, then follow `docs/DEPLOY.md`. Until then "frontend talks to the deployed API" is verified only locally.
+
+## M19: GPU end-to-end (yours)
+Run once on the laptop: start the API and `web/` dev server (see `web/README.md`), run `scripts/start_worker.sh`, upload photos at `/new` and confirm the result page. Not run overnight (needs a GPU session and a browser).
