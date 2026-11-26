@@ -671,3 +671,28 @@ Not started; no code changed, no rows added. Task left unticked.
   `fc.PROTOCOL`, run `overview --force`, re-choose thresholds on the training-split trees, rerun
   every Fuji test method (v1, v2, baselines, sync, v3, COLMAP) detached and resumable across
   sessions, rebuild the reports and remove the 'unreliable' note only for rerun tables."
+
+## 2026-11-26: Twentieth tech-lead audit — open (owner: Shreev / orchestrator)
+
+- **Checks:** `ruff check .` clean. `pytest -m "not slow and not gpu"`: 1149 passed, 26 skipped,
+  1 xfailed, **1 failed** (`test_ci_workflow.py::test_full_cpu_installs_every_extra_that_importorskip_needs`:
+  `transformers` is not mapped to an extra after the E1 WIP commit). Queued as the first new task.
+- **Why four Fuji tasks are `[!]`:** C-DOG/E4, real-data ablations, test-tree order invariance and E1
+  all score against the overview GT frame, which predates the window-alignment fix. No task did the
+  joint rerun, even though five ablation attempts proposed one. It is now queued (part 1: protocol bump,
+  `overview --force`, re-tune and rerun v2; part 2: every other method, C-DOG test, reports). The four
+  `[!]` lines are superseded by new `[ ]` lines that depend on part 1; **don't re-queue the old `[!]`
+  lines.** No Fuji or GPU job was running at audit time (C-DOG tuning finished, `tune_cdog.done` exit=0).
+- **Partial work kept:** E1 has 769 test rows (`results/e1_tracker.csv`, pre-fix GT) and
+  `scripts/report_e1.py` but no results doc; Lighthouse on `/jobs/[id]` and `/s/[token]` has a runner
+  script (`web/scripts/lighthouse-pages.mjs`) but no measured medians.
+- **Also queued:** an oracle-camera geometry arm on Fuji, to split geometry from association error
+  (§0.6 Core row), if the dataset ships per-image cameras.
+- **Human-only, not queued (unchanged):** G3 and G4 decisions (refreshed evidence after the rerun);
+  `git rm --cached CLAUDE.md` and push so hosted CI runs (M21); Google OAuth client, Vercel/R2/Neon
+  accounts and deploys (H5, M18-M20); capture day and hand counts (H1, unlocks P1-P5 and the own-scene
+  §0.6 rows); frontend review on a phone (H2); interviews (H3); professor meeting (H4); the demo video;
+  the CountGD weights; a scratch Postgres for the 21 skipped contract tests (`COUNTONCE_PG_URL`).
+- **Orchestrator note:** the joint rerun runs for hours on the 8 GB GPU. The tasks are written to wait up to
+  15 minutes, then log progress and exit. Expect status-only sessions until part 1's `.done` file exists.
+  The Lighthouse task comes before part 2 because it uses only the CPU.
