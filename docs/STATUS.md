@@ -17,7 +17,7 @@ Legend: yes / no / planned (selecting it raises an error that says so) / n/a.
 
 | Component | Config name | Implemented | Synthetic-tested | Real-model-tested | Held-out real benchmark |
 |---|---|---|---|---|---|
-| GroundingDINO via HuggingFace (`IDEA-Research/grounding-dino-tiny`) | `gdino` (**default**), `groundingdino` | yes | yes (fake model) | yes (tiny scene, GPU marked test) | yes (Fuji Core, v1 and v2 rows) |
+| GroundingDINO via HuggingFace (`IDEA-Research/grounding-dino-tiny`) | `gdino` (**default**), `groundingdino` | yes | yes (fake model) | yes (tiny scene, GPU marked test) | yes (Fuji Core, v1, v2, sync and v3 rows) |
 | GroundingDINO original package path | `detector_options.backend: groundingdino` | yes | gating only | no | no |
 | CountGD | `countgd` | **planned**: forward pass is a stub, weights gated | no | no | no |
 | CountGD++ | `countgdpp` | **planned**: not implemented | no | no | no |
@@ -41,8 +41,8 @@ the message and exits non-zero. It never silently falls back to another detector
 |---|---|---|---|---|---|
 | v1 3D clustering | `v1` | yes | yes | yes (with the real detector and VGGT) | yes (Fuji Core) |
 | v2 reprojection + Hungarian | `v2` | yes | yes | yes | yes (Fuji Core) |
-| Permutation sync | `sync` | yes | yes | no | no |
-| v3 learned matcher | `v3` | yes | yes (trained on synthetic data only) | no | no |
+| Permutation sync | `sync` | yes | yes | yes (Fuji, real detector and VGGT) | yes (Fuji Core) |
+| v3 learned matcher | `v3` | yes | yes (trained on synthetic data only) | yes (Fuji, no Fuji fine-tune) | yes (Fuji Core; higher MAE than v2 at k=10) |
 
 ## Baselines, pipeline and tooling
 

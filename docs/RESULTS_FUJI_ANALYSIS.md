@@ -1,8 +1,8 @@
 ## Reading of the numbers (hand-written; appended by `bench.fuji_report`)
 
 Protocol `fuji_core_v2`; thresholds frozen on the training-split trees before the test trees were
-touched (`configs/fuji_core.yaml`: score 0.2, merge_k 0.3). 320 test rows, none failed, none
-dropped. Two accidental duplicate rows (a second writer started by mistake) were removed from
+touched (`configs/fuji_core.yaml`: score 0.2, merge_k 0.3). 320 test rows (v1, v2 and baselines),
+none failed, none dropped. 128 more rows (sync and v3, below) were added later, 448 in total. Two accidental duplicate rows (a second writer started by mistake) were removed from
 `results/bench.csv`; their predictions were identical to the originals.
 
 **Gate G3 ("v1/v2 beat Sum and Max on most scenes"): not met.** Per slice (tree x side, 16 per k),
@@ -48,3 +48,17 @@ false positives (about 121 per window, detections that match no visible GT apple
 some are real apples outside the GT, so this is an upper bound) and by about 52 misses. The
 biggest error source is therefore the detector, then duplicates from association under estimated
 geometry. Oracle-detection boxes assume a 4 cm apple radius (not measured).
+
+### Sync and v3 on the test trees (added later)
+
+64 `countonce_sync` and 64 `countonce_v3` rows, one per v2 test window, none failed. Same
+detector, backbone, prompt, score threshold, merge_k and ground truth as the v2 rows. Sync's
+settings were frozen on the training-split trees (`configs/fuji_core_sync.yaml`); v3 is the
+registered checkpoint `v001`, trained on synthetic data only, with no Fuji fine-tune.
+
+- Paired MAE against v2 (table above): sync is within 1.6 apples at every k. v3 is lower by 1.7 at
+  k=3, higher by 2.4 at k=5, by 25.5 [9.8, 40.2] at k=10 and by 47.9 [-1.5, 107.6] at k=20.
+- v3's signed bias at k=10 and 20 (+61, +99) is close to Sum's (+65, +113): it merges few
+  detections. At k=3, where the pipeline under-counts on average, merging less lowers MAE.
+- Association F1 exists only for slices with identity-labelled detections, so it is not in the table.
+  The subset comparison is in `docs/GATES.md` under G4.

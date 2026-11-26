@@ -950,3 +950,11 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **Claim:** photo-order invariance of v1, v2 and sync is supported on 12 Fuji validation windows (10 permutations each). v3 and the test split were not run; validation trees only; one reconstruction per window (permutations re-order photos, they do not re-run VGGT).
 - **§0.6 row ticked** (v2 and sync invariant: count range 0, partitions unchanged, with merges present).
 - Tests: `tests/test_order_invariance_gate_sweep.py` (CPU). The script runs on CPU from the caches (stubs the GPU dtype probe so cache keys match).
+
+## Sync and v3 on the Fuji-SfM held-out trees (2026-11-25)
+- **Provenance:** the 128 test rows (64 `countonce_sync`, 64 `countonce_v3`) ran from commit `ec31df2` plus uncommitted changes that were committed afterwards as `07e948f`; the rows carry `git_commit=ec31df2…`, `git_dirty=True` and timestamp 2026-11-26T03:28:25Z (the run's start, UTC). They were not re-run from a clean tree.
+- **Row count:** the task text said 128 rows per method. There are 64 v2 test windows (8 trees x 2 sides x 4 k), so the complete set is 64 per method, 128 in total (`wall_min=117.2`, no failed rows). The stated criterion "one row per v2 test window" is what was applied.
+- **No second run:** the process had exited (`runs/fuji_core/test_sync_v3.done`, 21:25) before this session; nothing was relaunched.
+- **v3:** registered checkpoint `models/checkpoints/v001.pt` (sha256 prefix `ebd3f291fc111374`) as-is; no tuned setting of its own.
+- **Report path fix:** `bench/fuji_report.py` still wrote its LaTeX table to `paper/tables/`, which would have recreated the quarantined directory; it now writes to `experimental/paper/tables/` (test added).
+- `web/content/benchmark/benchmark_summary.csv` was refreshed from `results/` (existing cells unchanged, sync and v3 cells added). The web pages still show only v1, v2 and the baselines.

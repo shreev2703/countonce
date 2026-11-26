@@ -270,8 +270,8 @@ def build(csv_path: Path, root: Path) -> dict[str, Any]:
         md += "\n" + extra.read_text()
     (root / "docs").mkdir(exist_ok=True)
     (root / "docs/RESULTS_FUJI.md").write_text(md)
-    (root / "paper/tables").mkdir(parents=True, exist_ok=True)
-    (root / "paper/tables/fuji_core.tex").write_text(latex_table(report))
+    (root / "experimental/paper/tables").mkdir(parents=True, exist_ok=True)
+    (root / "experimental/paper/tables/fuji_core.tex").write_text(latex_table(report))
     out = root / "results/fuji_core_report.json"
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(report, indent=1))

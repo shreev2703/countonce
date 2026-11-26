@@ -373,6 +373,22 @@ README setup was verified with `uv pip`, not plain `pip`, and resolved torch 2.1
   external datasets and VLM API spend.
 - **After this batch:** the PLAN has no autonomous work left that doesn't need the photos or the human items.
 
+## 2026-11-25: Gate G4 (learning helps), v3 vs v2 on Fuji-SfM — open (owner: Shreev, decision)
+- **Recommendation: G4 not met on Fuji-SfM. Keep v3 out of the default path.** G4 asks for v3 to beat v2 on
+  association F1 on Fuji-SfM and on own captures. v3 does not on Fuji; there are no own captures.
+- Association F1, v3 minus v2, on slices where both are defined (per-tree mean, 95% bootstrap CI over trees):
+  k=3 -0.36 [-0.68, -0.08] (5 slices); k=5 0.00 (2 slices, uninformative); k=10 -0.32 [-0.61, -0.06] (7 slices,
+  6 trees); k=20 -0.61 [-0.71, -0.50] (13 slices, 7 trees). These are small subsets of the 16 slices per k.
+- Count MAE, v3 minus v2, all 16 slices per k (8 trees): k=3 -1.7 [-3.7, -0.3]; k=5 +2.4 [0.1, 4.7];
+  k=10 +25.5 [9.8, 40.2]; k=20 +47.9 [-1.5, 107.6]. Slices where v3's error is lower / equal / higher: 5/8/3,
+  2/9/5, 3/2/11, 5/0/11. No multiple-comparison correction.
+- The one gain (k=3 MAE) comes with lower F1; v3 merges little and the pipeline under-counts there on average,
+  so it is not evidence of better matching.
+- v3 is the `v001` checkpoint trained on synthetic data only. A sim-to-real gap is a likely cause but was not
+  tested. PLAN §21 fallback: improve randomization or fine-tune (at least 3 seeds), and if it still fails,
+  report it and keep v2 as default. Whether to spend on the fine-tune ablation is the owner's call.
+- Evidence: `docs/RESULTS_FUJI.md`, `results/bench.csv` (rows from `ec31df2`, dirty tree; see DEVIATIONS).
+
 ## Open items carried from earlier audit snapshots — open (owner: Shreev)
 Items from the resolved snapshots that no other open section above lists.
 - **Phase 0 and captures:** gates G0/G1; the G2 foliage and easy captures; identity labels on 3-5 scenes; the
@@ -390,7 +406,7 @@ Items from the resolved snapshots that no other open section above lists.
 - **Environment:** decide whether `.venv` (Python 3.12) should be 3.11 to match CI.
 
 ## Overnight tasks left `[!]` — open (owner: orchestrator / Shreev, to re-queue)
-- **M5b** (tune v1/v2/sync on synthetic validation, re-run v3) and **sync and v3 on Fuji held-out trees** have
-  WIP commits only (`7427ba3`, `07e948f`).
+- **M5b** (tune v1/v2/sync on synthetic validation, re-run v3) has a WIP commit only (`7427ba3`); re-queued as
+  M5b-1 and M5b-2. Sync and v3 on Fuji held-out trees is finished (see G4 below).
 - Orchestrator settings suggested by earlier audits: skip a task after 2 consecutive gate logs, and raise the
   turn cap for GPU tasks or split them.
