@@ -486,3 +486,9 @@ has landed: the strict xfail still fails as expected, `results/bench.csv` has 0 
 **Re-check #2 (2026-11-25, third attempt of the COLMAP task): still OPEN.** Alignment fix has not landed,
 `results/bench.csv` has 0 `_colmap` rows, and no `run_fuji_core.py bench` process is running (only the
 orchestrator's own session matched `pgrep`). No code changed; the 128-slice run was not launched. Task left unticked.
+
+**Re-check #3 (2026-11-25, fourth attempt of the COLMAP task): still OPEN.** No commit since
+re-check #2 touches the alignment, the strict xfail still fails as expected, `results/bench.csv` has 0
+`_colmap` rows and no bench process is running. Not launched; task left unticked. Re-queuing this task
+alone cannot succeed: queue the alignment fix (steps 1 and 2 above) ahead of it.
+`ruff check .` clean; `pytest -m "not slow and not gpu"`: 1104 passed, 26 skipped, 2 xfailed.
