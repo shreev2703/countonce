@@ -1,0 +1,205 @@
+{
+ "chosen_on": "training trees only (bench/splits_fuji_sfm.json 'training')",
+ "bytetrack": {
+  "high_thr": 0.2,
+  "low_thr": 0.2,
+  "match_iou": 0.2,
+  "second_iou": 0.5,
+  "max_lost": 30
+ },
+ "sam2": {
+  "cover_iou": 0.5,
+  "model_id": "facebook/sam2.1-hiera-small"
+ },
+ "grid": {
+  "n_windows": 12,
+  "bytetrack": [
+   {
+    "params": {
+     "high_thr": 0.2,
+     "low_thr": 0.2,
+     "match_iou": 0.1,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 60.75
+   },
+   {
+    "params": {
+     "high_thr": 0.2,
+     "low_thr": 0.2,
+     "match_iou": 0.2,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 60.666666666666664
+   },
+   {
+    "params": {
+     "high_thr": 0.2,
+     "low_thr": 0.2,
+     "match_iou": 0.3,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 61.166666666666664
+   },
+   {
+    "params": {
+     "high_thr": 0.2,
+     "low_thr": 0.2,
+     "match_iou": 0.5,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 61.0
+   },
+   {
+    "params": {
+     "high_thr": 0.3,
+     "low_thr": 0.2,
+     "match_iou": 0.1,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 80.58333333333333
+   },
+   {
+    "params": {
+     "high_thr": 0.3,
+     "low_thr": 0.2,
+     "match_iou": 0.2,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 80.5
+   },
+   {
+    "params": {
+     "high_thr": 0.3,
+     "low_thr": 0.2,
+     "match_iou": 0.3,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 80.58333333333333
+   },
+   {
+    "params": {
+     "high_thr": 0.3,
+     "low_thr": 0.2,
+     "match_iou": 0.5,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 80.54166666666667
+   },
+   {
+    "params": {
+     "high_thr": 0.4,
+     "low_thr": 0.2,
+     "match_iou": 0.1,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 89.41666666666667
+   },
+   {
+    "params": {
+     "high_thr": 0.4,
+     "low_thr": 0.2,
+     "match_iou": 0.2,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 89.375
+   },
+   {
+    "params": {
+     "high_thr": 0.4,
+     "low_thr": 0.2,
+     "match_iou": 0.3,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 89.375
+   },
+   {
+    "params": {
+     "high_thr": 0.4,
+     "low_thr": 0.2,
+     "match_iou": 0.5,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 89.375
+   },
+   {
+    "params": {
+     "high_thr": 0.5,
+     "low_thr": 0.2,
+     "match_iou": 0.1,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 92.625
+   },
+   {
+    "params": {
+     "high_thr": 0.5,
+     "low_thr": 0.2,
+     "match_iou": 0.2,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 92.625
+   },
+   {
+    "params": {
+     "high_thr": 0.5,
+     "low_thr": 0.2,
+     "match_iou": 0.3,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 92.625
+   },
+   {
+    "params": {
+     "high_thr": 0.5,
+     "low_thr": 0.2,
+     "match_iou": 0.5,
+     "second_iou": 0.5,
+     "max_lost": 30
+    },
+    "mae": 92.625
+   }
+  ],
+  "sam2": [
+   {
+    "params": {
+     "cover_iou": 0.2,
+     "model_id": "facebook/sam2.1-hiera-small"
+    },
+    "mae": 60.833333333333336,
+    "n": 12
+   },
+   {
+    "params": {
+     "cover_iou": 0.3,
+     "model_id": "facebook/sam2.1-hiera-small"
+    },
+    "mae": 60.583333333333336,
+    "n": 12
+   },
+   {
+    "params": {
+     "cover_iou": 0.5,
+     "model_id": "facebook/sam2.1-hiera-small"
+    },
+    "mae": 60.416666666666664,
+    "n": 12
+   }
+  ]
+ }
+}

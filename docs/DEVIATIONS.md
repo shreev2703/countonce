@@ -1051,3 +1051,32 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
   and are memoised in memory. ViT-S/14 is loaded with `torch.hub`, as the existing extractor did.
 - It refuses protocol `fuji_core_v2` instead of running from a pre-fix worktree: GATES holds
   ablations until v2 is rerun with the fixed alignment. No rows, no analysis table, no STATUS ticks.
+
+## 2026-11-26: E1 tracker side on Fuji-SfM (ByteTrack, SAM 2.1)
+
+- **ByteTrack:** re-implemented in `bench/baselines_track.py` (IoU + constant-velocity Kalman, two-stage
+  matching, Hungarian via scipy) instead of a pip package: the reference `ByteTrack` repo is not on PyPI and
+  the packaged ports checked are GPL or unmaintained. Unit-tested on a synthetic moving-box sequence only; it
+  has not been validated against the reference implementation on MOT data, so absolute numbers are those of
+  this re-implementation.
+- **SAM 2.1:** `facebook/sam2.1-hiera-small` through `transformers` `Sam2VideoModel`, streaming mode, bf16.
+  A detection starts a new object (box prompt) unless a propagated mask covers it at mask/box IoU >=
+  `cover_iou`; covered detections join the best-covering track. The "small" checkpoint was chosen because it
+  is the one already in the HF cache and fits beside the other GPU jobs; large/base-plus were not tried.
+  Because new objects are added after the old ones were propagated on the same frame, that frame is
+  evaluated twice for the old objects (an API constraint), which only costs time.
+- **Views and strides:** the windows are the Core test windows (k = 3, 5, 10, 20; 40 views are not cached).
+  Stride s shows every s-th view of a window, so the viewpoint gap grows but the window shrinks to
+  ceil(k/s) views; fewer than 2 views is recorded as a `skipped` row. GT of a strided run is the union of the
+  GT apples visible in the shown views. CountOnce v1/v2 counts exist only at stride 1 (not re-reconstructed on
+  subsets).
+- **Scoring:** a tracker's count is the number of distinct tracks among detections whose lifted point lies in
+  the tree's ROI (detections whose lift failed cannot be placed and are not counted), the same ROI rule as
+  the per-image baselines. Tracks are never aligned to GT.
+- **Tuning:** thresholds chosen on the training trees (Tree09-11) only, windows k=5,10 (SAM 2.1: k=5), strides
+  1 and 2, capture order; written to `configs/e1_tracker.json`. Test rows are not read by `tune`.
+- **GT caveat inherited from Core:** the overview pseudo-poses still predate the window-alignment fix
+  (docs/GATES.md), so GT counts per window are as unreliable as for the existing v2 rows; the tracker-vs-v2
+  comparison uses the same prepared GT for both, so it is paired, but absolute errors are not.
+- **Rows:** `results/e1_tracker.csv`, not `results/bench.csv`, because the Core CSV's protocol/staleness
+  machinery assumes pipeline rows.
