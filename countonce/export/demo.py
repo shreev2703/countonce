@@ -23,6 +23,7 @@ from typing import Any
 
 import numpy as np
 
+from countonce.config import Config
 from countonce.export.ply import sample_points
 from countonce.schemas import CURRENT_VERSION, load_markers, load_result
 from countonce.types import Frame
@@ -116,7 +117,7 @@ def build_scene(
     label: str,
     detector: str = "color_blob",
     backbone: str = "fixture",
-    assoc: str = "v1",
+    assoc: str = Config.model_fields["assoc"].default,
     gt_count: int | None = None,
     extra_config: dict[str, Any] | None = None,
     repo_root: Path = Path("."),
@@ -125,7 +126,6 @@ def build_scene(
     from PIL import Image
 
     from countonce import pipeline
-    from countonce.config import Config
     from countonce.export.writers import write_markers_json, write_result_json
     from countonce.lift import compute_scene_scale
     from countonce.provenance import run_metadata

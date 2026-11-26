@@ -10,13 +10,13 @@
     "view_4.png": "fac5fa20616b0b0f65c37643bb4df51cc0d4a9e683e083b4ffc5e505050a4b62"
   },
   "run": {
-    "git_commit": "ca2fa6b4e21c2f6023f63b1ef1fdc82d13e328ff",
+    "git_commit": "adc1b7897a099e22db836bb6483ba79e4880eba5",
     "git_dirty": true,
-    "timestamp_utc": "2026-11-26T01:18:26+00:00",
+    "timestamp_utc": "2026-11-26T05:44:25+00:00",
     "config": {
       "detector": "color_blob",
       "backbone": "fixture",
-      "assoc": "v1",
+      "assoc": "v2",
       "cannot_link": true,
       "appearance": true,
       "negative_prompts": true,
@@ -73,7 +73,7 @@
   "model_versions": {
     "detector": "color_blob@1",
     "backbone": "fixture",
-    "associator": "v1",
+    "associator": "v2",
     "calibration": null
   }
 }

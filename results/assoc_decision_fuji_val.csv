@@ -1,0 +1,4 @@
+method,mae,ci_low,ci_high,n_windows,n_trees,diff_vs_v2,diff_ci_low,diff_ci_high,source
+v1,54.75,16.5,113.0,12,3,-6.5,-11.0,1.25,results/fuji_tune2_s0.2_k0.3.csv
+v2,61.25,27.5,122.75,12,3,0.0,0.0,0.0,results/fuji_tune2_s0.2_k0.3.csv
+sync,61.83,27.25,121.25,12,3,0.58,-1.5,3.5,results/fuji_tune_sync_s0.2_k0.3.csv

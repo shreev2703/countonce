@@ -80,7 +80,7 @@ def test_end_to_end_counts_each_object_once(tmp_path):
     raw = json.loads((tmp_path / "out" / "result.json").read_text())
     loaded = schemas.load_result(raw)
     assert loaded.count == len(OBJECTS)
-    assert "git_commit" in loaded.config and loaded.config["config"]["assoc"] == "v1"
+    assert "git_commit" in loaded.config and loaded.config["config"]["assoc"] == "v2"
     for name in ("markers.json", "counts.csv"):
         assert (tmp_path / "out" / name).exists()
 

@@ -128,6 +128,13 @@ Each chunk aligns to the already-merged result, so errors accumulate along the c
 
 ## 7. v2: geometric cross-view matching
 
+**v2 is the default associator** (`Config.assoc`, CLI and demo exporter). The rule (PLAN §0.1) was
+"v2, or sync if it wins on validation". On 12 Fuji validation windows (3 trees) count MAE was v2
+61.25 [27.5, 122.75] and sync 61.83 [27.25, 121.25], so sync did not win. v1 was lower than both,
+54.75 [16.5, 113.0] (95% bootstrap CIs over trees; its difference from v2 includes 0). The default
+therefore follows the rule, not the lowest validation number
+([DEVIATIONS.md](DEVIATIONS.md), "Default associator").
+
 [`merge/match.py`](../countonce/merge/match.py) processes frames in increasing id, keeping running
 instance tracks:
 

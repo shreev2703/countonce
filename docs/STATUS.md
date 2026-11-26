@@ -40,7 +40,7 @@ the message and exits non-zero. It never silently falls back to another detector
 | Component | Config name | Implemented | Synthetic-tested | Real-model-tested | Held-out real benchmark |
 |---|---|---|---|---|---|
 | v1 3D clustering | `v1` | yes | yes | yes (with the real detector and VGGT) | yes (Fuji Core) |
-| v2 reprojection + Hungarian | `v2` | yes | yes | yes | yes (Fuji Core) |
+| v2 reprojection + Hungarian | `v2` (**default**) | yes | yes | yes | yes (Fuji Core) |
 | Permutation sync | `sync` | yes | yes | yes (Fuji, real detector and VGGT) | yes (Fuji Core) |
 | v3 learned matcher | `v3` | yes | yes (trained on synthetic data only) | yes (Fuji, no Fuji fine-tune) | yes (Fuji Core; higher MAE than v2 at k=10) |
 

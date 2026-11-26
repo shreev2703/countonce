@@ -110,7 +110,7 @@ feed-forward reconstruction (VGGT)        cameras + depth + point maps    counto
 lift each detection to a 3D point + size  countonce/lift.py
    │
    ▼
-associate detections across views         v1 3D clustering | v2 reprojection + Hungarian | sync
+associate detections across views         v1 3D clustering | v2 reprojection + Hungarian (default) | sync
    │  (two detections in one photo are never the same object)
    ▼
 count = number of instances, plus a sensitivity range, quality warnings,
@@ -195,7 +195,7 @@ These two backends exist only to exercise the CLI end to end (`tests/test_cli_e2
 not real detection or reconstruction. Regenerate the scene with `python examples/tiny_scene/generate.py`.
 
 Flags: `--detector {gdino,color_blob}` (`countgd` and `countgdpp` are planned and exit with an error), `--backbone {vggt,vggt_omega,vggt_t3,colmap}`,
-`--assoc {v1,v2,v3,sync}`, `--config file.yaml` (flags override the file). Not every choice has an
+`--assoc {v1,v2,v3,sync}` (default `v2`), `--config file.yaml` (flags override the file). Not every choice has an
 implementation yet; unimplemented ones exit with an error.
 
 Download the Fuji-SfM dataset (about 6.9 GB). It is CC BY-NC-SA 4.0: research and education only, no commercial use. Do not redistribute its images or any GT derived from them, and do not upload them to a Hugging Face dataset. The loader reads `data/fuji_sfm` (gitignored):

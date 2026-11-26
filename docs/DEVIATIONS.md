@@ -958,3 +958,20 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **v3:** registered checkpoint `models/checkpoints/v001.pt` (sha256 prefix `ebd3f291fc111374`) as-is; no tuned setting of its own.
 - **Report path fix:** `bench/fuji_report.py` still wrote its LaTeX table to `paper/tables/`, which would have recreated the quarantined directory; it now writes to `experimental/paper/tables/` (test added).
 - `web/content/benchmark/benchmark_summary.csv` was refreshed from `results/` (existing cells unchanged, sync and v3 cells added). The web pages still show only v1, v2 and the baselines.
+
+## Default associator: v2 (2026-11-25, Fuji validation windows only)
+- **Rule (PLAN §0.1 rule 1):** GroundingDINO → VGGT → v2, or sync if sync wins on validation. Applied as written: **v2**, because sync is not lower.
+- **Inputs:** Tree09-11 x east/west x k in {5, 10} = 12 windows, protocol `fuji_core_v2`, each method at its frozen setting (score 0.2, merge_k 0.3): v1 and v2 from `results/fuji_tune2_s0.2_k0.3.csv` (commit `2309cdf`, dirty), sync from `results/fuji_tune_sync_s0.2_k0.3.csv` (commit `ec31df2`, dirty). No test-split row was read. Reproduce with `scripts/decide_assoc_fuji_val.py`, which writes `results/assoc_decision_fuji_val.csv`.
+
+| method | count MAE (apples) | 95% CI | MAE minus v2 | 95% CI |
+|---|---|---|---|---|
+| v1 | 54.75 | [16.5, 113.0] | -6.50 | [-11.0, 1.25] |
+| v2 | 61.25 | [27.5, 122.75] | 0 | |
+| sync | 61.83 | [27.25, 121.25] | +0.58 | [-1.5, 3.5] |
+
+- **v1 was lower than both v2 and sync.** v2 is kept per the rule. This is on record, not explained away.
+- **CIs:** 10,000-sample percentile bootstrap over trees (per-tree mean over its 4 windows), paired for the differences. The MAE column is the mean over the 12 windows. With only 3 trees the intervals are very coarse; none of the three methods is shown to differ.
+- **Limits:** these windows also chose the thresholds, so the MAEs are not held-out estimates. v1's distance `merge_k` was swept (0.3, 0.5, 0.8); v2's and sync's gates were not (their gate scales as k / merge_k, so `merge_k` leaves them unchanged), which may favour v1.
+- **Made to agree:** `Config.assoc`, `countonce run --help`, `routing.LiveRoute`, the demo exporter (assets under `web/public/demo/tiny` rebuilt: count 5 and interval 5-25 unchanged), README, STATUS, EXPLAINER. `score_threshold` and `merge_k` defaults are unchanged; the Fuji frozen values stay in `configs/fuji_core*.yaml`.
+- **Left explicit on v1:** `configs/profile*.yaml` and `scripts/profile_confidence.py` name v1 so they stay comparable with the profiles already measured. Bench and test configs that name an associator are unchanged.
+- **Tiny scene under the new default:** CPU (`color_blob` + `fixture`, `all_views.yaml`, no `--assoc`): count 5, associator recorded `v2`. GPU test `tests/test_tiny_scene_real_gpu.py` no longer pins v1; run on the RTX 5070 (`.venv-gpu`): 1 passed (count 5). It keeps one view by default dedup, so it does not discriminate between associators.

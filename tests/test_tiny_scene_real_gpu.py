@@ -30,7 +30,6 @@ def test_real_path_counts_five_on_tiny_scene(tmp_path: Path) -> None:
     cfg = Config(
         detector="gdino",
         backbone="vggt",
-        assoc="v1",
         score_threshold=0.5,  # above the distractor scores, below the red ones
         nms_iou=0.7,
         out_dir=str(tmp_path / "out"),

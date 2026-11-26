@@ -31,7 +31,11 @@ def _parser() -> argparse.ArgumentParser:
         "--detector", choices=["countgd", "gdino", "groundingdino", "countgdpp", "color_blob"]
     )
     r.add_argument("--backbone", choices=["vggt", "vggt_omega", "vggt_t3", "colmap", "fixture"])
-    r.add_argument("--assoc", choices=["v1", "v2", "v3", "sync"])
+    r.add_argument(
+        "--assoc",
+        choices=["v1", "v2", "v3", "sync"],
+        help=f"associator (default: {Config.model_fields['assoc'].default})",
+    )
     r.add_argument("--v3-checkpoint", type=Path, help="matcher checkpoint for --assoc v3")
     r.add_argument("--out", type=Path)
     r.add_argument("--fps", type=float)

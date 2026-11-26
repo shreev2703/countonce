@@ -26,7 +26,8 @@ class Config(BaseModel):
 
     detector: DetectorName = "gdino"
     backbone: BackboneName = "vggt"
-    assoc: AssocName = "v1"
+    # PLAN 0.1 rule 1; chosen on Fuji-SfM validation windows (docs/DEVIATIONS.md).
+    assoc: AssocName = "v2"
 
     # Ablation switches (PLAN 9.6). Defaults reproduce the shipped behaviour.
     cannot_link: bool = True  # v1/v2: never merge two detections from the same frame
