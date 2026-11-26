@@ -44,12 +44,32 @@ from synth.geometry import IMAGE_SIZE, Episode, load_episode
 
 FAR_DEPTH = 10.0
 
-V1_GRID = {"k": [0.25, 0.5, 0.75, 1.0, 1.5, 2.0]}
-V2_GRID = {"max_reproj_norm": [0.25, 0.5, 1.0, 2.0], "depth_tol": [0.5, 1.0, 2.0, 4.0]}
+# ``score_threshold`` drops detections scoring below it before association (0.0 keeps all).
+SCORE_GRID = [0.0, 0.4, 0.6, 0.8]
+V1_GRID = {"k": [0.25, 0.5, 0.75, 1.0, 1.5, 2.0], "score_threshold": SCORE_GRID}
+V2_GRID = {
+    "max_reproj_norm": [0.25, 0.5, 1.0, 2.0],
+    "depth_tol": [0.5, 1.0, 2.0, 4.0],
+    "score_threshold": SCORE_GRID,
+}
 SYNC_GRID = {
     "eig_threshold": [0.3, 0.5, 0.7],
     "assign_threshold": [0.3, 0.5, 0.7],
+    "score_threshold": SCORE_GRID,
 }
+
+
+class ScoreGated:
+    """Wrap an associator so detections scoring below ``threshold`` are never associated."""
+
+    def __init__(self, inner: Associator, threshold: float):
+        self.inner = inner
+        self.threshold = threshold
+        self.name = inner.name
+
+    def associate(self, lifted: Any, recon: Any = None, frames: Any = None) -> Any:
+        keep = [ld for ld in lifted if ld.det.score >= self.threshold]
+        return self.inner.associate(keep, recon, frames)
 
 
 @dataclass(frozen=True)
@@ -178,16 +198,37 @@ def _grid(space: dict[str, list[Any]]) -> list[dict[str, Any]]:
     return [dict(zip(keys, vals, strict=True)) for vals in itertools.product(*space.values())]
 
 
+def _gate(inner: Associator, p: dict[str, Any]) -> Associator:
+    thr = float(p.get("score_threshold", 0.0))
+    return ScoreGated(inner, thr) if thr > 0 else inner
+
+
 def make_v1(p: dict[str, Any]) -> Associator:
-    return V1Associator(**p)
+    q = {k: v for k, v in p.items() if k != "score_threshold"}
+    return _gate(V1Associator(**q), p)
 
 
 def make_v2(p: dict[str, Any]) -> Associator:
-    return V2Associator(V2Config(**p))
+    q = {k: v for k, v in p.items() if k != "score_threshold"}
+    return _gate(V2Associator(V2Config(**q)), p)
 
 
 def make_sync(p: dict[str, Any], v2: dict[str, Any] | None = None) -> Associator:
-    return SyncAssociator(SyncConfig(**p), V2Config(**(v2 or {})))
+    """Sync over v2 pairwise matches; the score gate is sync's own (``p``), not v2's."""
+    q = {k: v for k, v in p.items() if k != "score_threshold"}
+    v2q = {k: v for k, v in (v2 or {}).items() if k != "score_threshold"}
+    return _gate(SyncAssociator(SyncConfig(**q), V2Config(**v2q)), p)
+
+
+def write_tuning_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    """Every grid point tried on the validation split, with the default and chosen flags."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    keys: list[str] = ["variant", "method", "val_mae", "is_default", "chosen"]
+    params = sorted({k for r in rows for k in r if k not in keys})
+    with path.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=[*keys, *params], restval="")
+        w.writeheader()
+        w.writerows(rows)
 
 
 def tune(

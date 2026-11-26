@@ -43,6 +43,7 @@ from bench.synth_component import (
     summarize_counts,
     tune,
     write_summary_csv,
+    write_tuning_csv,
 )
 from countonce.merge.cluster import DEFAULT_K
 from countonce.merge.match import V2Config
@@ -54,12 +55,16 @@ def defaults() -> dict[str, dict[str, Any]]:
     v2 = V2Config()
     sy = SyncConfig()
     return {
-        "v1": {"k": DEFAULT_K},
-        "v2": {"max_reproj_norm": v2.max_reproj_norm, "depth_tol": v2.depth_tol},
+        "v1": {"k": DEFAULT_K, "score_threshold": 0.0},
+        "v2": {
+            "max_reproj_norm": v2.max_reproj_norm,
+            "depth_tol": v2.depth_tol,
+            "score_threshold": 0.0,
+        },
         "sync": {
             "eig_threshold": sy.eig_threshold,
             "assign_threshold": sy.assign_threshold,
-            "min_pair_affinity": sy.min_pair_affinity,
+            "score_threshold": 0.0,
         },
     }
 
@@ -78,6 +83,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out-json", default="results/synth_component.json")
     ap.add_argument("--out-csv", default="results/synth_component_summary.csv")
     ap.add_argument("--out-rows-csv", default="results/synth_component_rows.csv")
+    ap.add_argument("--out-tuning-csv", default="results/synth_component_tuning.csv")
+    ap.add_argument("--device", default="cpu", help="device for v3 inference (cpu or cuda)")
     ap.add_argument("--n-boot", type=int, default=2000)
     ap.add_argument("--max-val", type=int, default=None)
     a = ap.parse_args(argv)
@@ -85,7 +92,9 @@ def main(argv: list[str] | None = None) -> int:
     val_files = sorted(Path(a.data, "val").glob("*.npz"))[: a.max_val]
     test_files = sorted(Path(a.data, "test").glob("*.npz"))
     dflt = defaults()
-    v3 = V3Associator(a.checkpoint)
+    v3 = V3Associator(a.checkpoint, device=a.device)
+    v3s = V3Associator(a.checkpoint, device=a.device, synchronize=True)
+    tuning_rows: list[dict[str, Any]] = []
     result: dict[str, Any] = {}
     row_dump: list[dict[str, Any]] = []
     summaries: dict[tuple[str, str], dict[str, float]] = {}
@@ -103,7 +112,20 @@ def main(argv: list[str] | None = None) -> int:
             "sync (default)": make_sync(dflt["sync"]),
             "sync (tuned)": make_sync(ts.best, t2.best),
             "v3": v3,
+            "v3+sync": v3s,
         }
+        for t, dfl in ((t1, dflt["v1"]), (t2, dflt["v2"]), (ts, dflt["sync"])):
+            for params, mae in t.trials:
+                tuning_rows.append(
+                    dict(
+                        variant=variant,
+                        method=t.method,
+                        val_mae=mae,
+                        is_default=int(params == dfl),
+                        chosen=int(params == t.best),
+                        **params,
+                    )
+                )
         rows = {name: evaluate(assoc, test) for name, assoc in arms.items()}
         summ = {}
         for name, r in rows.items():
@@ -144,6 +166,7 @@ def main(argv: list[str] | None = None) -> int:
         Path(out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out_json).write_text(json.dumps(result, indent=1, default=float))
     write_summary_csv(Path(a.out_csv), summaries)
+    write_tuning_csv(Path(a.out_tuning_csv), tuning_rows)
     with Path(a.out_rows_csv).open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(row_dump[0]))
         w.writeheader()
