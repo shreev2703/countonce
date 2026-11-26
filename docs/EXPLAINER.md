@@ -394,7 +394,8 @@ already been run once before scoring bugs were found and the protocol was revise
 re-tuned on training trees, same thresholds). So they are not untouched.
 
 **20. Which Fuji baselines are missing?**
-COLMAP, permutation sync, CountVid, a vision-language model, and v3.
+CountVid and a vision-language model. COLMAP, permutation sync and v3 rows exist, but they predate
+the window-alignment fix and need a rerun.
 
 **21. What changed between your first v3 comparison and an honest one?**
 The ranking flipped. The first table compared v3 with untuned v1/v2/sync. After tuning them on the

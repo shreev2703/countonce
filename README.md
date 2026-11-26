@@ -91,7 +91,8 @@ Planned, **not done**. Details in [docs/PLAN.md](docs/PLAN.md).
 4. Evaluate the learned matcher (v3), so far tested on synthetic data only, on real data after
    training on rendered scenes.
 5. Missing comparisons: CountVid and other video baselines, a vision-language model baseline,
-   COLMAP and permutation sync on Fuji-SfM, calibrated (conformal) intervals on real data.
+   calibrated (conformal) intervals on real data. COLMAP-backbone Fuji-SfM rows exist but need a
+   rerun after the window-alignment fix ([results](docs/RESULTS_FUJI.md)).
 6. CountGD and CountGD++ detectors (currently stubs that exit with an error).
 7. A small user pilot.
 

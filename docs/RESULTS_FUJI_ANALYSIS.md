@@ -63,6 +63,21 @@ registered checkpoint `v001`, trained on synthetic data only, with no Fuji fine-
 - Association F1 exists only for slices with identity-labelled detections, so it is not in the table.
   The subset comparison is in `docs/GATES.md` under G4.
 
+### COLMAP backbone on the test trees
+
+64 `countonce_v2_colmap` rows, one per `fuji_core_v2` v2 window: same detection cache, frozen v2
+settings and GT. The numbers are in the backbone table above. These rows share the alignment
+problem described below.
+
+- Registration: 14 of 16 windows fail at k=3 and at k=5 (`no_model`: COLMAP built no
+  reconstruction). None fail at k=10 or k=20. VGGT v2 has no failed rows.
+- k=3 and 5: only 2 windows each succeed (2 trees), too few to compare accuracy.
+- k=10: MAE difference (COLMAP - VGGT) +3.4, CI [-21.9, 25.5], no clear difference. The signed
+  biases differ in sign (-43.4 COLMAP, +16.9 VGGT), so similar MAE does not mean similar counts.
+- k=20: COLMAP's MAE is higher by 68.3, CI [36.2, 96.6]. It under-counts more (signed bias -170.1
+  against -57.2). The cause was not measured. Sparse COLMAP depth leaving detections without
+  enough points to lift is one untested possibility.
+
 ## Known problem: window alignment rotation (found 2026-11-25; code fixed 2026-11-26, rows not rerun)
 
 Treat every number on this page as unreliable. When these rows were made, windows were aligned to

@@ -31,7 +31,7 @@ the message and exits non-zero. It never silently falls back to another detector
 | Component | Config name | Implemented | Synthetic-tested | Real-model-tested | Held-out real benchmark |
 |---|---|---|---|---|---|
 | VGGT-1B | `vggt` | yes | adapter only | yes (tiny scene, GPU marked test) | yes (Fuji Core) |
-| COLMAP | `colmap` | yes | adapter only | no | no |
+| COLMAP | `colmap` | yes | adapter only | yes (Fuji, real COLMAP output) | yes (Fuji Core v2; fails to register 28 of 32 windows at k=3/5; pre-fix alignment, rerun needed) |
 | Fixture (rendered-scene cameras and depth) | `fixture` | yes (test backend) | yes | n/a | n/a |
 | VGGT-Omega, VGG-T3 | `vggt_omega`, `vggt_t3` | **planned** (names accepted, no adapter) | no | no | no |
 

@@ -588,3 +588,7 @@ says `exit=0`.
 `countonce_v2_colmap` rows (only k=20 windows left), no `.done` file; no second copy started, no code
 changed. Task left unticked; when `test_colmap.done` says `exit=0`, follow "Resume" above
 (report, commit, tick, remove the worktree).
+
+**Resolved (2026-11-26):** the run finished (`exit=0`), 64 of 64 rows (36 ok, 28 failed `no_model`).
+The report and docs are updated, the task is ticked and the `countonce_prefix` worktree is removed.
+The "Resume" steps above are done. Still open: the joint rerun of all Fuji rows after the alignment fix.
