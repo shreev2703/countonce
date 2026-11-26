@@ -18,6 +18,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:live": "playwright test -c playwright.live.config.ts",
+    "lighthouse:pages": "node scripts/lighthouse-pages.mjs 3",
     "lighthouse": "npx --yes lighthouse@13 http://127.0.0.1:3100/ --only-categories=performance,accessibility,best-practices --chrome-flags='--headless=new --no-sandbox' --quiet --output=json --output-path=/tmp/lighthouse.json"
   },
   "dependencies": {

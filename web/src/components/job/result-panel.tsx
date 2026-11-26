@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { api, type JobView } from "@/lib/api/browser";
 import { confidenceBadge, csvForResult, intervalText } from "@/lib/result-view/model";
+import type { JobBundle } from "@/lib/server/job";
 import { parseResult } from "@/lib/schemas/result";
 import { cn } from "@/lib/utils";
 
@@ -19,10 +20,10 @@ const BADGE = {
   Low: "border-dotted text-status-rejected",
 } as const;
 
-export function ResultPanel({ job }: { job: JobView }) {
+export function ResultPanel({ job, initialResult, initialCorrections }: { job: JobView; initialResult?: JobBundle["result"]; initialCorrections?: JobBundle["corrections"] }) {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["result", job.id], queryFn: () => api.getResult(job.id) });
-  const corr = useQuery({ queryKey: ["corrections", job.id], queryFn: () => api.corrections(job.id) });
+  const q = useQuery({ queryKey: ["result", job.id], queryFn: () => api.getResult(job.id), initialData: initialResult, staleTime: initialResult ? 60_000 : 0 });
+  const corr = useQuery({ queryKey: ["corrections", job.id], queryFn: () => api.corrections(job.id), initialData: initialCorrections, staleTime: initialCorrections ? 60_000 : 0 });
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareErr, setShareErr] = useState(false);
 

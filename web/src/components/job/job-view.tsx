@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { JobView as JobT } from "@/lib/api/browser";
+import type { JobBundle } from "@/lib/server/job";
 import { useJob } from "@/lib/job-events";
 
 import { ResultPanel } from "./result-panel";
@@ -22,7 +23,7 @@ const STAGES: Record<string, string> = {
   done: "Done",
 };
 
-export function JobView({ id, initial }: { id: string; initial?: JobT }) {
+export function JobView({ id, initial, initialResult, initialCorrections }: { id: string; initial?: JobT; initialResult?: JobBundle["result"]; initialCorrections?: JobBundle["corrections"] }) {
   const { job, transport, error } = useJob(id, initial);
   if (!job) {
     return <p role="status">{error ?? "Loading…"}</p>;
@@ -66,7 +67,7 @@ export function JobView({ id, initial }: { id: string; initial?: JobT }) {
         </div>
       )}
 
-      {job.status === "done" && <ResultPanel job={job} />}
+      {job.status === "done" && <ResultPanel job={job} initialResult={initialResult} initialCorrections={initialCorrections} />}
     </div>
   );
 }
