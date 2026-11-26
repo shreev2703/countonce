@@ -35,15 +35,15 @@ weights/
 .DS_Store
 
 # Generated paper/site outputs
-paper/tables/
-paper/*.aux
-paper/*.log
-paper/*.bbl
-paper/*.blg
-paper/*.out
-paper/*.fls
-paper/*.fdb_latexmk
-paper/main.pdf
+experimental/paper/tables/
+experimental/paper/*.aux
+experimental/paper/*.log
+experimental/paper/*.bbl
+experimental/paper/*.blg
+experimental/paper/*.out
+experimental/paper/*.fls
+experimental/paper/*.fdb_latexmk
+experimental/paper/main.pdf
 site/
 
 # Orchestrator logs

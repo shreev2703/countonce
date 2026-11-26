@@ -55,7 +55,7 @@ the message and exits non-zero. It never silently falls back to another detector
 | Chunked reconstruction (chain, pose graph) | yes | yes | no | no |
 | SAM 2 masks | yes | yes | yes (GPU marked test) | no |
 | Benchmark harness, Fuji loader and report | yes | yes | yes | yes (Fuji Core only) |
-| API, jobs, worker, MCP server | yes | yes | no | n/a |
+| API, jobs, worker | yes | yes | no | n/a |
 | Web app: demo, landing, benchmark and information pages | yes | yes (Playwright, synthetic demo scene) | no (not deployed) | n/a |
 | Web app: signed-in flow | yes | yes (mocked API; local API with a fake worker) | no (no real Google sign-in or GPU worker run) | n/a |
 | Count-first metrics and error decomposition | yes | yes | yes (Fuji failure-source run) | yes (Fuji Core) |
@@ -75,3 +75,11 @@ evidence about real-model accuracy.
 - The v3 synthetic result is a component test: the tuned-baseline, noisy-depth re-run (M5) was not
   completed (`docs/RESULTS_V3_SYNTH.md`).
 - Nothing is hosted, and there are no own captures.
+
+## Quarantined (`experimental/`, PLAN §28.5)
+Not on the reliable path; run with `pytest experimental`. Not in the installed package and not in
+the default test run. Bring each back when its tier starts. No claims are made about these.
+- `experimental/llm/` LLM router, `experimental/integrations/` MCP server (`countonce-mcp` script
+  removed; `mcp` extra kept), `experimental/paper/` paper draft (`make paper`).
+- Stayed in the package because `countonce/cli.py` imports them: `sites.py`, `routing.py` (shadow
+  routing), `serving/` (cold start). See `docs/DEVIATIONS.md`.

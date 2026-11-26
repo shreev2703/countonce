@@ -83,4 +83,4 @@ def test_wheel_contents(tmp_path):
         assert f"countonce/configs/{cfg}.yaml" in names
     assert "countonce/resources.py" in names
     assert "countonce = countonce.cli:main" in eps
-    assert "countonce-mcp = countonce.integrations.mcp_server:main" in eps
+    assert "countonce-mcp" not in eps  # quarantined in experimental/

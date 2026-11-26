@@ -259,3 +259,7 @@ ported from the author's VGGT benchmark repo (not public yet).
 non-commercial) and datasets are not covered by it and keep their own licenses.
 
 Related work and the hypothesis under test: [docs/RELATED_WORK.md](docs/RELATED_WORK.md).
+
+`experimental/` holds unproven Moon-tier code kept off the reliable path (LLM router, MCP server,
+paper draft; see `docs/STATUS.md`). It is not installed with the package and is not in the default
+test run; use `pytest experimental`.

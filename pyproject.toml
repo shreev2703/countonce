@@ -97,7 +97,6 @@ dev = [
 
 [project.scripts]
 countonce = "countonce.cli:main"
-countonce-mcp = "countonce.integrations.mcp_server:main"
 
 [tool.setuptools.packages.find]
 include = ["countonce*", "synth*"]
@@ -121,7 +120,7 @@ extend-exclude = [
 select = ["E", "F", "I", "UP", "B", "W"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests"]  # experimental/ runs only via `pytest experimental`
 python_files = ["test_*.py", "jobs_contract.py"]
 addopts = "-ra"
 filterwarnings = [

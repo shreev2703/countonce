@@ -21,6 +21,8 @@ jobs:
         run: ruff format --check .
       - name: Test
         run: pytest -m "not slow and not gpu"
+      - name: Test (experimental, quarantined Moon tier)
+        run: pytest experimental
       - name: Golden gate (CPU synthetic geometry)
         run: |
           python -m bench.golden compare --cpu-synthetic \

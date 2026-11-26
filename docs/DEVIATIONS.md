@@ -923,3 +923,9 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - Mockup approval is marked resolved because PLAN §0.1 rule 5 moved the review to after the build (H2).
 - The 23 report re-run entries and the step-2 entry are one entry. `3737ddc`..`2afa977` (inclusive) holds retries 3-23; the first two retries are earlier commits.
 - Added an open section for the overnight tasks still marked `[!]` (M5b, sync/v3 on Fuji), which GATES did not list.
+
+## Quarantine of unproven scaffolding (2026-11-25)
+- **Moved to `experimental/`:** `countonce/llm/` -> `experimental/llm/`, `countonce/integrations/` -> `experimental/integrations/` (the `countonce-mcp` console script is removed from `pyproject.toml`; the `mcp` extra stays), `paper/` -> `experimental/paper/`, with `tests/test_llm_router.py`, `tests/test_mcp_server.py` and the paper-draft tests now in `experimental/tests/`. Nothing in `pipeline.py`, `cli.py`, `api/`, `jobs/` or `web/` imported them (grep checked).
+- **Stayed, because `cli.py` imports them lazily:** `countonce/sites.py` (`countonce sites`), `countonce/routing.py` (`countonce routing-report`; also used by `tests/test_planned_detectors.py`), `countonce/serving/` (`countonce coldstart`). Quarantining them would need removing those CLI commands, which the task forbids (cli.py must not depend on quarantined code). Candidates for a later task that drops the commands.
+- **Import names:** quarantined code imports as top-level `llm` / `integrations`, set up by `experimental/conftest.py`; they are not part of the installed package. `make paper` and `scripts/make_paper_tables.py` now write to `experimental/paper/`.
+- **CI:** added a `pytest experimental` step. `tests/test_paper_site.py` keeps the table and site generator tests.

@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import pytest
-
-from countonce.llm import (
+from llm import (
     AllRoutesFailed,
     ErrorKind,
     LLMClient,
