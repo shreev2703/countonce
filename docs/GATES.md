@@ -561,3 +561,8 @@ When `runs/fuji_core/test_colmap.done` says `exit=0` and there are 64 ok-or-fail
 are symlinks; only the links go). If it died, rerun from inside that worktree (finished slices are
 skipped):
 `PYTHONPATH=. setsid nohup /home/shreev2703/countonce/.venv-gpu/bin/python -u scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600 --csv /home/shreev2703/countonce/results/bench.csv > /home/shreev2703/countonce/runs/fuji_core/test_colmap.log 2>&1 &`
+
+**Status check (2026-11-26, tenth session on this task):** run still going, PID 2086810, 53 of 64
+`countonce_v2_colmap` rows (k=20 windows remain), no `.done` file; no second copy started, no code
+changed. Task left unticked; when `test_colmap.done` says `exit=0`, follow "Resume" above
+(report, commit, tick, remove the worktree).
