@@ -344,6 +344,35 @@ README setup was verified with `uv pip`, not plain `pip`, and resolved torch 2.1
 - **After this batch:** remaining PLAN work needs the photos (P1-P6) or the human items above. Oracle-geometry
   failure-source runs need a dataset with cameras (own captures with COLMAP, or rendered data in P6).
 
+## 2026-11-25: Eighteenth tech-lead audit — open (owner: Shreev)
+- Audit state at `426f112`: `ruff check .` clean; `pytest -m "not slow and not gpu"` gives 1091 passed, 26 skipped
+  (Postgres without `COUNTONCE_PG_URL`, `pycolmap`), 1 xfail (the M21 `CLAUDE.md` test); `pytest experimental`
+  gives 36 passed, 1 skipped (`mcp`).
+- **Neither `[!]` task is a real gate.** M5b and "sync and v3 on Fuji held-out trees" both stopped at the
+  orchestrator's 25-minute session timeout (exit 124). The Fuji test-split sync/v3 run kept going detached
+  (PID 1692818, 56 of 128 rows per method at 20:45). Both are re-queued: the Fuji one as a task that finishes
+  that run and never starts a second copy, and M5b as M5b-1 (resumable, parallel tuning launched detached) plus
+  M5b-2 (test run and report).
+- **Bug found:** a synthetic-component test wrote toy rows into `results/synth_component_tuning.csv` on every
+  `pytest` run. The audit deleted the toy file; the fix and a guard against tests writing into `results/` and
+  `docs/` are queued first.
+- **Gap found:** `Config.assoc` defaults to `v1`, but PLAN §0.1 rule 1 names v2 (or sync if it wins on
+  validation) and the README quickstart passes `--assoc v2`. Queued as a decision task that applies the rule to
+  the Fuji validation numbers.
+- **Also queued:** order-invariance at a gate where v2 and sync actually merge (the existing Fuji result is
+  vacuous for them), and a 3.11 + 3.12 CI matrix (closes the environment item below).
+- **Checked and not queued:** oracle-geometry failure-source runs on Fuji. Fuji-SfM has no dataset cameras or
+  depth (`scripts/run_failure_sources_fuji.py`), so they need own captures with COLMAP or rendered data (P2/P6).
+  No Strong-tier scaffolding is queued: PLAN §4 rules 9-11 and §0.1 rule 2 forbid it until the Core rows are
+  done, and those rows need the photos.
+- **`TASKS_OVERNIGHT.md` stays gitignored** (M21, §0.1 rule 6). The audit updated it locally and did not
+  force-add it; only this file is committed.
+- **Still yours (human only), unchanged from the seventeenth audit:** G3 decision (and G4 once the Fuji v3
+  rows are complete); the M21 `CLAUDE.md` untrack and a push to check hosted CI; H1 capture day, then P1-P5;
+  H5 accounts and the M18/M19 deploy; H2, H3, H4, H6 and the demo video; Docker builds, gated weights,
+  external datasets and VLM API spend.
+- **After this batch:** the PLAN has no autonomous work left that doesn't need the photos or the human items.
+
 ## Open items carried from earlier audit snapshots — open (owner: Shreev)
 Items from the resolved snapshots that no other open section above lists.
 - **Phase 0 and captures:** gates G0/G1; the G2 foliage and easy captures; identity labels on 3-5 scenes; the
