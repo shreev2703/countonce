@@ -577,3 +577,9 @@ test failed on them).
 **Status check (2026-11-26 01:07, twelfth session on this task):** run still going, PID 2086810, 55 of 64
 `countonce_v2_colmap` rows, no `.done` file; no second copy started, no code changed. Task left unticked;
 when `test_colmap.done` says `exit=0`, follow "Resume" above (report, commit, tick, remove the worktree).
+
+**Status check (2026-11-26 01:14, thirteenth session on this task):** run still going, PID 2086810, 57 of 64
+`countonce_v2_colmap` rows (all k=3/5/10 done, only k=20 windows left), no `.done` file; no second copy
+started. ruff clean; fast tests in a clone: 1101 passed, 31 skipped, 1 xfailed. All 28 failed rows so far
+are `ReconAdaptError: ... no_model`. Task left unticked; follow "Resume" above once `test_colmap.done`
+says `exit=0`.
