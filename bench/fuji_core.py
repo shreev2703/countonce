@@ -378,7 +378,38 @@ def config_hash(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:12]
 
 
+def file_hash(path: Path) -> str:
+    """Short sha256 of a file's bytes (checkpoint provenance in config_json)."""
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:16]
+
+
 PROTOCOL = "fuji_core_v2"
+
+# Pipeline method name per association. All of them read the same cached detections and
+# reconstruction of a window, so their upstream inputs are identical.
+ASSOC_METHODS: dict[str, str] = {
+    "v1": "countonce_v1",
+    "v2": "countonce_v2",
+    "sync": "countonce_sync",
+    "v3": "countonce_v3",
+}
+METHOD_ASSOC: dict[str, str] = {m: a for a, m in ASSOC_METHODS.items()}
+BASELINE_METHODS = ("sum", "max", "median")
+
+
+def method_for_assoc(assoc: str) -> str:
+    try:
+        return ASSOC_METHODS[assoc]
+    except KeyError:
+        known = sorted(ASSOC_METHODS)
+        raise ValueError(f"unknown assoc {assoc!r}; expected one of {known}") from None
+
+
+def methods_for(assocs: Any, baselines: bool = True) -> tuple[str, ...]:
+    """Method names to schedule for ``assocs`` (order kept, duplicates dropped), plus the
+    per-image baselines when ``baselines`` (finished slices are skipped on resume anyway)."""
+    out = tuple(dict.fromkeys(method_for_assoc(a) for a in assocs))
+    return out + BASELINE_METHODS if baselines else out
 
 
 def _row_protocol(r: dict[str, Any]) -> str | None:

@@ -421,3 +421,70 @@ def test_test_split_requires_frozen_config(tmp_path):
     f.write_text("score_threshold: 0.35\n")
     vals, h = mod.load_frozen(f, "test")
     assert vals == {"score_threshold": 0.35} and len(h) == 12
+
+
+# --- sync / v3 association options of the Fuji runner (CPU) ---------------------------------
+
+
+def test_assoc_methods_cover_all_pipeline_assocs() -> None:
+    from typing import get_args
+
+    from countonce.config import AssocName
+
+    assert set(fc.ASSOC_METHODS) == set(get_args(AssocName))
+    assert fc.method_for_assoc("sync") == "countonce_sync"
+    assert fc.method_for_assoc("v3") == "countonce_v3"
+    assert all(fc.METHOD_ASSOC[m] == a for a, m in fc.ASSOC_METHODS.items())
+    with pytest.raises(ValueError, match="unknown assoc"):
+        fc.method_for_assoc("v9")
+
+
+def test_methods_for_orders_dedups_and_adds_baselines() -> None:
+    assert fc.methods_for(["v1", "v2"]) == (
+        "countonce_v1", "countonce_v2", "sum", "max", "median",
+    )  # fmt: skip
+    assert fc.methods_for(["sync", "v3", "sync"], baselines=False) == (
+        "countonce_sync", "countonce_v3",
+    )  # fmt: skip
+
+
+def test_runner_accepts_sync_and_v3_options(tmp_path: Path) -> None:
+    script = _load_script()
+    p = script.build_parser()  # type: ignore[attr-defined]
+    d = p.parse_args(["bench"])
+    assert d.assocs == ["v1", "v2"] and d.no_baselines is False
+    b = p.parse_args(
+        ["bench", "--split", "test", "--assocs", "sync", "v3", "--no-baselines",
+         "--v3-checkpoint", "x.pt"]
+    )  # fmt: skip
+    assert (b.assocs, b.no_baselines, b.v3_checkpoint) == (["sync", "v3"], True, Path("x.pt"))
+    with pytest.raises(SystemExit):
+        p.parse_args(["bench", "--assocs", "v4"])
+    # v3 needs its checkpoint before any expensive stage; sync needs nothing extra
+    assert script._v3_meta(p.parse_args(["bench", "--assocs", "sync"])) == {}  # type: ignore[attr-defined]
+    with pytest.raises(SystemExit, match="missing"):
+        script._v3_meta(  # type: ignore[attr-defined]
+            p.parse_args(["bench", "--assocs", "v3", "--v3-checkpoint", str(tmp_path / "no.pt")])
+        )
+    ck = tmp_path / "m.pt"
+    ck.write_bytes(b"abc")
+    meta = script._v3_meta(  # type: ignore[attr-defined]
+        p.parse_args(["bench", "--assocs", "v3", "--v3-checkpoint", str(ck)])
+    )
+    assert meta == {"v3_checkpoint": str(ck), "v3_checkpoint_sha256": fc.file_hash(ck)}
+
+
+def test_sync_and_v3_slices_resume_independently(tmp_path: Path) -> None:
+    """A finished v1 row does not mark the sync or v3 slice of the same window as done."""
+    csv = tmp_path / "b.csv"
+    from bench.runner import run_jobs
+
+    cfg = {"protocol": fc.PROTOCOL, "host": "h"}
+    v1 = [fc.make_job("Tree01", "test", "east", 5, "countonce_v1", cfg)]
+    run_jobs(v1, lambda j: fc.RunOutput(pred=1, gt=1, runtime_s=0.1), csv, cfg)
+    more = [
+        fc.make_job("Tree01", "test", "east", 5, m, cfg)
+        for m in fc.methods_for(["v1", "sync", "v3"], baselines=False)
+    ]
+    left = [j.method for j in fc.pending_jobs(more, csv)]
+    assert left == ["countonce_sync", "countonce_v3"]

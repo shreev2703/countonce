@@ -24,14 +24,23 @@ from bench.runner import read_rows
 from bench.stats import bootstrap_ci, paired_compare
 
 TODO = "TODO: fill from results"
-METHODS = ("countonce_v1", "countonce_v2", "sum", "max", "median")
+METHODS = ("countonce_v1", "countonce_v2", "countonce_sync", "countonce_v3", "sum", "max", "median")
 KS = (3, 5, 10, 20)
 TEST_TREES = tuple(f"Tree{i:02d}" for i in range(1, 9))
 SIDES = ("east", "west")
 PROTOCOL = fuji_core.PROTOCOL
 N_BOOT = 1000
 METRICS = ("mae", "signed_bias", "mape", "assoc_f1", "duplicate_rate", "miss_rate")
-PIPELINE = ("countonce_v1", "countonce_v2")
+PIPELINE = ("countonce_v1", "countonce_v2", "countonce_sync", "countonce_v3")
+# Paired MAE comparisons (a, b); negative difference favours a.
+PAIRS = (
+    ("countonce_v2", "countonce_v1"),
+    ("countonce_v2", "sum"),
+    ("countonce_v2", "max"),
+    ("countonce_v2", "median"),
+    ("countonce_sync", "countonce_v2"),
+    ("countonce_v3", "countonce_v2"),
+)
 
 
 class MissingBackingRow(ValueError):
@@ -115,9 +124,7 @@ def compute(rows: Sequence[dict[str, str]]) -> dict[str, Any]:
                 }  # fmt: skip
     paired: dict[str, dict[str, Any]] = {}
     for k in KS:
-        for a, b in [("countonce_v2", "countonce_v1")] + [
-            ("countonce_v2", x) for x in ("sum", "max", "median")
-        ]:
+        for a, b in PAIRS:
             va, vb = tree_values(rows, a, k, "mae"), tree_values(rows, b, k, "mae")
             if va is None or vb is None:
                 continue
@@ -167,13 +174,14 @@ def markdown_table(report: dict[str, Any]) -> str:
         "|---|---|---|---|---|",
     ]
     for k in KS:
-        for b in ("countonce_v1", "sum", "max", "median"):
-            p = report["paired"].get(f"countonce_v2|{b}|{k}|mae")
+        for a, b in PAIRS:
+            p = report["paired"].get(f"{a}|{b}|{k}|mae")
+            label = f"{a.removeprefix('countonce_')} vs {b.removeprefix('countonce_')}"
             if p is None:
-                lines.append(f"| v2 vs {b} | {k} | {TODO} | {TODO} | {TODO} |")
+                lines.append(f"| {label} | {k} | {TODO} | {TODO} | {TODO} |")
             else:
                 lines.append(
-                    f"| v2 vs {b} | {k} | {p['diff']:.2f} [{p['ci_low']:.2f}, {p['ci_high']:.2f}]"
+                    f"| {label} | {k} | {p['diff']:.2f} [{p['ci_low']:.2f}, {p['ci_high']:.2f}]"
                     f" | {p['p_bootstrap']:.3f} | {p['p_wilcoxon']:.3f} |"
                 )
     return "\n".join(lines)

@@ -131,6 +131,15 @@ def _mk(args: argparse.Namespace) -> dict[str, Any]:
     return {} if args.merge_k is None else {"merge_k": args.merge_k}
 
 
+def _v3_meta(args: argparse.Namespace) -> dict[str, Any]:
+    if "v3" not in args.assocs:
+        return {}
+    ck = Path(args.v3_checkpoint)
+    if not ck.is_file():
+        raise SystemExit(f"v3 checkpoint {ck} is missing")
+    return {"v3_checkpoint": str(ck), "v3_checkpoint_sha256": fc.file_hash(ck)}
+
+
 def cmd_bench(args: argparse.Namespace) -> None:
     frozen, cfg_hash = load_frozen(args.config, args.split)
     if "score_threshold" in frozen:
@@ -157,6 +166,7 @@ def cmd_bench(args: argparse.Namespace) -> None:
         "downscale": fc.DOWNSCALE, "stride": STRIDE, "roi_margin_m": fc.ROI_MARGIN_M,
         "gt_tol_occ_m": fc.GT_TOL_OCC_M, "gt_max_depth_m": fc.GT_MAX_DEPTH_M,
         "match_px": fc.MATCH_PX, "chunk_size": base.chunk_size, "protocol": fc.PROTOCOL,
+        "assocs": list(args.assocs), **_v3_meta(args),
         "frozen_config": str(args.config), "frozen_config_hash": cfg_hash,
         "frozen_values": frozen, **fc.host_info(),
     }  # fmt: skip
@@ -169,8 +179,12 @@ def cmd_bench(args: argparse.Namespace) -> None:
             return memo[key]
         start, stop, paths, gt_ext = _window(scene, imgs, ov, side, tree, k)
         runs: dict[str, Any] = {}
-        for assoc in ("v1", "v2"):
-            cfg = base_config(assoc=assoc, score_threshold=args.score_threshold, **_mk(args))
+        # v1 always runs: it carries the per-image baselines and the shared ingest/detect timings
+        for assoc in dict.fromkeys(("v1", *args.assocs)):
+            extra = {"v3_checkpoint": args.v3_checkpoint} if assoc == "v3" else {}
+            cfg = base_config(
+                assoc=assoc, score_threshold=args.score_threshold, **_mk(args), **extra
+            )
             res = run(paths, PROMPT, cfg, detector=det, reconstructor=rec, export=False)
             recon = load_recon(cfg, res.recon_cache_key or "")
             if recon.n_views != k:
@@ -195,7 +209,7 @@ def cmd_bench(args: argparse.Namespace) -> None:
                     if (time.time() - t_start) / 60 > args.budget_min:
                         print(f"budget hit before {tree}/{side}/k={k}", flush=True)
                         return
-                    for method in ("countonce_v1", "countonce_v2", "sum", "max", "median"):
+                    for method in fc.methods_for(args.assocs, baselines=not args.no_baselines):
                         cfg = {**model_cfg, "tree": tree, "side": side}
                         yield fc.make_job(tree, args.split, side, k, method, cfg)
 
@@ -204,9 +218,10 @@ def cmd_bench(args: argparse.Namespace) -> None:
         runs = group(job.scene_id, job.sample, job.n_views)
         v1_ev, v1_res = runs["v1"]
         if job.method.startswith("countonce"):
-            ev, res = runs["v2" if job.method.endswith("v2") else "v1"]
+            assoc = fc.METHOD_ASSOC[job.method]
+            ev, res = runs[assoc]
             t = dict(res.timings)
-            if job.method.endswith("v2"):  # recon and detection are shared; add v2's own stages
+            if assoc != "v1":  # recon and detection are shared; add this association's own stages
                 t = {**v1_res.timings, "associate": t["associate"], "confidence": t["confidence"]}
                 t["total"] = sum(
                     t[x] for x in ("ingest", "detect", "recon", "associate", "confidence")
@@ -240,6 +255,24 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--sides", nargs="+", default=["east", "west"])
     b.add_argument("--score-threshold", type=float, default=0.3)
     b.add_argument("--merge-k", type=float, default=None, help="v1 association distance (x size)")
+    b.add_argument(
+        "--assocs",
+        nargs="+",
+        choices=sorted(fc.ASSOC_METHODS),
+        default=["v1", "v2"],
+        help="pipeline associations to run (identical cached upstream inputs)",
+    )
+    b.add_argument(
+        "--v3-checkpoint",
+        type=Path,
+        default=Path("models/checkpoints/v001.pt"),
+        help="registered matcher checkpoint, used as-is (no Fuji fine-tune)",
+    )
+    b.add_argument(
+        "--no-baselines",
+        action="store_true",
+        help="skip the per-image baseline rows (already in the CSV)",
+    )
     b.add_argument("--budget-min", type=float, default=90.0)
     b.add_argument("--config", type=Path, default=FROZEN_CONFIG)
     b.add_argument("--csv", type=Path, default=DEFAULT_CSV)
