@@ -56,7 +56,6 @@ def test_align_window_ignores_unregistered_views() -> None:
         fc.align_window(gt, rec)
 
 
-@pytest.mark.xfail(strict=True, reason="docs/GATES.md: roll is free for collinear cameras")
 def test_window_alignment_recovers_rotation_for_collinear_cameras() -> None:
     gt = _line_cameras(3)
     roll = np.eye(4)

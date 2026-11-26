@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from scipy.spatial.transform import Rotation
 
 from bench import fuji_core as fc
 from bench import fuji_report as fr
@@ -110,6 +111,13 @@ def test_check_alignment_flags_bad_scale_and_bad_fit() -> None:
         fc.check_alignment(gt_ext, ext, Sim3(0.2, np.eye(3), np.zeros(3)))
     with pytest.raises(fc.AlignmentError, match="non-positive"):
         fc.check_alignment(gt_ext, ext, Sim3(-1.0, np.eye(3), np.zeros(3)))
+    assert info["cam_rot_deg"] < 1e-4
+    # a roll about the camera path leaves every centre in place, so only the rotation gate sees it
+    roll = Rotation.from_euler("x", 90, degrees=True).as_matrix()
+    straight = np.tile(np.eye(3, 4), (5, 1, 1))
+    straight[:, 0, 3] = -np.linspace(0, 1.0, 5)
+    with pytest.raises(fc.AlignmentError, match="rotation"):
+        fc.check_alignment(straight, straight, Sim3(1.0, roll, np.zeros(3)))
 
 
 # ----------------------------------------------------------------------------- evaluate_window

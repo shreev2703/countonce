@@ -1017,3 +1017,15 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
   `n_registered`. The misfit gate (`check_alignment`) is applied against the VGGT cameras.
 - The test split has 64 windows (8 trees x 2 sides x 4 k), not the 128 the task names, so one
   method has 64 rows.
+
+## F1: camera alignment uses orientations (2026-11-26)
+
+- `recon.align.align_by_poses`: rotation is the chordal mean of the per-view orientation
+  differences, then scale and translation from the centres. `align_chunk` always uses it (chunk
+  stitching and the pose graph too), not only when centres are degenerate: nearly collinear
+  windows were also wrong. This replaces the two-camera axis-tip points.
+- A non-positive scale from the centres is now an error instead of a rotation chosen to fit them.
+- `check_alignment` also fails when the median orientation error exceeds 30 degrees
+  (`MAX_ROT_ERR_DEG`). The threshold was set a priori, not tuned on any split.
+- `fc.PROTOCOL` is not bumped and no rows were rerun, so the existing reports still build from the
+  old rows. The bump belongs to the rerun (docs/GATES.md).

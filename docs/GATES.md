@@ -436,7 +436,20 @@ Items from the resolved snapshots that no other open section above lists.
   weights (CountGD/CountGD++, VGGT-Ω, VGG-T³), CountVid/DG-Net and the video datasets (E2, E3), OneScene-Bench
   images (E5), frontier-VLM API spend.
 
-## Fuji window alignment leaves rotation unconstrained; COLMAP test run not launched (OPEN, 2026-11-25)
+## Fuji window alignment leaves rotation unconstrained; COLMAP test run not launched (CODE FIXED 2026-11-26, ROWS STALE)
+
+**Update 2026-11-26:** the alignment code is fixed (rotation from camera orientations, 30 degree
+median rotation gate in `check_alignment`, xfail removed). Cached VGGT windows replayed on CPU
+(median rotation error, degrees): Tree04 east k=3/5/10 = 1.0 / 6.9 / 10.2 (was 78 / 152 / 26).
+Tree02 west k=5 is now rejected (`ChunkAlignmentError`, negative scale from the camera centres):
+once the orientations are respected, the window's centres run against the pseudo-pose path, so
+that side's pseudo-poses (or the window reconstruction) still need checking.
+
+**Still open:** every existing Fuji row and the frozen thresholds predate the fix. They were not
+rerun and `fc.PROTOCOL` is still `fuji_core_v2`. Before writing any new Fuji row: bump
+`fc.PROTOCOL`, check the pseudo-poses, make the VGGT path in `scripts/run_fuji_core.py` record
+alignment rejections as `status=failed`, re-tune on the training trees and rerun. The text below
+describes the state before the fix.
 
 **Affects:** every Fuji row in `results/bench.csv` (VGGT v1/v2/sync/v3 and baselines), the frozen
 thresholds in `configs/fuji_core.yaml` (tuned under the same alignment), `docs/RESULTS_FUJI*.md`.

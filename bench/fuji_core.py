@@ -10,7 +10,7 @@ data it does have (all choices are logged in ``docs/DEVIATIONS.md``):
    to every frame) and to pick the frames that look at each tree. Counts are never aligned to GT.
 2. **Windows**: for each tree and side, ``k`` contiguous frames centred on the frame whose camera
    is nearest the tree along the row. Each window is reconstructed on its own, and aligned to the
-   GT frame with ``countonce.recon.chunked.align_chunk`` (camera centres + axis tips) against the
+   GT frame with ``countonce.recon.chunked.align_chunk`` (camera orientations + centres) against the
    overview pseudo-poses of the same frames, never against apples.
 3. **GT for a window** is the set of GT apples (all 11 trees, since neighbours are in view)
    whose projection lands in a view, in front of the reconstructed surface (depth test), within
@@ -37,7 +37,13 @@ from bench.baselines import BASELINES
 from bench.datasets.fuji_sfm import FujiScene
 from bench.gt_matching import match_detections_to_gt
 from bench.runner import Job, RunOutput, read_rows
-from countonce.recon.align import Sim3, camera_centers, transform_extrinsics, umeyama
+from countonce.recon.align import (
+    Sim3,
+    camera_centers,
+    rotation_angles_deg,
+    transform_extrinsics,
+    umeyama,
+)
 from countonce.recon.chunked import MIN_OVERLAP, ChunkAlignmentError, align_chunk
 from countonce.types import Detection
 
@@ -198,6 +204,7 @@ class AlignmentError(RuntimeError):
 
 
 MAX_CAM_RMS_FRAC = 0.5  # camera RMS misfit above this share of the window's camera span fails
+MAX_ROT_ERR_DEG = 30.0  # median camera orientation error above this fails (set a priori, not tuned)
 
 
 def registered_views(extrinsics: np.ndarray) -> np.ndarray:
@@ -217,29 +224,17 @@ def align_window(gt_ext: np.ndarray, recon_ext: np.ndarray) -> Sim3:
 def align_to_reference(ref_ext: np.ndarray, recon_ext: np.ndarray) -> tuple[Sim3, float]:
     """Sim(3) placing another backbone's window into the reference window's *aligned* frame.
 
-    Rotation is the chordal mean of the per-view camera orientation differences, so it is fixed
-    even when the camera centres are collinear; scale and translation then come from the centres.
-    Registered views only. Also returns the median orientation residual in degrees. This does not
-    repair the reference's own alignment (docs/GATES.md): both backbones share that frame."""
-    from scipy.spatial.transform import Rotation
-
+    Same fit as ``align_window``. Also returns the median orientation residual in degrees."""
+    sim = align_window(ref_ext, recon_ext)
     reg = registered_views(recon_ext)
-    if int(reg.sum()) < MIN_OVERLAP:
-        raise ChunkAlignmentError(f"only {int(reg.sum())} registered views")
-    ref, ext = np.asarray(ref_ext, float)[reg], np.asarray(recon_ext, float)[reg]
-    per_view = np.transpose(ref[:, :3, :3], (0, 2, 1)) @ ext[:, :3, :3]
-    rot = Rotation.from_matrix(per_view).mean()
-    resid = (Rotation.from_matrix(per_view) * rot.inv()).magnitude()
-    r = rot.as_matrix()
-    c_ref, c = camera_centers(ref), camera_centers(ext)
-    a = (c - c.mean(0)) @ r.T
-    b = c_ref - c_ref.mean(0)
-    var = float((a**2).sum())
-    scale = float((a * b).sum()) / var if var > 1e-18 else float("nan")
-    if not np.isfinite(scale) or scale <= 0:
-        raise ChunkAlignmentError(f"cannot estimate scale from camera centres ({scale})")
-    sim = Sim3(scale, r, c_ref.mean(0) - scale * r @ c.mean(0))
-    return sim, float(np.degrees(np.median(resid)))
+    resid = rotation_errors_deg(np.asarray(ref_ext)[reg], np.asarray(recon_ext)[reg], sim)
+    return sim, float(np.median(resid))
+
+
+def rotation_errors_deg(gt_ext: np.ndarray, recon_ext: np.ndarray, sim: Sim3) -> np.ndarray:
+    """Per-view camera orientation error of the aligned reconstruction, in degrees."""
+    aligned = transform_extrinsics(recon_ext, sim)
+    return rotation_angles_deg(np.asarray(gt_ext, float)[:, :3, :3], aligned[:, :3, :3])
 
 
 def scaled_depth(depth: np.ndarray, sim: Sim3) -> np.ndarray:
@@ -250,13 +245,18 @@ def scaled_depth(depth: np.ndarray, sim: Sim3) -> np.ndarray:
 
 
 def check_alignment(
-    gt_ext: np.ndarray, recon_ext: np.ndarray, sim: Sim3, max_frac: float = MAX_CAM_RMS_FRAC
+    gt_ext: np.ndarray,
+    recon_ext: np.ndarray,
+    sim: Sim3,
+    max_frac: float = MAX_CAM_RMS_FRAC,
+    max_rot_deg: float = MAX_ROT_ERR_DEG,
 ) -> dict[str, float]:
-    """Camera-centre misfit of the aligned window against the overview pseudo-poses.
+    """Camera misfit of the aligned window against the overview pseudo-poses.
 
-    Returns ``cam_rms_m`` and ``cam_span_m``; raises ``AlignmentError`` when the misfit is a large
-    share of the span (a window that fails this has a meaningless scale, so its depth test and GT
-    would be wrong) or when the scale is not finite and positive."""
+    Returns ``cam_rms_m``, ``cam_span_m`` and ``cam_rot_deg`` (median orientation error); raises
+    ``AlignmentError`` when the centre misfit is a large share of the span (meaningless scale),
+    the orientation error exceeds ``max_rot_deg`` (the depth test and GT would be built in a
+    rotated frame) or the scale is not finite and positive."""
     if not np.isfinite(sim.s) or sim.s <= 0:
         raise AlignmentError(f"non-positive alignment scale {sim.s}")
     c_gt = camera_centers(gt_ext)
@@ -265,7 +265,10 @@ def check_alignment(
     span = float(np.linalg.norm(np.ptp(c_gt, axis=0)))
     if span > 0 and rms > max_frac * span:
         raise AlignmentError(f"camera misfit {rms:.3f} m is >{max_frac:.0%} of span {span:.3f} m")
-    return {"cam_rms_m": rms, "cam_span_m": span}
+    rot = float(np.median(rotation_errors_deg(gt_ext, recon_ext, sim)))
+    if not rot <= max_rot_deg:
+        raise AlignmentError(f"camera rotation error {rot:.1f} deg is >{max_rot_deg:g} deg")
+    return {"cam_rms_m": rms, "cam_span_m": span, "cam_rot_deg": rot}
 
 
 def _frame_gt(
