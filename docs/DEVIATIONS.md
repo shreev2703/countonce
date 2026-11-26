@@ -899,3 +899,21 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **Does the "unordered photos" claim hold?** Supported for v1 on real data. For v2/sync it is supported only by the synthetic test (M4); the real-data run cannot confirm or refute it. **The §0.6 row stays unticked.** Needed: a real scene (own captures, P2) or a looser v2 gate where v2 merges.
 - **Side finding:** `canonical_frame_order` sorts camera centres lexicographically by (x, y, z). On a row walk along y this makes x noise the main key. It is still permutation-invariant, but not a meaningful "along the path" order. Not changed.
 - Test: `tests/test_order_invariance_fuji_adapter.py` (CPU, tiny synthetic window).
+
+## `/demo/tiny` Lighthouse performance (2026-11-25)
+- **Method:** Lighthouse 13, default mobile preset (simulated throttling), headless Playwright Chromium on WSL2 (software rendering), production build served by `next start -p 3100`. Same flags as the `lighthouse` npm script, with the URL swapped per page and run from `/tmp`. Local runs, not Lighthouse CI or a real phone.
+
+| `/demo/tiny` | performance (3 runs) | median | LCP | TBT |
+|---|---|---|---|---|
+| before | 0.51, 0.54, 0.56 | 0.54 | 5.7-5.9 s | 1.12-1.85 s |
+| lazy viewer only | 0.76, 0.78, 0.77 | 0.77 | 3.2 s | 620-702 ms |
+| final | 0.93, 0.92, 0.94 | **0.93** | 0.77-0.78 s | 282-357 ms |
+
+- **Final build, accessibility / best practices:** 1.00 / 0.96. Script transfer before the viewer: 168.2 KiB (budget 200 KB).
+- **Other pages, 3 runs:** `/` 0.95, 0.94, 0.95 (median 0.95); `/benchmark` 0.94 in all three.
+- **Other pages, 1 run each:** `/demo` 0.93, `/how-it-works` 0.98, `/about` 0.95, `/privacy` 0.90, `/status` 0.92, `/history` 0.94, `/new` 0.96, `/signin` 0.93. `/jobs/[id]` and `/s/[token]` were not measured (they need backend data).
+- **The margin is thin and noisy:** an intermediate `/demo/tiny` build with the same fix plus `<Suspense>` boundaries scored 0.90, 0.84, 0.82, 0.93, 0.92. TBT swings widely on this shared machine. Most of it is evaluation of the shared framework chunks, which `/` pays too.
+- **Changes:** scene JSON is read and validated at build time (zod leaves the client path, count and photos are in the static HTML); `points.bin` and the three.js viewer load only on activation; media queries are read only in the client-only viewer wrapper and an effect. The last one removed a forced second render on phones and took LCP from 3.2 s to 0.8 s.
+- **Behaviour change:** phones show a "Load 3D view" button (selecting an object or photo also loads it); desktop loads the viewer 1.2 s after the page load event. The poster is a text panel, not an image.
+- **No worker for point decoding:** `parsePoints` only creates typed-array views over the fetched buffer, so there is no decode work to move off the main thread.
+- **`<Suspense>` boundaries rejected:** React's prerender moved the large sections into hidden segments revealed by a script, one Playwright test then saw duplicate nodes, and the long hydration task did not shrink.

@@ -376,8 +376,8 @@ The consistency pass is committed, but its "done when" is not met: only the reli
 README rows could honestly be ticked. M22 is left unchecked. What each other no-photo row needs:
 - **Gate G3 (yours):** confirm or reject the "not met" recommendation above.
 - **Repo hygiene (yours):** the M21 `CLAUDE.md` step, then push and check hosted CI.
-- **Lighthouse (code):** `/demo/tiny` performance 0.58-0.60 (mobile preset, headless software rendering,
-  LCP 5.2-5.5 s, TBT 900-970 ms). `/` 0.95 and `/benchmark` 0.95 pass.
+- **Lighthouse (code):** resolved 2026-11-25. `/demo/tiny` performance went from a median 0.54 to 0.93
+  (3 local runs); see DEVIATIONS.
 - **Failure sources:** separating geometry from association needs data with oracle geometry.
 - **Related work:** run experiments E1-E5 and read the remaining works (`docs/RELATED_WORK.md`).
 

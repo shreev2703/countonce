@@ -16,7 +16,10 @@ test.describe("results experience on the tiny demo (no backend)", () => {
     await expect(page.getByTestId("confidence")).toContainText("confidence");
     await expect(page.getByTestId("honesty")).toContainText("Precomputed example");
     await expect(page.getByTestId("honesty")).toContainText("synthetic test scene");
-    await expect(page.getByTestId("viewer").locator("canvas")).toBeVisible();
+    // Phones wait for the button; desktop loads the viewer once the page is idle.
+    const load = page.getByRole("button", { name: "Load 3D view" });
+    if (await load.isVisible()) await load.click();
+    await expect(page.getByTestId("viewer").locator("canvas")).toBeVisible({ timeout: 15_000 });
   });
 
   test("selecting an object highlights its boxes in every photo (two-way linking)", async ({ page }) => {
@@ -104,6 +107,21 @@ test("without WebGL the count and photos still show", async ({ page }) => {
     } as typeof real;
   });
   await page.goto("/demo/tiny");
-  await expect(page.getByText("The 3D view could not start on this device")).toBeVisible();
+  await expect(page.getByTestId("count")).toHaveText("5");
+  const load = page.getByRole("button", { name: "Load 3D view" });
+  if (await load.isVisible()) await load.click();
+  await expect(page.getByText("The 3D view could not start on this device")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("tab", { name: "Photos" })).toBeVisible();
+});
+
+test("phones load no point cloud until asked", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "desktop loads the viewer once the page is idle");
+  const requested: string[] = [];
+  page.on("request", (r) => requested.push(r.url()));
+  await page.goto("/demo/tiny", { waitUntil: "networkidle" });
+  await expect(page.getByTestId("viewer-poster")).toBeVisible();
+  expect(requested.filter((u) => u.endsWith("points.bin"))).toEqual([]);
+  await page.getByRole("button", { name: "Load 3D view" }).click();
+  await expect(page.getByTestId("viewer").locator("canvas")).toBeVisible({ timeout: 15_000 });
+  expect(requested.some((u) => u.endsWith("points.bin"))).toBe(true);
 });

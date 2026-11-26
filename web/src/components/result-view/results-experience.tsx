@@ -2,10 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentProps } from "react";
 import type * as THREE from "three";
 
-import { loadDemoScene } from "@/lib/result-view/demo";
+import { loadDemoPoints, type DemoScene } from "@/lib/result-view/demo";
 import {
   buildCameras,
   buildDetections,
@@ -31,6 +31,18 @@ const Viewer = dynamic(() => import("./viewer"), {
   ),
 });
 
+const PHONE_QUERY = "(pointer: coarse), (max-width: 767px)";
+
+/**
+ * Media queries are read here, in a client-only mount. Reading them in the page component made the
+ * server value differ on phones, which forced a second synchronous render during hydration.
+ */
+function LiveViewer(props: Omit<ComponentProps<typeof Viewer>, "maxPoints" | "reducedMotion">) {
+  const phone = useMedia(PHONE_QUERY);
+  const reducedMotion = useMedia("(prefers-reduced-motion: reduce)");
+  return <Viewer {...props} maxPoints={phone ? MAX_POINTS_PHONE : MAX_POINTS_DESKTOP} reducedMotion={reducedMotion} />;
+}
+
 const TABS = ["Photos", "Explain", "Warnings", "Details"] as const;
 type Tab = (typeof TABS)[number];
 
@@ -47,9 +59,17 @@ function useMedia(query: string): boolean {
   );
 }
 
-export function ResultsExperience({ scene: sceneId }: { scene: string }) {
-  const q = useQuery({ queryKey: ["demo", sceneId], queryFn: () => loadDemoScene(sceneId), staleTime: Infinity });
-  const scene = q.data;
+export function ResultsExperience({ scene }: { scene: DemoScene }) {
+  const sceneId = decodeURIComponent(scene.base.split("/").pop() ?? "");
+  // The 3D viewer (three.js, ~0.4 MB of JS) and points.bin load only once activated: on a click, on
+  // the first object/camera selection, or automatically after the page is idle on desktop.
+  const [view3d, setView3d] = useState(false);
+  const pts = useQuery({
+    queryKey: ["demo-points", scene.base],
+    queryFn: () => loadDemoPoints(scene.base),
+    staleTime: Infinity,
+    enabled: view3d,
+  });
 
   const [tab, setTab] = useState<Tab>("Photos");
   const [selectedObject, setSelectedObject] = useState<number | null>(null);
@@ -59,17 +79,31 @@ export function ResultsExperience({ scene: sceneId }: { scene: string }) {
   const [command, setCommand] = useState<ViewCommand>({ kind: "reset", n: 0 });
   const glRef = useRef<THREE.WebGLRenderer | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
-  const phone = useMedia("(pointer: coarse), (max-width: 767px)");
-  const maxPoints = phone ? MAX_POINTS_PHONE : MAX_POINTS_DESKTOP;
-  const reducedMotion = useMedia("(prefers-reduced-motion: reduce)");
 
-  const cameras = useMemo(() => (scene ? buildCameras(scene.result) : []), [scene]);
-  const detections = useMemo(() => (scene ? buildDetections(scene.result) : []), [scene]);
+  useEffect(() => {
+    if (view3d || window.matchMedia(PHONE_QUERY).matches) return;
+    let id = 0;
+    const arm = () => {
+      id = window.setTimeout(() => setView3d(true), 1200);
+    };
+    if (document.readyState === "complete") arm();
+    else window.addEventListener("load", arm, { once: true });
+    return () => {
+      window.removeEventListener("load", arm);
+      window.clearTimeout(id);
+    };
+  }, [view3d]);
+
+  const cameras = useMemo(() => buildCameras(scene.result), [scene]);
+  const detections = useMemo(() => buildDetections(scene.result), [scene]);
   const rejected = useMemo(() => detections.filter((d) => d.status === "rejected"), [detections]);
-  const ids = useMemo(() => scene?.markers.markers.map((m) => m.id) ?? [], [scene]);
+  const ids = useMemo(() => scene.markers.markers.map((m) => m.id), [scene]);
   const highlightObject = hoverObject ?? selectedObject;
 
-  const run = useCallback((kind: ViewCommand["kind"], id?: number) => setCommand((c) => ({ kind, id, n: c.n + 1 })), []);
+  const run = useCallback((kind: ViewCommand["kind"], id?: number) => {
+    setView3d(true);
+    setCommand((c) => ({ kind, id, n: c.n + 1 }));
+  }, []);
   const selectObject = useCallback(
     (id: number | null) => {
       setSelectedObject(id);
@@ -120,22 +154,6 @@ export function ResultsExperience({ scene: sceneId }: { scene: string }) {
     glRef.current = gl;
   }, []);
 
-  if (q.isError) {
-    return (
-      <main className="mx-auto max-w-3xl px-4 py-12" role="alert">
-        <h1 className="text-2xl font-semibold">Could not load this example</h1>
-        <p className="mt-2 text-muted-foreground">{(q.error as Error).message}</p>
-      </main>
-    );
-  }
-  if (!scene) {
-    return (
-      <main className="mx-auto max-w-3xl px-4 py-12">
-        <p role="status">Loading example…</p>
-      </main>
-    );
-  }
-
   const ctx: PanelCtx = {
     scene,
     cameras,
@@ -173,26 +191,45 @@ export function ResultsExperience({ scene: sceneId }: { scene: string }) {
             data-camera={selectedCamera ?? ""}
             className="relative h-[55vh] min-h-72 w-full overflow-hidden rounded-lg bg-muted lg:h-[60vh]"
           >
-            <ViewerBoundary>
-              <Viewer
-                xyz={scene.xyz}
-                rgb={scene.rgb}
-                maxPoints={maxPoints}
-                markers={scene.markers.markers}
-                cameras={cameras}
-                rejected={rejected}
-                showRejected={showRejected}
-                selectedObject={selectedObject}
-                highlightObject={highlightObject}
-                selectedCamera={selectedCamera}
-                command={command}
-                reducedMotion={reducedMotion}
-                onSelectObject={selectObject}
-                onHoverObject={setHoverObject}
-                onSelectCamera={selectCamera}
-                onReady={onReady}
-              />
-            </ViewerBoundary>
+            {!pts.data ? (
+              <div className="grid h-full place-items-center p-6 text-center" data-testid="viewer-poster">
+                <div className="flex max-w-sm flex-col items-center gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    {view3d && !pts.isError
+                      ? "Loading 3D scene…"
+                      : "The 3D point cloud loads on request so the count and photos appear fast."}
+                  </p>
+                  {pts.isError && <p role="alert" className="text-sm">Could not load the point cloud.</p>}
+                  <button
+                    type="button"
+                    className={toolBtn}
+                    disabled={view3d && !pts.isError}
+                    onClick={() => (pts.isError ? void pts.refetch() : setView3d(true))}
+                  >
+                    {pts.isError ? "Retry 3D view" : "Load 3D view"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <ViewerBoundary>
+                <LiveViewer
+                  xyz={pts.data.xyz}
+                  rgb={pts.data.rgb}
+                  markers={scene.markers.markers}
+                  cameras={cameras}
+                  rejected={rejected}
+                  showRejected={showRejected}
+                  selectedObject={selectedObject}
+                  highlightObject={highlightObject}
+                  selectedCamera={selectedCamera}
+                  command={command}
+                  onSelectObject={selectObject}
+                  onHoverObject={setHoverObject}
+                  onSelectCamera={selectCamera}
+                  onReady={onReady}
+                />
+              </ViewerBoundary>
+            )}
             {camPhoto && (
               // eslint-disable-next-line @next/next/no-img-element
               <img

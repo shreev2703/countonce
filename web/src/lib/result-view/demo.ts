@@ -1,49 +1,23 @@
-/** Loads and validates one precomputed demo scene from `/demo/<scene>/` (no backend, PLAN 17.4). */
-import { DemoManifest, EvidenceFile, parsePoints } from "@/lib/schemas/demo";
-import { parseMarkers, parseResult, type MarkersDoc, type Result } from "@/lib/schemas/result";
+/** Demo scene types and the lazy point-cloud loader (client-safe: no zod). Scene JSON is loaded by `demo-server.ts`. */
+import { parsePoints } from "@/lib/schemas/points";
+import type { DemoManifest } from "@/lib/schemas/demo";
+import type { MarkersDoc, Result } from "@/lib/schemas/result";
 
 export interface DemoScene {
   base: string;
   manifest: ReturnType<typeof DemoManifest.parse>;
   result: Result;
   markers: MarkersDoc;
-  xyz: Float32Array;
-  rgb: Uint8Array;
   provenance: { synthetic: boolean; commit: string; timestamp: string };
 }
 
-async function getJson(url: string): Promise<unknown> {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
-  return r.json();
-}
-
-export async function loadDemoScene(scene: string): Promise<DemoScene> {
-  const base = `/demo/${encodeURIComponent(scene)}`;
-  const [manifestRaw, resultRaw, markersRaw, evidenceRaw, provRaw, pointsRes] = await Promise.all([
-    getJson(`${base}/manifest.json`),
-    getJson(`${base}/result.json`),
-    getJson(`${base}/markers.json`),
-    getJson(`${base}/evidence.json`),
-    getJson(`${base}/provenance.json`),
-    fetch(`${base}/points.bin`),
-  ]);
-  if (!pointsRes.ok) throw new Error(`points.bin: HTTP ${pointsRes.status}`);
-  const manifest = DemoManifest.parse(manifestRaw);
-  EvidenceFile.parse(evidenceRaw);
-  const { xyz, rgb } = parsePoints(await pointsRes.arrayBuffer());
-  const prov = provRaw as { synthetic?: boolean; run?: { git_commit?: string; timestamp_utc?: string } };
-  return {
-    base,
-    manifest,
-    result: parseResult(resultRaw),
-    markers: parseMarkers(markersRaw),
-    xyz,
-    rgb,
-    provenance: {
-      synthetic: Boolean(prov.synthetic),
-      commit: prov.run?.git_commit ?? "unknown",
-      timestamp: prov.run?.timestamp_utc ?? "unknown",
-    },
-  };
+/**
+ * Fetch and decode the point cloud. Kept apart from the scene so the 3D payload is only requested
+ * once the viewer is activated (first paint and the count need no points). `parsePoints` only wraps
+ * typed-array views over the buffer, so there is no heavy decode to move to a worker.
+ */
+export async function loadDemoPoints(base: string): Promise<{ xyz: Float32Array; rgb: Uint8Array }> {
+  const r = await fetch(`${base}/points.bin`);
+  if (!r.ok) throw new Error(`points.bin: HTTP ${r.status}`);
+  return parsePoints(await r.arrayBuffer());
 }

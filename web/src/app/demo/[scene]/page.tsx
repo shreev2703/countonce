@@ -2,6 +2,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { ResultsExperience } from "@/components/result-view/results-experience";
+import { loadDemoSceneServer } from "@/lib/result-view/demo-server";
 
 export const dynamicParams = false;
 
@@ -15,5 +16,5 @@ export function generateStaticParams() {
 
 export default async function DemoPage({ params }: { params: Promise<{ scene: string }> }) {
   const { scene } = await params;
-  return <ResultsExperience scene={scene} />;
+  return <ResultsExperience scene={loadDemoSceneServer(scene)} />;
 }

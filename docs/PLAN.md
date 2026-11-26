@@ -130,7 +130,7 @@ Checked in the M22 consistency pass (2026-11-25). A box is ticked only where the
 **Product done (required):**
 - [ ] Live site: landing, demo gallery with real own-capture scenes, results experience with the 3D fly-to and "Explain this match", benchmark page with real numbers
 - [ ] Signed-in flow works end to end from a phone: upload → laptop GPU → result
-- [ ] Playwright, axe and Lighthouse checks pass; no placeholder text in production — *Playwright, axe and the placeholder check pass; Lighthouse passes on `/` and `/benchmark`; `/demo/tiny` performance is below 90*
+- [x] Playwright, axe and Lighthouse checks pass; no placeholder text in production — *local runs, not hosted CI or a real phone; Lighthouse median performance: `/` 0.95, `/demo/tiny` 0.93 (thin margin: an intermediate build had runs at 0.82-0.84, see DEVIATIONS), `/benchmark` 0.94; `/jobs/[id]` and `/s/[token]` not measured*
 - [ ] 2-minute demo video
 
 **Strong and Moon:** upgrades after the above, in tier order (§3.1, §19).
