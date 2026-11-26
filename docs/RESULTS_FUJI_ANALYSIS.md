@@ -63,12 +63,13 @@ registered checkpoint `v001`, trained on synthetic data only, with no Fuji fine-
 - Association F1 exists only for slices with identity-labelled detections, so it is not in the table.
   The subset comparison is in `docs/GATES.md` under G4.
 
-## Known problem: window alignment rotation (found 2026-11-25, unfixed)
+## Known problem: window alignment rotation (found 2026-11-25; code fixed 2026-11-26, rows not rerun)
 
-Treat every number on this page as unreliable. Windows are aligned to the overview pseudo-poses
-from camera centres only (three or more views). Short windows have collinear centres, so the
+Treat every number on this page as unreliable. When these rows were made, windows were aligned to
+the overview pseudo-poses from camera centres only (three or more views). Short windows have collinear centres, so the
 rotation about the camera path is not determined. Checked VGGT windows were 26 to 156 degrees off
 in median camera orientation. That affects which GT apples count as visible and which predictions
 fall in the region of interest. The COLMAP backbone rows (table above) were run in the
-VGGT window's frame so the two backbones share this error; they must be rerun after the fix. See
-`docs/GATES.md`.
+VGGT window's frame so the two backbones share this error. The alignment code now uses camera
+orientations, but no row on this page has been rerun with it. The last COLMAP windows were run from
+the pre-fix commit `df5a7c8` so that all rows share one frame. See `docs/GATES.md`.

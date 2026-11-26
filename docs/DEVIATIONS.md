@@ -1029,3 +1029,15 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
   (`MAX_ROT_ERR_DEG`). The threshold was set a priori, not tuned on any split.
 - `fc.PROTOCOL` is not bumped and no rows were rerun, so the existing reports still build from the
   old rows. The bump belongs to the rerun (docs/GATES.md).
+
+## Fuji COLMAP resume run from the pre-fix commit (2026-11-26)
+
+- The first COLMAP run was stopped by SIGTERM at 51 of 64 windows (sender not identified). The
+  rotation fix (`8d2d34e`) landed afterwards.
+- The remaining windows run from a detached worktree at `df5a7c8` (`../countonce_prefix`), whose
+  bench/countonce/scripts/configs code differs from the current branch only by that fix, appending
+  to the same `results/bench.csv`. Running them on the fixed code would mix two GT frames inside
+  one table and trip the check that GT equals the VGGT v2 row's GT.
+- All `fuji_core_v2` rows therefore predate the fix and need one joint rerun under a new protocol.
+- The task's "128 test slices" are 64 windows under `fuji_core_v2` (8 trees x 2 sides x 4 k); the
+  extra 64 `countonce_v2` rows in the CSV belong to the superseded `fuji_core_v1` protocol.
