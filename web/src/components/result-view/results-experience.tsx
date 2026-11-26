@@ -20,6 +20,7 @@ import { CountCard } from "./count-card";
 import { PhotoTile } from "./photo-tile";
 import { DetailsTab, ExplainTab, PhotosTab, WarningsTab, type PanelCtx } from "./panels";
 import type { ViewCommand } from "./viewer";
+import { ViewerBoundary } from "./viewer-boundary";
 
 const Viewer = dynamic(() => import("./viewer"), {
   ssr: false,
@@ -172,24 +173,26 @@ export function ResultsExperience({ scene: sceneId }: { scene: string }) {
             data-camera={selectedCamera ?? ""}
             className="relative h-[55vh] min-h-72 w-full overflow-hidden rounded-lg bg-muted lg:h-[60vh]"
           >
-            <Viewer
-              xyz={scene.xyz}
-              rgb={scene.rgb}
-              maxPoints={maxPoints}
-              markers={scene.markers.markers}
-              cameras={cameras}
-              rejected={rejected}
-              showRejected={showRejected}
-              selectedObject={selectedObject}
-              highlightObject={highlightObject}
-              selectedCamera={selectedCamera}
-              command={command}
-              reducedMotion={reducedMotion}
-              onSelectObject={selectObject}
-              onHoverObject={setHoverObject}
-              onSelectCamera={selectCamera}
-              onReady={onReady}
-            />
+            <ViewerBoundary>
+              <Viewer
+                xyz={scene.xyz}
+                rgb={scene.rgb}
+                maxPoints={maxPoints}
+                markers={scene.markers.markers}
+                cameras={cameras}
+                rejected={rejected}
+                showRejected={showRejected}
+                selectedObject={selectedObject}
+                highlightObject={highlightObject}
+                selectedCamera={selectedCamera}
+                command={command}
+                reducedMotion={reducedMotion}
+                onSelectObject={selectObject}
+                onHoverObject={setHoverObject}
+                onSelectCamera={selectCamera}
+                onReady={onReady}
+              />
+            </ViewerBoundary>
             {camPhoto && (
               // eslint-disable-next-line @next/next/no-img-element
               <img

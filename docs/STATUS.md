@@ -55,12 +55,25 @@ the message and exits non-zero. It never silently falls back to another detector
 | Chunked reconstruction (chain, pose graph) | yes | yes | no | no |
 | SAM 2 masks | yes | yes | yes (GPU marked test) | no |
 | Benchmark harness, Fuji loader and report | yes | yes | yes | yes (Fuji Core only) |
-| API, jobs, MCP server | yes | yes | no | n/a |
+| API, jobs, worker, MCP server | yes | yes | no | n/a |
+| Web app: demo, landing, benchmark and information pages | yes | yes (Playwright, synthetic demo scene) | no (not deployed) | n/a |
+| Web app: signed-in flow | yes | yes (mocked API; local API with a fake worker) | no (no real Google sign-in or GPU worker run) | n/a |
+| Count-first metrics and error decomposition | yes | yes | yes (Fuji failure-source run) | yes (Fuji Core) |
+| Failure-source harness | yes | yes | yes (Fuji, no oracle geometry) | k=10 only |
+| Photo-order invariance (v1, v2, sync, v3) | yes | yes (permutation test) | no | no |
 
-## Known open problem
+## Known open problems
 
 The real detector + VGGT path counts the tiny scene correctly (5) only with `score_threshold=0.5`
 on the single frame the default near-duplicate filter keeps; at the 0.3 default it counts 7 (blue and
 green distractors), and with all five views VGGT geometry is too poor to merge (root cause in
 `docs/DEVIATIONS.md`, task M2). The synthetic-fixture path counts 5. Do not read the synthetic rows as
 evidence about real-model accuracy.
+
+- Fuji-SfM errors are large and gate G3 ("geometry beats Sum and Max") is recommended **not met**
+  (`docs/RESULTS_FUJI_ANALYSIS.md`); the owner's decision is open.
+- The v3 synthetic result is a component test: the tuned-baseline, noisy-depth re-run (M5) was not
+  completed (`docs/RESULTS_V3_SYNTH.md`).
+- On WSL2 with an 8 GB GPU the five-view CLI run fails unless
+  `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False` is set (`docs/GATES.md`).
+- Nothing is hosted, and there are no own captures.

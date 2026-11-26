@@ -95,3 +95,15 @@ test.describe("results experience on the tiny demo (no backend)", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });
+
+test("without WebGL the count and photos still show", async ({ page }) => {
+  await page.addInitScript(() => {
+    const real = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...args: unknown[]) {
+      return type.startsWith("webgl") ? null : (real as (...a: unknown[]) => unknown).call(this, type, ...args);
+    } as typeof real;
+  });
+  await page.goto("/demo/tiny");
+  await expect(page.getByText("The 3D view could not start on this device")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Photos" })).toBeVisible();
+});

@@ -4,33 +4,49 @@ import { DemoSceneCard } from "@/components/chrome/demo-card";
 import { PageShell } from "@/components/chrome/site-chrome";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { loadFuji, type FujiSummary } from "@/lib/benchmark";
 import { listDemoScenes } from "@/lib/demo-index";
 
-const PROOF_POINTS = [
-  {
-    title: "More accurate than adding up per-photo counts",
-    body: "Counting each photo and summing double-counts every object seen twice.",
-  },
-  {
-    title: "Works from 3–40 photos, no depth sensor",
-    body: "Ordinary phone photos in, one count out.",
-  },
-  {
-    title: "Open benchmark with confidence intervals",
-    body: "Methods are compared on public data, with uncertainty reported.",
-  },
-];
+const PHOTOS = 10;
+
+/** Evidence lines come from the benchmark summary; a missing value gives the empty state. */
+function proofPoints(fuji: FujiSummary | null) {
+  const mae = (method: string) =>
+    fuji?.cells.find((c) => c.method === method && c.k === PHOTOS && c.metric === "mae");
+  const [v2, sum, max] = [mae("countonce_v2"), mae("sum"), mae("max")];
+  return [
+    {
+      title: "Compared with adding up per-photo counts",
+      body: "Counting each photo and summing double-counts every object seen twice.",
+      evidence:
+        v2 && sum && max
+          ? `On real apple trees with ${PHOTOS} photos, the mean count error in apples was ${v2.estimate.toFixed(1)} for CountOnce v2, ${sum.estimate.toFixed(1)} for the sum and ${max.estimate.toFixed(1)} for the largest single-photo count (lower is better). These errors are large.`
+          : null,
+    },
+    {
+      title: "Ordinary photos, no depth sensor",
+      body: "The 3D scene is estimated from the photos themselves.",
+      evidence: null,
+    },
+    {
+      title: "Benchmark with confidence intervals",
+      body: "Methods are compared on public data, including where CountOnce does worse.",
+      evidence: v2 ? `${v2.n} held-out test trees, with 95% bootstrap intervals.` : null,
+    },
+  ];
+}
 
 const STEPS = [
   ["Detect", "An open-vocabulary detector finds your target in every photo."],
   ["Lift to 3D", "A feed-forward model places each detection in a shared 3D scene."],
   ["Merge", "Detections that are the same physical object are merged, with the reason recorded."],
-  ["Count", "You get one number, an interval, and a confidence level."],
+  ["Count", "You get one number, a range showing how sensitive it is to settings, and warnings."],
 ];
 
 export default function Home() {
   const scenes = listDemoScenes();
   const hero = scenes[0];
+  const points = proofPoints(loadFuji());
   return (
     <PageShell>
       <section className="mx-auto grid max-w-5xl gap-8 px-4 py-12 md:grid-cols-2 md:items-center">
@@ -41,6 +57,9 @@ export default function Home() {
           <p className="mt-4 text-lg text-muted-foreground">
             CountOnce merges what every photo saw into one 3D scene, so an object that appears in
             five photos is counted once.
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            A research prototype: it is not yet accurate on real photos.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button asChild size="lg">
@@ -74,15 +93,24 @@ export default function Home() {
         <h2 id="proof" className="text-2xl font-semibold">
           What we claim, and the evidence
         </h2>
+        <p className="mt-1 text-sm">
+          <Link href="/benchmark" className="underline underline-offset-4">
+            See the full benchmark
+          </Link>
+        </p>
         <ul className="mt-4 grid gap-4 md:grid-cols-3">
-          {PROOF_POINTS.map((p) => (
+          {points.map((p) => (
             <li key={p.title}>
               <Card className="h-full p-5">
                 <h3 className="font-semibold">{p.title}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">{p.body}</p>
-                <p className="mt-3 rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
-                  No published number yet. This fills in from benchmark results once they are final.
-                </p>
+                {p.evidence ? (
+                  <p className="tabular mt-3 text-sm">{p.evidence}</p>
+                ) : (
+                  <p className="mt-3 rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
+                    No published number yet.
+                  </p>
+                )}
               </Card>
             </li>
           ))}

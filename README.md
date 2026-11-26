@@ -145,9 +145,13 @@ Setup (Python ≥ 3.11; the reconstruction backbone needs a GPU):
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,recon]"
+pip install -e ".[dev,recon,hf]" torchvision
+pip install "vggt @ git+https://github.com/facebookresearch/vggt.git@a288dd0f14786c93483e45524328726ab7b1b4ce"
 countonce env --out results/env.json     # check Python / torch / CUDA / VRAM
 ```
+
+The `hf` extra and `torchvision` are needed by the default detector and by VGGT; VGGT itself is
+installed from its repository. Weights download from Hugging Face on first use.
 
 Count objects in a folder of photos or a video:
 

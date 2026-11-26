@@ -1,4 +1,9 @@
-# v3 matcher: synthetic held-out evaluation
+# v3 matcher: synthetic component test
+
+**Component test, not an accuracy claim.** It tests only the association step, on generated
+geometry. v1 and v2 ran with untuned default settings, and the stand-in reconstruction has NaN
+depth, so the v2 visibility (occlusion) check never fires. The planned re-run with tuned baselines
+and noisy depth (PLAN §0.2 M5) was **not completed**; the table below predates it.
 
 First capped v3 run (take 2), PLAN §10.4. Synthetic data only; **no real-data v3 rows exist**
 (Fuji-SfM v3 cells stay `TODO: fill from results`). Related: [[HANDOFF]], [[DECISIONS]].

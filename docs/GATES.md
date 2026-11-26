@@ -369,3 +369,18 @@ The file stays on disk and is already in `.gitignore`. Then remove the `xfail` m
 Before merging into `main` (which still tracks the agent files): back up the local copies. Checking out
 `main` and then merging this branch deletes them from the working tree. Git history also still holds
 them and their personal paths; history was not rewritten.
+
+## M22: §0.6 rows left unticked (2026-11-25)
+The consistency pass is committed, but its "done when" is not met: only the tiny-scene and README rows
+could honestly be ticked. M22 is left unchecked. What each other no-photo row needs:
+- **Gate G3 (yours):** confirm or reject the "not met" recommendation above.
+- **Repo hygiene (yours):** the M21 `CLAUDE.md` step, then push and check hosted CI.
+- **Reliable path (code):** root-cause the five-view CUDA failure (M20 entry). Reproduced from a clean venv.
+- **Lighthouse (code):** `/demo/tiny` performance 0.58-0.60 (mobile preset, headless software rendering,
+  LCP 5.2-5.5 s, TBT 900-970 ms). `/` 0.95 and `/benchmark` 0.95 pass.
+- **Failure sources:** separating geometry from association needs data with oracle geometry.
+- **Related work:** run experiments E1-E5 and read the remaining works (`docs/RELATED_WORK.md`).
+
+Also found, not fixed: `docker/worker.Dockerfile` installs `.[recon,data]` without `transformers` or the
+`vggt` package, so that image cannot run the default pipeline (the image has never been built). The
+README setup was verified with `uv pip`, not plain `pip`, and resolved torch 2.15.0+cu132.

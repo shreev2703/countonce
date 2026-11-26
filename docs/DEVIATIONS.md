@@ -848,3 +848,16 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - The demo exporter rewrites the absolute repo root to `<repo>` in exported JSON; the tiny demo was re-exported.
 - Author name and GitHub URLs stay: they are attribution, not personal paths. History was not rewritten.
 
+
+## M22: final consistency pass (2026-11-25)
+- **README setup was wrong:** `.[dev,recon]` has neither `transformers` (default detector), `torchvision`
+  nor `vggt`. The README now installs them, with `vggt` pinned to the commit used for measured runs.
+  `pyproject.toml` and `uv.lock` were not changed.
+- **Landing proof points** said no number was published while README and `/benchmark` published them.
+  They now read the benchmark summary at build time, with titles that do not claim more than measured.
+- **No-WebGL crash:** a failed 3D renderer replaced the whole results page with an error screen. It is
+  now contained by `ViewerBoundary` (Playwright test).
+- **EXPLAINER** rewritten for the current code, with 33 interview questions. Numbers are copied from
+  the named reports; there is no test tying them to the source files.
+- **M5 was never completed;** STATUS, EXPLAINER and `RESULTS_V3_SYNTH.md` now say so.
+- **§0.6:** rows are ticked on evidence only, so most stay open (GATES).

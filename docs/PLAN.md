@@ -114,21 +114,23 @@ This section is the single source of truth for **what happens next, in what orde
 Recruit 3–10 users from H3 interviews; run 2–4 weeks with the laptop worker; `docs/PILOT.md` filled from the job store (§19 Phase 5).
 
 ### 0.6 Definition of done ("project wrapped up")
+Checked in the M22 consistency pass (2026-11-25). A box is ticked only where the evidence meets the row as written; notes say what is left. Component evidence is in `docs/STATUS.md`.
+
 **Core done (required):**
-- [ ] One reliable path works from a clean install; STATUS table accurate
+- [ ] One reliable path works from a clean install; STATUS table accurate — *STATUS updated; a clean `uv` venv with the README packages runs the real path; open: the five-view run crashes on the 8 GB WSL2 GPU without an allocator override*
 - [x] Tiny scene counts correctly with the real detector + VGGT (single-frame path, `score_threshold=0.5`; see DEVIATIONS)
-- [ ] Fuji-SfM held-out results with CIs, error decomposition and gate G3 decided
+- [ ] Fuji-SfM held-out results with CIs, error decomposition and gate G3 decided — *results, CIs and a k=10 decomposition exist; G3 is recommended "not met" and awaits the owner*
 - [ ] 20–30 own scenes (≥3 zero-target) benchmarked with frozen splits
-- [ ] Failure-source experiments show where the remaining error comes from
+- [ ] Failure-source experiments show where the remaining error comes from — *Fuji: detector, then duplicates; geometry is not separated from association (no oracle geometry)*
 - [ ] Order-invariance measured on real data; the "unordered photos" claim matches the evidence
-- [ ] README front page with a real result, a real failure and a runnable command
-- [ ] Related work read in full; one tested hypothesis instead of a novelty claim
-- [ ] Repo hygiene done (license, no agent files or personal paths, green CI)
+- [x] README front page with a real result, a real failure and a runnable command — *the real result is the Fuji-SfM table; the picture example is synthetic*
+- [ ] Related work read in full; one tested hypothesis instead of a novelty claim — *three closest works read in full, others not; the hypothesis is untested*
+- [ ] Repo hygiene done (license, no agent files or personal paths, green CI) — *license done; `CLAUDE.md` still tracked (GATES, M21); hosted CI not run on this branch*
 
 **Product done (required):**
 - [ ] Live site: landing, demo gallery with real own-capture scenes, results experience with the 3D fly-to and "Explain this match", benchmark page with real numbers
 - [ ] Signed-in flow works end to end from a phone: upload → laptop GPU → result
-- [ ] Playwright, axe and Lighthouse checks pass; no placeholder text in production
+- [ ] Playwright, axe and Lighthouse checks pass; no placeholder text in production — *Playwright, axe and the placeholder check pass; Lighthouse passes on `/` and `/benchmark`; `/demo/tiny` performance is below 90*
 - [ ] 2-minute demo video
 
 **Strong and Moon:** upgrades after the above, in tier order (§3.1, §19).
@@ -1449,6 +1451,8 @@ If CountOnce runs over budget two weeks in a row, cut the current tier's optiona
 ---
 
 ## 28. Brutal audit (2026-11-25) and recovery plan
+
+> **Snapshot taken before the M1–M22 pass.** Statements in §28.1–28.3 describe the repo at that time. For the current state see `docs/STATUS.md` and §0.6.
 
 An honest review of the repo as it stands after the overnight agent runs (114 of 115 tasks checked off).
 
