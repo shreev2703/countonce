@@ -768,3 +768,18 @@ Not started; no code changed, no rows added. Task left unticked.
 - **Proposed next task:** diagnose the west `overview` registration; add an a-priori validity gate
   (fail if trees collapse onto one window or camera y is far from monotonic); bump to `fuji_core_v4`,
   rebuild both overviews, re-tune on training trees, rerun v2. Keep v2 and v3 rows. Then re-queue part 2.
+
+## Experiment E1 tracker side, finish: BLOCKED on the Fuji GT frame (2026-11-26 ~06:45)
+
+- **Block:** the `fuji_core_v3` west overview is still degenerate (06:07 and 06:19 entries). Rechecked in
+  `results/bench.csv`: west Tree01-Tree06 at k=10 all give v2 pred 64, GT 0; `overview_west.json` has
+  `cam_y_monotonic_frac` 0.54. E1's GT and ROI come from these pseudo-poses, so re-preparing and
+  re-scoring would produce invalid errors. Part 1 is ticked, but its results are marked not usable.
+- **Not done:** no rows moved, no windows prepared, no tracker run, no `docs/RESULTS_E1.md`,
+  `docs/RELATED_WORK.md` unchanged. An east-only report was not made: the east frame is unverified.
+- **Needed first:** the task proposed in the 06:19 entry (diagnose the west overview, add a validity gate,
+  `fuji_core_v4`, re-tune, rerun v2/v1). Then re-queue this task against `fuji_core_v4`. The
+  order-invariance and oracle-geometry tasks queued after it use the same dataset frames; check them too.
+- **Trap for the next E1 run:** `runs/fuji_core/e1/*.json` (76 files) predate the v3 overview rebuild, and
+  `run_e1_tracker.py prepare` skips existing files. Move that directory aside before `prepare`, as well
+  as moving `results/e1_tracker.csv` to `results/e1_tracker.pre_alignfix.csv` (`run` skips existing keys).
