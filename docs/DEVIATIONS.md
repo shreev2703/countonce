@@ -1104,3 +1104,9 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
   GT = 0 rose from 3 to 7 of 12. The two MAEs are not on the same ground truth.
 - **Warning:** west overview `cam_y_monotonic_frac` fell 0.86 -> 0.54 and overview inlier fractions are
   low (east 0.27, west 0.18). The v3 GT frame may still be wrong; treat v3 errors as unverified.
+
+## Fuji v3 test rows: west frame invalid (2026-11-26)
+
+- v3 test numbers are **not** compared with v2 or reported: the rebuilt west overview maps west
+  Tree01-Tree06 to one shared window (docs/GATES.md, 06:07 status). The test-tree movement note is
+  deferred until a rerun with a valid frame.

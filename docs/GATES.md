@@ -735,3 +735,24 @@ Not started; no code changed, no rows added. Task left unticked.
   still live and `test_v3.done` does not exist. Not starting a second writer; task left UNTICKED.
 - Progress: Tree04 west reached in `runs/fuji_core/test_v3.log`. Follow the "Remaining" list in the 05:43
   entry once `test_v3.done` appears.
+
+### Joint Fuji v3 rerun, part 1: status (2026-11-26 06:07): run unfinished, **v3 west rows are invalid**
+
+- `test_v3.done` absent after a ~10 min wait; the run was still live (at Tree06 k=20). No second
+  writer was started. Task left UNTICKED. `bench.fuji_report` not run.
+- **Blocker (new):** the rebuilt **west** overview is degenerate. West Tree01-Tree06 all get the same
+  window (side-local start 259 at k=10, 262 at k=5), and `countonce_v2` predicts the same count for
+  different trees (64 at k=10, 52 at k=5; GT 0). `window_for_tree` clamps every tree to the side's end,
+  so these are not per-tree results. East windows do advance with the tree (0, 5, 30, 62, 90, ...).
+- Evidence (`runs/fuji_core/overview_west.json` vs `pre_v3/`): `cam_y_monotonic_frac` 0.86 -> 0.54,
+  scale 3.98 -> 1.49, `inlier_frac` 0.20 -> 0.18, candidate 3 -> 16. The cause of the bad
+  registration is not diagnosed. East monotonic fraction is 0.85.
+- Also seen: at 05:56, 11 of 42 v3 v2 rows were `failed` (those inspected: `ChunkAlignmentError`, k=3).
+- **Consequence:** do not report v3 numbers or start part 2 (other methods, ablations, order
+  invariance, E1), which all score against this frame. Row count 64 alone does not meet "done".
+  The val tuning behind the refrozen (0.2, 0.5) uses the same frames, so treat it as suspect too.
+- **Next (recommended):** diagnose the west overview registration (`overview` subcommand); add a
+  validity gate that fails when trees collapse onto one window or camera y is not near-monotonic
+  (set the limit a priori); then bump to `fuji_core_v4`, rebuild, re-tune and rerun. Keep v3 rows.
+- Tests during the live run: ruff clean; 1150 passed, 26 skipped, 1 xfailed, 1 teardown error from the
+  write guard because the benchmark was appending to `results/bench.csv`.
