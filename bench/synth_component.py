@@ -9,12 +9,15 @@ Extends ``bench.synth_assoc`` with two things the first v3 comparison lacked:
   absolute count error on ``val``; v3 stays at its trained default (it is not tuned here).
 
 Metrics are count-first: MAE, signed bias, within-10%, the exact error decomposition
-(missed / duplicates / injected false positives / wrong merges); association F1 is explanatory.
+(missed / duplicates / false-positive instances / wrong merges, plus the number of injected
+false-positive detections fed in); association F1 is explanatory. ``true`` is the number of objects
+with at least one detection (``Episode.true_count``), as in ``bench.synth_assoc``.
 This is a component test on generated geometry, not evidence about real photos.
 """
 
 from __future__ import annotations
 
+import csv
 import itertools
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -25,10 +28,10 @@ import numpy as np
 
 from bench.metrics import (
     count_decomposition,
+    count_summary,
     duplicate_rate,
     miss_rate,
     pairwise_prf,
-    signed_bias,
 )
 from bench.synth_assoc import GRID, episode_to_lifted
 from countonce.match.model import NOMINAL_OBJECT_SIZE
@@ -113,7 +116,12 @@ def score_episode(ep: Episode, lifted: Sequence[LiftedDetection], res: Any) -> d
     labels = [cluster.get(ld.det.id, -1 - i) for i, ld in enumerate(lifted)]
     gt: list[int | None] = [int(g) if g >= 0 else None for g in ep.identity]
     universe = sorted({g for g in gt if g is not None})
-    dec = count_decomposition(labels, gt, universe)
+    # Only detections inside a predicted instance count towards the predicted count: one the
+    # associator rejected is not an instance (and an object with only rejected ones is missed).
+    kept = [i for i, ld in enumerate(lifted) if ld.det.id in cluster]
+    kept_labels = [labels[i] for i in kept]
+    kept_gt = [gt[i] for i in kept]
+    dec = count_decomposition(kept_labels, kept_gt, universe)
     pred, truth = float(len(res.instances)), float(ep.true_count())
     return {
         "pred": pred,
@@ -121,8 +129,8 @@ def score_episode(ep: Episode, lifted: Sequence[LiftedDetection], res: Any) -> d
         "abs_err": abs(pred - truth),
         "signed_err": pred - truth,
         "assoc_f1": pairwise_prf(labels, gt)[2],
-        "duplicate_rate": duplicate_rate(labels, gt),
-        "miss_rate": miss_rate(labels, gt, universe),
+        "duplicate_rate": duplicate_rate(kept_labels, kept_gt),
+        "miss_rate": miss_rate(kept_labels, kept_gt, universe),
         "injected_fp_dets": float((ep.identity < 0).sum()),
         **{k: float(v) for k, v in dec.items()},
     }
@@ -196,15 +204,35 @@ def tune(
     return TuneResult(method, best, best_mae, default_mae, trials)
 
 
+COUNT_COLUMNS = ("mae", "signed_bias", "within_10pct", "zero_scene_false_count")
+EXPLANATORY_COLUMNS = (
+    "missed",
+    "duplicates",
+    "false_positives",
+    "wrong_merges",
+    "injected_fp_dets",
+    "assoc_f1",
+    "duplicate_rate",
+    "miss_rate",
+)
+SUMMARY_COLUMNS = ("variant", "method", "n", "n_zero", *COUNT_COLUMNS, *EXPLANATORY_COLUMNS)
+
+
 def summarize_counts(rows: Sequence[dict[str, float]]) -> dict[str, float]:
-    pred = [r["pred"] for r in rows]
-    gt = [r["gt"] for r in rows]
-    out = {k: float(np.mean([r[k] for r in rows])) for k in (
-        "abs_err", "assoc_f1", "duplicate_rate", "miss_rate",
-        "missed", "duplicates", "false_positives", "wrong_merges", "injected_fp_dets",
-    )}  # fmt: skip
-    out["signed_bias"] = signed_bias(pred, gt)
-    out["within_10pct"] = float(
-        np.mean([abs(p - g) <= 0.10 * max(g, 1e-9) for p, g in zip(pred, gt, strict=True)])
-    )
+    """Count-first summary of per-episode rows. ``zero_scene_false_count`` is NaN (with
+    ``n_zero == 0``) when no episode has a true count of zero."""
+    counts = count_summary([r["pred"] for r in rows], [r["gt"] for r in rows])
+    out = {"n": float(len(rows)), "n_zero": counts["n_zero"]}
+    out.update({k: counts[k] for k in COUNT_COLUMNS})
+    out.update({k: float(np.mean([r[k] for r in rows])) for k in EXPLANATORY_COLUMNS})
     return out
+
+
+def write_summary_csv(path: Path, summaries: dict[tuple[str, str], dict[str, float]]) -> None:
+    """One row per (depth variant, method), count metrics before the explanatory ones."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=SUMMARY_COLUMNS, extrasaction="ignore")
+        w.writeheader()
+        for (variant, method), s in summaries.items():
+            w.writerow({"variant": variant, "method": method, **s})

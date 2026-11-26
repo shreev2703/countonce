@@ -869,3 +869,18 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - Evidence (RTX 5070 Laptop 8 GB, torch 2.15.0+cu132, five-view tiny scene): before, 3 of 3 failed;
   after, 3 of 3 returned 14, the README figure. The driver-level cause is not known.
 - Cost: WSL loses the fragmentation benefit; the OOM ladder still applies.
+
+## M5a: synthetic component-test harness (2026-11-25)
+- **Decomposition sign:** the task repeats the PLAN §9.4 wording; the exact identity stays
+  `duplicates + FP - missed - wrong merges = predicted - true` (see the M3 note). Fixed the same
+  slip in the `count_decomposition` docstring.
+- **Rejected detections** are no longer scored as one-detection clusters in the decomposition,
+  duplicate rate and miss rate: they are not predicted instances, and counting them broke the identity.
+  `bench/synth_assoc.py` (the old v3 table) is unchanged and still treats them as singletons.
+- **True count** stays `Episode.true_count` (objects with at least one detection), as in the first
+  comparison, so `missed` is non-zero only when the associator rejects all of an object's detections.
+- **Zero-scene false count** is `nan` with `n_zero = 0` when no episode has a true count of zero. The
+  generator's false positives scale with the instance count, so it cannot make a useful zero scene;
+  none were added.
+- **CSV layout:** `--out-csv` is now the count-first summary (one row per variant and method);
+  per-episode rows moved to `--out-rows-csv`.

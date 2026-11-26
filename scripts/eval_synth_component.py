@@ -1,10 +1,18 @@
 """M5 component test: tune v1/v2/sync on the synthetic val split, compare with v3 on test.
 
-    PYTHONPATH=. .venv-gpu/bin/python scripts/eval_synth_component.py
+    .venv-gpu/bin/python scripts/eval_synth_component.py
 
-Two depth variants: ``nan_depth`` (visibility check inert, as in the first v3 run) and
-``finite_depth`` (z-buffered noisy depth, check active). Writes ``results/synth_component.json``
-and ``results/synth_component_rows.csv`` and prints the Markdown table for the doc.
+Both depth variants run every time:
+
+  nan_depth     the stand-in reconstruction has NaN depth, so the v2/sync visibility
+                (occlusion) check never rejects anything on depth, as in the first v3 run.
+  finite_depth  z-buffered depth with multiplicative noise (instances occlude one another
+                over a ground plane), so the visibility check is active.
+
+Outputs: a summary CSV (one row per variant and method; columns mae, signed_bias,
+within_10pct and zero_scene_false_count first, then the error decomposition and F1), a
+per-episode CSV and a JSON file. zero_scene_false_count is nan when n_zero is 0.
+This is a component test on generated geometry, not evidence about real photos.
 """
 
 from __future__ import annotations
@@ -12,10 +20,14 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+# `bench` and `synth` are not installed packages
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bench.stats import bootstrap_ci, paired_bootstrap
 from bench.synth_component import (
@@ -30,6 +42,7 @@ from bench.synth_component import (
     prepare,
     summarize_counts,
     tune,
+    write_summary_csv,
 )
 from countonce.merge.cluster import DEFAULT_K
 from countonce.merge.match import V2Config
@@ -56,15 +69,18 @@ def ci(vals: list[float], n_boot: int) -> tuple[float, float, float]:
     return c.estimate, c.low, c.high
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--data", default="data/dag_v3_capped/episodes")
     ap.add_argument("--checkpoint", default="runs/match_v3_capped/best.pt")
     ap.add_argument("--out-json", default="results/synth_component.json")
-    ap.add_argument("--out-csv", default="results/synth_component_rows.csv")
+    ap.add_argument("--out-csv", default="results/synth_component_summary.csv")
+    ap.add_argument("--out-rows-csv", default="results/synth_component_rows.csv")
     ap.add_argument("--n-boot", type=int, default=2000)
     ap.add_argument("--max-val", type=int, default=None)
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
 
     val_files = sorted(Path(a.data, "val").glob("*.npz"))[: a.max_val]
     test_files = sorted(Path(a.data, "test").glob("*.npz"))
@@ -72,6 +88,7 @@ def main() -> int:
     v3 = V3Associator(a.checkpoint)
     result: dict[str, Any] = {}
     row_dump: list[dict[str, Any]] = []
+    summaries: dict[tuple[str, str], dict[str, float]] = {}
     for variant, finite in (("nan_depth", False), ("finite_depth", True)):
         val: list[Prepared] = prepare(val_files, finite)
         test: list[Prepared] = prepare(test_files, finite)
@@ -90,7 +107,8 @@ def main() -> int:
         rows = {name: evaluate(assoc, test) for name, assoc in arms.items()}
         summ = {}
         for name, r in rows.items():
-            s = summarize_counts(r)
+            s: dict[str, Any] = summarize_counts(r)
+            summaries[(variant, name)] = dict(s)
             m, lo, hi = ci([x["abs_err"] for x in r], a.n_boot)
             s["mae_ci"] = [m, lo, hi]
             summ[name] = s
@@ -122,12 +140,15 @@ def main() -> int:
             mean_true_count=float(np.mean([d.ep.true_count() for d in test])),
         )
         print(variant, json.dumps(result[variant]["tuned"], default=float))
+    for out in (a.out_json, a.out_rows_csv):
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out_json).write_text(json.dumps(result, indent=1, default=float))
-    with Path(a.out_csv).open("w", newline="") as f:
+    write_summary_csv(Path(a.out_csv), summaries)
+    with Path(a.out_rows_csv).open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(row_dump[0]))
         w.writeheader()
         w.writerows(row_dump)
-    print(f"wrote {a.out_json}, {a.out_csv}")
+    print(f"wrote {a.out_json}, {a.out_csv}, {a.out_rows_csv}")
     return 0
 
 

@@ -273,7 +273,7 @@ def count_decomposition(
 ) -> dict[str, int]:
     """Exact split of one scene's count error into its causes::
 
-        missed + duplicates + false_positives - wrong_merges == predicted - true
+        duplicates + false_positives - missed - wrong_merges == predicted - true
 
     ``clusters[i]`` is the predicted instance of detection ``i``; ``gt_ids[i]`` the true object
     it shows (``None`` = not a target). ``gt_universe`` lists every true object. ``predicted`` is
