@@ -833,3 +833,11 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **Retention lives in the worker loop** (hourly, default 30 days) rather than a separate scheduler, so the one-command start covers it. No worker, no purge; `/privacy` states this.
 - **`example_box` is dropped before `Config`** (`UI_ONLY_OPTIONS` in `countonce/jobs/worker.py`): the pipeline has no use for it yet, so it is stored with the job but not applied. Fixes the M16 failure.
 - **Not verified:** the "upload from the frontend -> worker on GPU -> result page" run on real hardware was not done unattended (see `docs/GATES.md`). Covered: worker/queue logic by `tests/test_worker_hardening.py`, and the frontend-to-API path by the M16 live Playwright run with a fake worker.
+
+## M20: README front page (2026-11-25)
+- **No hand-counted photos exist and Fuji images cannot be shown** (PLAN 0.1), so the example is the synthetic tiny scene, labelled as such; "true count" is by construction, not a hand count. Replace with an own capture in P4/P5.
+- **Two example runs, both labelled:** consistent IDs across views come from the CPU stand-ins (`color_blob` + `fixture`); the failure is the real GroundingDINO + VGGT path on all five views (14, truth 5). The real path's correct 5 uses one view, so it cannot show cross-view IDs.
+- **The tiny-scene table was re-measured** (2026-11-25, `.venv-gpu`, commit b22b2ba, `backbone_options.weights_dtype: fp32`, v1 and v2). It replaces nothing; M2's "22 at k=0.5" was a different association setting/code state, today's v1 default gives 23.
+- **One measured table is MAE only**, copied from `results/benchmark_summary.csv`; `tests/test_readme.py` fails if they diverge. `bench.fuji_report` no longer writes a block into the README (it would bring the TODO cells back); the full table stays in `docs/RESULTS_FUJI.md`.
+- **Live demo link:** none exists, so the README says "not hosted yet" (see `docs/GATES.md`).
+- **Found, not fixed (outside M20):** the CLI's `expandable_segments:True` (`countonce/oom.py`) made the five-view VGGT run fail with `CUDA driver error: device not ready` on WSL2 + RTX 5070 8 GB (3 of 3 CLI attempts); with `expandable_segments:False` it succeeded, as did the Python API path, which does not set it. The README command sets the override.

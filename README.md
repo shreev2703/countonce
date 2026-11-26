@@ -4,42 +4,96 @@
 
 Count objects in 3D from a few photos or a short video, without counting any object twice.
 
-> **Status: draft.** The pipeline and benchmark harness are implemented and tested on synthetic
-> and toy inputs. The real path (HF GroundingDINO, VGGT, v1/v2) has been run on the tiny scene and
-> on the Fuji-SfM Core test trees; see `docs/STATUS.md` for exactly what each component has and
-> has not been tested on. Figures and table cells without a measured value stay
-> `TODO: fill from results`.
+**Status: research prototype. It is not yet accurate on real photos.** On held-out orchard trees the
+errors are large (table below), and the project's own "geometry beats simple baselines" gate was not
+met. What has and has not been run is listed per component in [docs/STATUS.md](docs/STATUS.md).
 
-![Headline figure: MAPE vs. number of views](TODO: fill from results)
+**Live demo:** not hosted yet. To run the demo site locally, `cd web && npm ci && npm run dev`, then
+open <http://localhost:3000/demo/tiny> (synthetic scene, CPU stand-in outputs).
 
-## Key findings
+## Example: five views, five red spheres
 
-- `TODO: fill from results` (headline accuracy vs. the sum/max/median baselines)
-- `TODO: fill from results` (effect of ordered vs. shuffled photos)
-- `TODO: fill from results` (v1 vs. v2 vs. sync association)
-- `TODO: fill from results` (at least one weakness, e.g. the worst error slice)
+Input photos. This is a **synthetic test scene** rendered by
+[`examples/tiny_scene/generate.py`](examples/tiny_scene/generate.py), with blue and green
+distractors. The true count, **5**, is known by construction; there are no hand-counted real photos
+yet.
 
-## Demo
+![Five input views of the synthetic scene](docs/assets/tiny_inputs.png)
 
-Demo link: `TODO: fill from results`. Screenshot: `TODO: fill from results`.
+**Predicted 5, true 5**, with the same ID on each sphere in every view. This run uses stand-ins (a
+colour detector and the scene's known cameras and depth), so it shows that lifting and association
+work when their inputs are good. It says nothing about model accuracy.
 
-## Results
+![The same five IDs drawn across all five views](docs/assets/tiny_ids_standin.png)
 
-Methods × views on the test split. Cells are filled by `countonce bench --figures` output,
-never by hand.
+### Run it (CPU, no model weights)
 
-| Method | Views | MAPE | Within 10% | Association F1 | Runtime |
-|---|---|---|---|---|---|
-| sum (baseline) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | n/a | TODO: fill from results |
-| max (baseline) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | n/a | TODO: fill from results |
-| median (baseline) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | n/a | TODO: fill from results |
-| CountOnce v1 (VGGT) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| CountOnce v2 (VGGT) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| CountOnce sync (VGGT) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| CountOnce v1 (COLMAP) | 3 / 5 / 10 / 20 / 40 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+```bash
+pip install -e ".[dev]" && countonce run examples/tiny_scene --prompt "red sphere" --detector color_blob --backbone fixture --assoc v2 --config examples/tiny_scene/all_views.yaml --out results/tiny
+```
 
-Confidence intervals are scene-level bootstrap CIs (`bench/stats.py`).
-Sensitivity-range coverage: `TODO: fill from results`.
+It prints `red sphere: 5` and writes annotated views, `counts.csv` and `result.json` to
+`results/tiny/`. Use a Python 3.11+ virtual environment.
+
+## A representative failure
+
+The same five views through the real models (GroundingDINO-tiny + VGGT-1B, v2): **predicted 14,
+true 5**.
+
+![Real models split spheres into different IDs across views](docs/assets/tiny_failure_real.png)
+
+IDs change between views, so one sphere is counted several times; a blue distractor is counted (9);
+and one partly hidden red sphere is missed in the third view. VGGT recovers poor cameras on this
+small, flat-shaded, symmetric scene, so views of one sphere do not land close enough to merge
+([root-cause notes](docs/DEVIATIONS.md)).
+
+| Real models on this scene (v1 and v2, true count 5) | v1 | v2 |
+|---|---|---|
+| Default settings (near-duplicate filter keeps 1 of 5 views) | 7 | 7 |
+| Detector threshold 0.5, per-frame NMS (1 view) | 5 | 5 |
+| All 5 views, default threshold | 23 | 18 |
+| All 5 views, threshold 0.5, per-frame NMS | 17 | 14 |
+
+The one correct real-model result uses a single view and a threshold picked on this scene.
+Measured 2026-11-25 on an RTX 5070 Laptop GPU (8 GB).
+
+## Measured results on real trees (Fuji-SfM)
+
+Mean absolute count error **in apples** (lower is better) with 95% bootstrap CIs over the 8 test
+trees, by number of views `k`. Thresholds were frozen on training trees first.
+
+| Method | k=3 | k=5 | k=10 | k=20 |
+|---|---|---|---|---|
+| CountOnce v1 | 61.6 [21.7, 110.1] | 67.2 [27.2, 114.8] | 52.6 [39.4, 69.9] | 100.0 [66.1, 130.1] |
+| CountOnce v2 | 62.8 [22.4, 111.8] | 65.7 [25.1, 113.5] | 40.1 [28.0, 53.0] | 101.8 [68.2, 135.1] |
+| Sum of per-photo counts | 61.0 [21.1, 108.9] | 68.2 [28.1, 115.6] | 68.2 [51.9, 88.9] | 157.4 [120.2, 203.1] |
+| Max per-photo count | 66.2 [23.7, 118.8] | 60.1 [17.7, 110.4] | 31.1 [14.1, 50.2] | 153.8 [109.8, 187.3] |
+| Median per-photo count | 72.6 [26.8, 127.4] | 57.9 [14.4, 111.5] | 43.8 [21.4, 67.3] | 185.0 [139.1, 219.5] |
+
+- For scale, the mean true count per window is 77, 57, 53 and 197 apples at k = 3, 5, 10 and 20.
+  Many short windows contain no ground-truth apple at all (7 of 16 at k=3, 8 of 16 at k=5).
+- v1 and v2 beat both Sum and Max only at k=20. At k=10, Max is better than either.
+- The detector is the largest error source, followed by duplicates from association.
+
+Full tables, paired tests and caveats: [docs/RESULTS_FUJI.md](docs/RESULTS_FUJI.md). The runs were
+made from a working tree with uncommitted changes. Fuji-SfM images are not shown here
+(CC BY-NC-SA 4.0).
+
+## Roadmap
+
+Planned, **not done**. Details in [docs/PLAN.md](docs/PLAN.md).
+
+1. Capture 20-30 real scenes, including scenes with none of the target, and hand-count them
+   ([capture guide](docs/CAPTURE_GUIDE.md)).
+2. Benchmark them with frozen splits, then fix the largest error source shown by the error
+   decomposition.
+3. Host the demo and the upload flow ([deploy notes](docs/DEPLOY.md)); show real scenes in the demo.
+4. Evaluate the learned matcher (v3), so far tested on synthetic data only, on real data after
+   training on rendered scenes.
+5. Missing comparisons: CountVid and other video baselines, a vision-language model baseline,
+   COLMAP and permutation sync on Fuji-SfM, calibrated (conformal) intervals on real data.
+6. CountGD and CountGD++ detectors (currently stubs that exit with an error).
+7. A small user pilot.
 
 ## How it works
 
@@ -120,8 +174,19 @@ blue and green distractors) with known cameras and depth. The test-only `color_b
 `fixture` backbone count it on CPU (expected: 5):
 
 ```bash
-countonce run examples/tiny_scene --prompt "red sphere" --detector color_blob --backbone fixture --assoc v2 --out results/tiny
+countonce run examples/tiny_scene --prompt "red sphere" --detector color_blob --backbone fixture --assoc v2 --config examples/tiny_scene/all_views.yaml --out results/tiny
 ```
+
+Without `--config`, the near-duplicate filter keeps one of the five views and the CLI warns about it.
+
+The real-model failure above (GPU). On WSL2 with an 8 GB card the five-view run failed with
+`CUDA driver error: device not ready` unless the allocator setting below was turned off:
+
+```bash
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False countonce run examples/tiny_scene --prompt "red sphere" --assoc v2 --config configs/readme_real_failure.yaml --out results/tiny_real
+```
+
+The figures are drawn from those two runs by `python scripts/make_readme_figures.py --standin results/tiny --real results/tiny_real`.
 
 These two backends exist only to exercise the CLI end to end (`tests/test_cli_e2e.py`); they are
 not real detection or reconstruction. Regenerate the scene with `python examples/tiny_scene/generate.py`.
@@ -176,67 +241,17 @@ This repo ships download scripts, not datasets or model weights. Verify each lic
 | Item | Role | License status |
 |---|---|---|
 | VGGT (Wang et al., CVPR 2025) | Reconstruction backbone | Original checkpoint is non-commercial; a commercial variant exists by application |
-| VGGT-Ω, VGG-T³ | Optional backbones (not wired) | Research only / `TODO: verify` |
+| VGGT-Ω, VGG-T³ | Optional backbones (not wired) | Research only; license terms not verified |
 | CountGD (Amini-Naieni et al.) | Open-vocabulary counting detector | MIT |
 | CountVid, DG-Net | Video baselines (not run yet) | MIT (repository code; weights and datasets keep their own) |
-| CountGD++, GroundingDINO, DINOv2 | Detector / appearance features | `TODO: verify` each (see `docs/MODEL_SURVEY.md`) |
+| CountGD++, GroundingDINO, DINOv2 | Detector / appearance features | Not all verified; see `docs/MODEL_SURVEY.md` |
 | Fuji-SfM | Benchmark scenes | CC BY-NC-SA 4.0 (research/education only): no redistribution of its images or derived GT, no HF dataset upload |
 | WGISD, MinneApple, AppleGrowthVision, FSC-147 | Other candidate datasets | See `docs/DATASETS.md` |
 | Kubric | Planned synthetic data | Open source; asset licenses to be checked |
 | Pachauri et al., NeurIPS 2013 | Spectral permutation synchronization (`countonce/merge/sync.py`) | Paper |
 
 Reconstruction wrapper, memory guard, frame extraction, COLMAP wrapper and plotting style are
-ported from the author's VGGT benchmark repo (`TODO: fill from results` — add its URL once
-public). The project's own license: `TODO: choose a license before release`.
+ported from the author's VGGT benchmark repo (not public yet). This repository does not have a
+license file yet.
 
 Related work and the hypothesis under test: [docs/RELATED_WORK.md](docs/RELATED_WORK.md).
-
-<!-- fuji-core:begin -->
-### Fuji-SfM Core (test trees 01-08)
-
-Generated by `python -m bench.fuji_report`; details in `docs/RESULTS_FUJI.md`.
-
-| Method | k | MAE (apples) | signed bias (apples) | MAPE (%) | assoc F1 (explains errors) | duplicate rate | miss rate |
-|---|---|---|---|---|---|---|---|
-| countonce_v1 | 3 | 61.62 [21.68, 110.14] | -54.25 [-107.20, -12.94] | 292.0 [42.8, 765.9] | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| countonce_v1 | 5 | 67.25 [27.24, 114.82] | -33.75 [-96.25, +17.26] | 1036.0 [157.0, 2207.1] | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| countonce_v1 | 10 | 52.62 [39.37, 69.88] | +39.88 [+19.75, +61.19] | 315.3 [103.2, 597.7] | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| countonce_v1 | 20 | 100.00 [66.12, 130.14] | -3.62 [-52.44, +54.06] | 73.4 [36.4, 113.4] | TODO: fill from results | TODO: fill from results | 0.955 [0.941, 0.970] |
-| countonce_v2 | 3 | 62.75 [22.38, 111.77] | -55.88 [-109.06, -14.56] | 279.2 [45.9, 724.0] | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| countonce_v2 | 5 | 65.69 [25.06, 113.51] | -36.31 [-98.08, +14.45] | 942.3 [148.4, 2022.0] | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| countonce_v2 | 10 | 40.12 [28.00, 53.00] | +16.88 [-3.75, +37.12] | 204.6 [68.5, 384.6] | TODO: fill from results | TODO: fill from results | TODO: fill from results |
-| countonce_v2 | 20 | 101.81 [68.23, 135.13] | -57.19 [-99.62, -7.62] | 54.7 [35.1, 74.2] | TODO: fill from results | TODO: fill from results | 0.956 [0.943, 0.971] |
-| sum | 3 | 61.00 [21.12, 108.89] | -53.62 [-105.95, -12.37] | 291.7 [42.4, 765.7] | n/a | n/a | n/a |
-| sum | 5 | 68.19 [28.06, 115.63] | -32.56 [-95.56, +19.69] | 1150.1 [156.9, 2478.4] | n/a | n/a | n/a |
-| sum | 10 | 68.19 [51.93, 88.88] | +64.69 [+45.81, +85.94] | 413.3 [143.4, 756.1] | n/a | n/a | n/a |
-| sum | 20 | 157.44 [120.18, 203.06] | +113.31 [+54.46, +183.03] | 143.0 [79.3, 220.5] | n/a | n/a | n/a |
-| max | 3 | 66.25 [23.69, 118.75] | -62.25 [-118.00, -19.99] | 167.6 [50.4, 382.0] | n/a | n/a | n/a |
-| max | 5 | 60.12 [17.68, 110.45] | -45.38 [-103.33, +2.44] | 498.0 [79.7, 1098.0] | n/a | n/a | n/a |
-| max | 10 | 31.06 [14.06, 50.19] | -22.06 [-45.07, -1.06] | 74.7 [29.7, 142.7] | n/a | n/a | n/a |
-| max | 20 | 153.75 [109.81, 187.25] | -153.75 [-187.25, -109.81] | 67.5 [58.6, 76.0] | n/a | n/a | n/a |
-| median | 3 | 72.56 [26.81, 127.44] | -71.19 [-126.57, -25.37] | 146.2 [80.8, 265.6] | n/a | n/a | n/a |
-| median | 5 | 57.88 [14.44, 111.50] | -53.38 [-109.00, -7.69] | 212.0 [96.3, 398.4] | n/a | n/a | n/a |
-| median | 10 | 43.81 [21.37, 67.29] | -43.25 [-67.16, -20.63] | 66.3 [43.7, 85.6] | n/a | n/a | n/a |
-| median | 20 | 185.00 [139.06, 219.47] | -185.00 [-219.47, -139.06] | 90.9 [86.7, 94.4] | n/a | n/a | n/a |
-
-Paired MAE difference over trees (a - b, negative favours a):
-
-| a vs b | k | diff [95% CI] | p (bootstrap) | p (Wilcoxon) |
-|---|---|---|---|---|
-| v2 vs countonce_v1 | 3 | 1.12 [0.25, 2.19] | 0.012 | 0.094 |
-| v2 vs sum | 3 | 1.75 [0.31, 3.88] | 0.010 | 0.094 |
-| v2 vs max | 3 | -3.50 [-7.69, 0.00] | 0.052 | 0.117 |
-| v2 vs median | 3 | -9.81 [-16.88, -2.87] | 0.002 | 0.055 |
-| v2 vs countonce_v1 | 5 | -1.56 [-3.44, 0.44] | 0.130 | 0.312 |
-| v2 vs sum | 5 | -2.50 [-5.06, 0.31] | 0.078 | 0.156 |
-| v2 vs max | 5 | 5.56 [-1.44, 13.31] | 0.132 | 0.375 |
-| v2 vs median | 5 | 7.81 [-4.19, 20.38] | 0.234 | 0.461 |
-| v2 vs countonce_v1 | 10 | -12.50 [-20.50, -4.62] | 0.000 | 0.031 |
-| v2 vs sum | 10 | -28.06 [-44.38, -11.25] | 0.002 | 0.031 |
-| v2 vs max | 10 | 9.06 [-7.44, 26.75] | 0.292 | 0.297 |
-| v2 vs median | 10 | -3.69 [-27.01, 23.42] | 0.726 | 0.844 |
-| v2 vs countonce_v1 | 20 | 1.81 [-26.07, 20.63] | 0.816 | 0.367 |
-| v2 vs sum | 20 | -55.62 [-122.38, -0.25] | 0.044 | 0.250 |
-| v2 vs max | 20 | -51.94 [-81.70, -20.25] | 0.006 | 0.023 |
-| v2 vs median | 20 | -83.19 [-112.82, -50.69] | 0.000 | 0.016 |
-<!-- fuji-core:end -->

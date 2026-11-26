@@ -349,3 +349,9 @@ Create the two Vercel projects, Neon Postgres and the R2 bucket, then follow `do
 
 ## M19: GPU end-to-end (yours)
 Run once on the laptop: start the API and `web/` dev server (see `web/README.md`), run `scripts/start_worker.sh`, upload photos at `/new` and confirm the result page. Not run overnight (needs a GPU session and a browser).
+
+## M20: live demo URL (yours; README has no link yet)
+No hosted frontend exists (see M18 above). After deploying, replace the "Live demo: not hosted yet" line in `README.md` with the URL.
+
+## M20: five-view VGGT run fails through the CLI on WSL2 8 GB (open bug)
+`countonce run examples/tiny_scene --prompt "red sphere" --assoc v2 --config configs/readme_real_failure.yaml` gives `reconstruction failed: cuda_error: CUDA driver error: device not ready` (3 of 3 attempts, including with `PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512`). `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False` works. Suspect: `configure_allocator()` in `countonce/oom.py`. Peak VRAM is at the 8 GB limit. The worker may be affected; check before the M19 GPU run.
