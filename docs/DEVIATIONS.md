@@ -917,3 +917,9 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **Behaviour change:** phones show a "Load 3D view" button (selecting an object or photo also loads it); desktop loads the viewer 1.2 s after the page load event. The poster is a text panel, not an image.
 - **No worker for point decoding:** `parsePoints` only creates typed-array views over the fetched buffer, so there is no decode work to move off the main thread.
 - **`<Suspense>` boundaries rejected:** React's prerender moved the large sections into hidden segments revealed by a script, one Playwright test then saw duplicate nodes, and the long hydration task did not shrink.
+
+## GATES.md hygiene (2026-11-25)
+- Older audit sections are marked resolved as snapshots, with their text kept. Their still-open items that no other open section listed are gathered in a new open section at the end of `docs/GATES.md`.
+- Mockup approval is marked resolved because PLAN §0.1 rule 5 moved the review to after the build (H2).
+- The 23 report re-run entries and the step-2 entry are one entry. `3737ddc`..`2afa977` (inclusive) holds retries 3-23; the first two retries are earlier commits.
+- Added an open section for the overnight tasks still marked `[!]` (M5b, sync/v3 on Fuji), which GATES did not list.
