@@ -988,3 +988,17 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 
 ## Synthetic tuner pool uses spawn (2026-11-25)
 - `bench/synth_component.py` builds its tuning pool with `spawn` (not `forkserver`: spawn is portable and what the load tests use). The requested `filterwarnings("error::DeprecationWarning:multiprocessing")` marker was not used: CPython 3.12 discards the exception when this warning is escalated inside `os.fork`, so it can never fail a test; an autouse fixture in `tests/test_synth_component.py` records warnings and asserts there is no fork warning (checked by temporarily restoring `fork`).
+
+## Fuji COLMAP backbone (2026-11-25)
+
+- GT for a COLMAP window is the VGGT reference window's visible set (checked against the VGGT v2
+  row's `gt`). COLMAP's sparse depth cannot run the occlusion test, and its own test would give
+  the two backbones different GT.
+- `match_px` is scaled by the grid width ratio (COLMAP works at the downscaled image size, VGGT at
+  518). Alignment uses registered views only.
+- COLMAP sees the whole frame; VGGT's crop-mode preprocessing may not. Detections are the same.
+- `status=failed` rows count as finished on resume; `status=error` rows are retried.
+- COLMAP MAE in the report is over successful windows only, shown next to the failure rate.
+- `ColmapMethod` now copies inputs from several directories into one (`recon/staging.py`). The
+  pipeline's sanitized frames are one directory each, so `--backbone colmap` raised before.
+- The 128-slice run is blocked on the alignment problem in `docs/GATES.md`.

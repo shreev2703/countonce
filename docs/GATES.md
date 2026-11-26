@@ -435,3 +435,38 @@ Items from the resolved snapshots that no other open section above lists.
   and the M18/M19 deploy plus the live URL in the README; H2, H3, H4, H6 and the demo video; Docker builds, gated
   weights (CountGD/CountGD++, VGGT-Ω, VGG-T³), CountVid/DG-Net and the video datasets (E2, E3), OneScene-Bench
   images (E5), frontier-VLM API spend.
+
+## Fuji window alignment leaves rotation unconstrained; COLMAP test run not launched (OPEN, 2026-11-25)
+
+**Affects:** every Fuji row in `results/bench.csv` (VGGT v1/v2/sync/v3 and baselines), the frozen
+thresholds in `configs/fuji_core.yaml` (tuned under the same alignment), `docs/RESULTS_FUJI*.md`.
+
+**Cause:** `align_chunk` uses only camera centres for three or more views. Overview pseudo-poses
+interpolate centres linearly (stride 3), so short windows are exactly collinear and Umeyama's
+rotation about that line is arbitrary.
+
+**Measured** (cached VGGT windows, median camera rotation error against the pseudo-poses, degrees):
+
+| window | current alignment | centres + axis tips | centre singular values |
+|---|---|---|---|
+| Tree04 east k=3 | 78.2 | 10.4 | 0.11, 0, 0 |
+| Tree04 east k=5 | 152.0 | 15.1 | 0.179, 0.042, 0 |
+| Tree04 east k=10 | 26.1 | 14.9 | 0.243, 0.218, 0.02 |
+| Tree02 west k=5 | 156.3 | 81.3 | 0.267, 0.023, 0 |
+
+A COLMAP window on Tree04 east k=3 registered 3/3 views and scored pred 0 against gt 100 (smoke
+run on a temporary CSV). Its error was 103 degrees. Sparse lifting also rejects many detections
+(no triangulated point in the box centre), so the alignment is not the only cause of low counts.
+
+**Done:** `--backbone colmap`, the report section and tests are committed. The 128-slice run was
+**not** launched (no PID, 0 COLMAP rows in `results/bench.csv`): COLMAP would be scored against
+GT built in a differently rotated frame, so the comparison would be meaningless.
+
+**Next (owner or a new task):**
+1. Fix the window alignment using camera orientations. Axis tips alone are not enough (81 degrees
+   remains on Tree02 west), so also check the pseudo-poses themselves, and gate on rotation error
+   in `check_alignment`. The strict xfail in `tests/test_fuji_colmap.py` must then pass.
+2. Bump `fc.PROTOCOL`, re-tune on the training trees, rerun all VGGT test rows.
+3. Then run (detached, resumable; roughly 5-15 s per window, not measured at k=20):
+   `PYTHONPATH=. setsid nohup .venv-gpu/bin/python -u scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600 > runs/fuji_core/test_colmap.log 2>&1 &`
+   and `python -m bench.fuji_report`.

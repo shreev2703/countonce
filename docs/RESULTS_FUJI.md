@@ -62,6 +62,17 @@ Paired MAE difference over trees (a - b, negative favours a):
 | sync vs v2 | 20 | 0.44 [-2.69, 4.38] | 0.888 | 0.711 |
 | v3 vs v2 | 20 | 47.94 [-1.45, 107.62] | 0.062 | 0.250 |
 
+## Backbone: COLMAP lifting vs VGGT (both v2)
+
+Same windows, cached detections, GT set (VGGT reference visibility) and alignment to the overview poses. A failure is a window COLMAP could not register or align; it has no count. MAE and the paired difference use only the windows where COLMAP succeeded (per tree, mean over those sides), so they are conditional on success and flatter COLMAP when failures are frequent. diff = COLMAP - VGGT, positive favours VGGT.
+
+| k | registration failures | trees compared | COLMAP MAE | VGGT MAE (same windows) | diff [95% CI] | p (Wilcoxon) | VGGT MAE (all 16) |
+|---|---|---|---|---|---|---|---|
+| 3 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+| 5 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+| 10 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+| 20 | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results | TODO: fill from results |
+
 ## Failure analysis
 
 Worst slices by absolute count error:
@@ -138,3 +149,12 @@ registered checkpoint `v001`, trained on synthetic data only, with no Fuji fine-
   detections. At k=3, where the pipeline under-counts on average, merging less lowers MAE.
 - Association F1 exists only for slices with identity-labelled detections, so it is not in the table.
   The subset comparison is in `docs/GATES.md` under G4.
+
+## Known problem: window alignment rotation (found 2026-11-25, unfixed)
+
+Treat every number on this page as unreliable. Windows are aligned to the overview pseudo-poses
+from camera centres only (three or more views). Short windows have collinear centres, so the
+rotation about the camera path is not determined. Checked VGGT windows were 26 to 156 degrees off
+in median camera orientation. That affects which GT apples count as visible and which predictions
+fall in the region of interest. The COLMAP comparison has not been run for this reason. See
+`docs/GATES.md`.

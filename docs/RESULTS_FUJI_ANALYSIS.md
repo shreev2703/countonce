@@ -62,3 +62,12 @@ registered checkpoint `v001`, trained on synthetic data only, with no Fuji fine-
   detections. At k=3, where the pipeline under-counts on average, merging less lowers MAE.
 - Association F1 exists only for slices with identity-labelled detections, so it is not in the table.
   The subset comparison is in `docs/GATES.md` under G4.
+
+## Known problem: window alignment rotation (found 2026-11-25, unfixed)
+
+Treat every number on this page as unreliable. Windows are aligned to the overview pseudo-poses
+from camera centres only (three or more views). Short windows have collinear centres, so the
+rotation about the camera path is not determined. Checked VGGT windows were 26 to 156 degrees off
+in median camera orientation. That affects which GT apples count as visible and which predictions
+fall in the region of interest. The COLMAP comparison has not been run for this reason. See
+`docs/GATES.md`.

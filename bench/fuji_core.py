@@ -38,6 +38,7 @@ from bench.datasets.fuji_sfm import FujiScene
 from bench.gt_matching import match_detections_to_gt
 from bench.runner import Job, RunOutput, read_rows
 from countonce.recon.align import Sim3, camera_centers, transform_extrinsics, umeyama
+from countonce.recon.chunked import MIN_OVERLAP, ChunkAlignmentError, align_chunk
 from countonce.types import Detection
 
 DOWNSCALE = 3
@@ -199,6 +200,20 @@ class AlignmentError(RuntimeError):
 MAX_CAM_RMS_FRAC = 0.5  # camera RMS misfit above this share of the window's camera span fails
 
 
+def registered_views(extrinsics: np.ndarray) -> np.ndarray:
+    """Mask of views with a camera. Sparse backbones (COLMAP) leave unregistered views all zero."""
+    ext = np.asarray(extrinsics, float)
+    return np.asarray(np.abs(ext[:, :3, :3]).sum((1, 2)) > 0)
+
+
+def align_window(gt_ext: np.ndarray, recon_ext: np.ndarray) -> Sim3:
+    """``align_chunk`` over the registered views only (identical to it when all are)."""
+    reg = registered_views(recon_ext)
+    if int(reg.sum()) < MIN_OVERLAP:
+        raise ChunkAlignmentError(f"only {int(reg.sum())} registered views")
+    return align_chunk(gt_ext[reg], recon_ext[reg])
+
+
 def scaled_depth(depth: np.ndarray, sim: Sim3) -> np.ndarray:
     """Depth maps in GT-frame metres. ``transform_extrinsics`` expresses camera coordinates in
     destination units (``s * x_c``), so reconstruction-frame depth must be multiplied by ``s``
@@ -274,16 +289,25 @@ def evaluate_window(
     gt_xyz: np.ndarray,
     box: tuple[np.ndarray, np.ndarray],
     gt_ext: np.ndarray | None = None,
+    visible: list[np.ndarray] | None = None,
+    match_px: float = MATCH_PX,
 ) -> dict[str, Any]:
     """Count, GT, association metrics and per-image baselines of one run, in the GT frame.
 
     ``gt_ext`` (the window's overview pseudo-poses), when given, is checked against the aligned
     cameras (``check_alignment``) and the misfit is recorded in the result.
+
+    ``visible`` (per-view GT indices) replaces this reconstruction's own depth test. Another
+    backbone is scored against the reference window's GT this way, so both share one GT.
+    ``match_px`` is in this reconstruction's pixels.
     """
-    align = check_alignment(gt_ext, recon.extrinsics, sim) if gt_ext is not None else {}
+    reg = registered_views(recon.extrinsics)
+    align = check_alignment(gt_ext[reg], recon.extrinsics[reg], sim) if gt_ext is not None else {}
     ext_gt = transform_extrinsics(recon.extrinsics, sim)
-    depth_gt = scaled_depth(recon.depth, sim)
-    vis = visible_gt(gt_xyz, recon.intrinsics, ext_gt, depth_gt)
+    if visible is None:
+        vis = visible_gt(gt_xyz, recon.intrinsics, ext_gt, scaled_depth(recon.depth, sim))
+    else:
+        vis = visible
     visible_set = sorted({int(i) for v in vis for i in v})
     h, w = recon.depth.shape[1:]
 
@@ -321,7 +345,7 @@ def evaluate_window(
             {v: recon.intrinsics[v]},
             {v: ext_gt[v]},
             {v: (w, h)},
-            threshold_px=MATCH_PX,
+            threshold_px=match_px,
         )
         pos = {gt_ids[i]: int(i) for i in inframe}
         labels.update(
@@ -393,23 +417,29 @@ ASSOC_METHODS: dict[str, str] = {
     "sync": "countonce_sync",
     "v3": "countonce_v3",
 }
+BACKBONES = ("vggt", "colmap")
 METHOD_ASSOC: dict[str, str] = {m: a for a, m in ASSOC_METHODS.items()}
+METHOD_ASSOC.update({f"{m}_colmap": a for a, m in ASSOC_METHODS.items()})
 BASELINE_METHODS = ("sum", "max", "median")
 
 
-def method_for_assoc(assoc: str) -> str:
+def method_for_assoc(assoc: str, backbone: str = "vggt") -> str:
+    """Bench method name; VGGT (the default backbone) carries no suffix."""
+    if backbone not in BACKBONES:
+        raise ValueError(f"unknown backbone {backbone!r}; expected one of {BACKBONES}")
     try:
-        return ASSOC_METHODS[assoc]
+        return ASSOC_METHODS[assoc] + ("" if backbone == "vggt" else f"_{backbone}")
     except KeyError:
         known = sorted(ASSOC_METHODS)
         raise ValueError(f"unknown assoc {assoc!r}; expected one of {known}") from None
 
 
-def methods_for(assocs: Any, baselines: bool = True) -> tuple[str, ...]:
+def methods_for(assocs: Any, baselines: bool = True, backbone: str = "vggt") -> tuple[str, ...]:
     """Method names to schedule for ``assocs`` (order kept, duplicates dropped), plus the
     per-image baselines when ``baselines`` (finished slices are skipped on resume anyway)."""
-    out = tuple(dict.fromkeys(method_for_assoc(a) for a in assocs))
-    return out + BASELINE_METHODS if baselines else out
+    out = tuple(dict.fromkeys(method_for_assoc(a, backbone) for a in assocs))
+    # per-image baselines do not use a reconstruction, so only the VGGT run records them
+    return out + BASELINE_METHODS if baselines and backbone == "vggt" else out
 
 
 def _row_protocol(r: dict[str, Any]) -> str | None:
@@ -421,14 +451,15 @@ def _row_protocol(r: dict[str, Any]) -> str | None:
 
 
 def done_slices(csv_path: Path, split: str) -> set[tuple[str, str, int, str]]:
-    """(tree, side, k, method) of every finished (status ok) row of ``split`` in the CSV.
+    """(tree, side, k, method) of every finished row of ``split`` in the CSV: status ``ok``, or
+    ``failed`` (a recorded reconstruction failure is a result, PLAN §9.8; ``error`` is retried).
 
     Only rows of the current protocol count, so rows from an older scoring protocol are
     never reused as finished work."""
     return {
         (r["scene_id"], r["sample"], int(r["n_views"]), r["method"])
         for r in read_rows(csv_path)
-        if r["status"] == "ok"
+        if r["status"] in ("ok", "failed")
         and r["split"] == split
         and r["n_views"]
         and _row_protocol(r) == PROTOCOL
