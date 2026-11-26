@@ -819,3 +819,11 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **`/privacy` states the gaps** instead of the PLAN 14.8 intent: no automatic 30-day deletion yet (M19), no automatic face/plate blurring, video metadata kept. Update the page when these change.
 - **`/about` has no email address;** contact is through GitHub issues.
 - **Build check** scans prerendered pages, browser bundles, `public/` and page sources (server-rendered pages have no prerendered output).
+
+## M18: API fit for Vercel
+- **Separate API project (`api.`), not `/api` in the site.** Python and Node in one project would need rewrites and two runtimes; the site proxy already makes the API same-origin for the browser. Details in `docs/DEPLOY.md`.
+- **SSE capped, polling fallback kept.** `COUNTONCE_SSE_MAX_S` ends the stream before the function limit; the existing client falls back to polling. No change to the client was needed; the proxy gets `maxDuration = 60`.
+- **`/` on the API redirects** to `COUNTONCE_WEB_URL` (else `/docs`) instead of returning JSON. Health probes should use `/health`.
+- **Benchmark data for a `web/`-rooted deploy:** `web/content/benchmark/benchmark_summary.csv` is committed (copy of `results/`, `npm run sync:results`). The `content/` name avoids the repo `.gitignore` entries for `data/` and `results/`.
+- **Not verified:** no real deployment was made (needs your Vercel/Neon/R2 accounts), so "frontend talks to the deployed API" is covered by the existing live Playwright run against a local API plus the proxy, not by a hosted one. Logged in `docs/GATES.md`.
+- Still open from M16: old API keys are not revoked on re-sign-in; `example_box` option rejected by `Config` in the worker (M19).

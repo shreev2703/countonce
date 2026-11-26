@@ -343,3 +343,6 @@ so `scripts/render_mockups.py` skips; open the HTML files directly or install pl
 
 ## 2026-11-25: Google OAuth client needed (does not block M16)
 - The sign-in code is in place but has never run against Google. Yours: create an OAuth web client, add `<origin>/api/auth/google/callback` as a redirect URI, set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `COUNTONCE_AUTH_SECRET`, `COUNTONCE_SESSION_SECRET` and `COUNTONCE_PUBLIC_URL`, and leave `COUNTONCE_DEV_AUTH` unset in public.
+
+## M18: hosted deployment (yours)
+Create the two Vercel projects, Neon Postgres and the R2 bucket, then follow `docs/DEPLOY.md`. Until then "frontend talks to the deployed API" is verified only locally.

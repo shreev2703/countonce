@@ -4,6 +4,8 @@ import { apiUrl } from "@/lib/server/config";
 import { getSession } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
+// Keep this at or above the API's COUNTONCE_SSE_MAX_S so the stream ends cleanly, not by timeout.
+export const maxDuration = 60;
 
 /**
  * Same-origin proxy to the CountOnce API. It adds the signed-in user's API key from the session

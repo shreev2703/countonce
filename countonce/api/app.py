@@ -645,6 +645,7 @@ def open_app(
     pg_url: str | None = None,
     blobs: BlobStore | None = None,
     tracing_cfg: tracing.TracingConfig | None = None,
+    sse_max_s: float | None = None,
 ) -> FastAPI:
     """App for a job database; upload limits from ``configs/uploads.yaml``.
 
@@ -669,4 +670,7 @@ def open_app(
         request_rate_limit=request_rate_limit,
         auth_secret=auth_secret or os.environ.get("COUNTONCE_AUTH_SECRET"),
         tracing_cfg=tracing_cfg,
+        sse_max_s=sse_max_s
+        if sse_max_s is not None
+        else float(os.environ.get("COUNTONCE_SSE_MAX_S") or 3600.0),
     )

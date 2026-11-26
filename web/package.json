@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "sync:results": "node scripts/sync-results.mjs",
     "postbuild": "node scripts/check-no-todo.mjs",
     "start": "next start",
     "lint": "eslint .",

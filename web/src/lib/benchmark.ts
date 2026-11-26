@@ -32,8 +32,15 @@ export interface SynthRow {
   n: number;
 }
 
+/**
+ * Where the result CSVs live: `COUNTONCE_RESULTS_DIR`, else the repo's `../results` (local builds),
+ * else the committed copy in `content/benchmark` (a Vercel project rooted at `web/` cannot see
+ * `../results`). `npm run sync:results` refreshes the committed copy.
+ */
 export function resultsDir(): string {
-  return process.env.COUNTONCE_RESULTS_DIR ?? join(process.cwd(), "..", "results");
+  if (process.env.COUNTONCE_RESULTS_DIR) return process.env.COUNTONCE_RESULTS_DIR;
+  const repo = join(process.cwd(), "..", "results");
+  return existsSync(join(repo, "benchmark_summary.csv")) ? repo : join(process.cwd(), "content", "benchmark");
 }
 
 /** The result CSVs read here hold no quoted fields; a quote means the format changed. */
