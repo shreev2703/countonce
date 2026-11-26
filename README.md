@@ -135,7 +135,7 @@ A longer walk-through is in [docs/EXPLAINER.md](docs/EXPLAINER.md). The full pla
   counts over a grid of merge strictness and detector thresholds. It shows how fragile the count
   is. It is not a statistical guarantee that the true count lies inside it
   (`confidence_method="sensitivity"`).
-- **Photo order.** Shuffling the photos (cameras travelling with them) did not change v1, v2 or sync counts or groupings in 12 Fuji validation windows (10 shuffles each, one reconstruction per window; v3 and the test trees not run). Evidence: `results/order_invariance_fuji_merging.csv`, `docs/DEVIATIONS.md`.
+- **Photo order.** Shuffling the photos (cameras travelling with them) did not change v1, v2 or sync counts or groupings in 12 Fuji validation windows (10 shuffles each, one reconstruction per window). The same holds for v1, v2, sync and v3 on 16 Fuji test windows when the reconstruction is held fixed (`results/order_invariance_fuji_test.csv`). **It does not hold end to end:** when VGGT is re-run on the photos in a new order, counts change in 60 of 64 window-method pairs (median count range 0.5 to 16, up to 28; v3 is the most stable, v2/sync/v1 the least). The pipeline is therefore order-invariant given a reconstruction, but VGGT itself is order-sensitive, so "unordered photos" is supported for the association step only. Evidence: `results/order_invariance_fuji_merging.csv`, `results/order_invariance_fuji_test.csv`, `docs/DEVIATIONS.md`.
 - Quality warnings and confidence scores are heuristics and are not calibrated.
 - The default detector is HuggingFace GroundingDINO (text prompts only). CountGD and CountGD++ are
   planned, not implemented: selecting them exits with an error. Per-component evidence is in

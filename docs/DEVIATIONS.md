@@ -1150,3 +1150,11 @@ that are ok under both protocols; the GT set differs between protocols, so the M
   report with the default root until the west frame is fixed (`fc.PROTOCOL` is now v3).
 - **Choice:** part 1 is ticked because its stated done criteria are met; part 2 and the ablation re-run
   are marked `[!]`, since their `.done`/row-count preconditions would pass on the broken frame.
+
+## Order-invariance on the Fuji test trees, v3 and VGGT re-run (2026-11-26)
+
+- **Run** (`scripts/run_order_invariance_fuji_test.py`, `results/order_invariance_fuji_test.csv`, 192 rows): v1, v2, sync, v3 at the frozen settings (score 0.2, merge_k 0.3, gate 0.5, v3 `v001.pt`) on the `fuji_core_v3` test windows (8 trees x east/west = 16 windows) at k=5 and 10, 10 permutations each. `permute` (128 rows): cached recon, photo-to-frame assignment permuted. `rerun_vggt` (64 rows): fixed subset of 8 windows (one side per tree, alternating east/west, both k), VGGT re-run on photos uploaded in 10 new orders, plus an identity-order control.
+- **Result, permute:** count range 0 and 0 changed partitions for all four associators at both k (merges present: v3 9/16 windows at k=5, 15/16 at k=10). Invariant given a reconstruction.
+- **Result, rerun_vggt:** not invariant. Count range > 0 in all windows for v1/v2/sync at k=5 and 10 and v3 at k=10; v3 k=5 4/8. Median range v1 5/16, v2 11/10.5, sync 6/15.5, v3 0.5/4.5 (k=5/k=10); max 28. Min Rand index over changed partitions 0.992. The identity-order control gave the same count and partition every time, so the variation comes from the photo order seen by VGGT, not run-to-run noise.
+- **Caveats:** the west overview frame is degenerate (see "west frame invalid"), so ROI counts on west windows are not valid and were not used. Count/partition columns do not depend on GT. Subset is 8 windows (more than the 4 requested), not all 16. The variant was not run on validation.
+- **Claim:** the "unordered photos" wording is narrowed in README, STATUS and PLAN §0.6 to the association step; end-to-end order invariance is not claimed.

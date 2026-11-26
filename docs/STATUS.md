@@ -60,7 +60,7 @@ the message and exits non-zero. It never silently falls back to another detector
 | Web app: signed-in flow | yes | yes (mocked API; local API with a fake worker) | no (no real Google sign-in or GPU worker run) | n/a |
 | Count-first metrics and error decomposition | yes | yes | yes (Fuji failure-source run) | yes (Fuji Core) |
 | Failure-source harness | yes | yes | yes (Fuji, no oracle geometry) | k=10 only |
-| Photo-order invariance (v1, v2, sync, v3) | yes | yes (permutation test) | v1, v2, sync: 12 Fuji validation windows, 10 permutations, count range 0, partition unchanged, with merges present (v2 15/93 at k=5/10, sync 4/81; `results/order_invariance_fuji_merging.csv`). v3 not run | no |
+| Photo-order invariance (v1, v2, sync, v3) | yes | yes (permutation test) | v1, v2, sync: 12 Fuji validation windows, 10 permutations, count range 0, partition unchanged, with merges present (v2 15/93 at k=5/10, sync 4/81; `results/order_invariance_fuji_merging.csv`). v3 not run on validation. **Test windows** (`results/order_invariance_fuji_test.csv`, 16 windows x 10 permutations, fixed recon): v1, v2, sync and v3 all count range 0, partitions unchanged. **VGGT re-run per permutation** (8 windows x 10 permutations, k=5 and 10): not invariant; counts change in 60/64 window-method pairs, median range 0.5 (v3 k=5) to 16 (v1 k=10), max 28; identical-order control reproduces exactly. The claim holds for association only, not end to end | no |
 
 ## Known open problems
 
