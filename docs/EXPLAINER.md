@@ -432,10 +432,12 @@ Add workers (the `SKIP LOCKED` claim supports it), keep caches in shared storage
 off sqlite. I load-tested the API with fake workers only (SERVING.md), so I have no real GPU
 throughput or cost figure.
 
-**30. What is a known bug right now?**
-On WSL2 with an 8 GB card, the five-view CLI run fails with `CUDA driver error: device not ready`
-unless `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False` is set. I suspect the allocator setting
-in `countonce/oom.py`; it is not fixed or root-caused.
+**30. Tell me about a bug you fixed late.**
+On WSL2 with an 8 GB card, the five-view CLI run failed with `CUDA driver error: device not ready`,
+while the Python API path worked. The difference was that the CLI set
+`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` to reduce fragmentation. With it, the run failed
+3 of 3 times; with the fix (not setting it on WSL) it succeeded 3 of 3 times. I know the trigger, not
+why the driver fails.
 
 **31. How does the pipeline avoid recomputing expensive stages?**
 The reconstruction cache is keyed by input hash, backbone, version and config; the detection cache by

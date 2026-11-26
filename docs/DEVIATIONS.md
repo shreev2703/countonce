@@ -861,3 +861,11 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
   the named reports; there is no test tying them to the source files.
 - **M5 was never completed;** STATUS, EXPLAINER and `RESULTS_V3_SYNTH.md` now say so.
 - **§0.6:** rows are ticked on evidence only, so most stay open (GATES).
+
+## M22 follow-up: allocator setting on WSL (2026-11-25)
+- `configure_allocator()` no longer sets `expandable_segments:True` when the kernel release names
+  Microsoft (WSL). Native Linux is unchanged, and a user's own `PYTORCH_CUDA_ALLOC_CONF` is never edited
+  on WSL. Chosen over documenting an override because the default CLI and worker path must not crash.
+- Evidence (RTX 5070 Laptop 8 GB, torch 2.15.0+cu132, five-view tiny scene): before, 3 of 3 failed;
+  after, 3 of 3 returned 14, the README figure. The driver-level cause is not known.
+- Cost: WSL loses the fragmentation benefit; the OOM ladder still applies.

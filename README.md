@@ -183,11 +183,10 @@ countonce run examples/tiny_scene --prompt "red sphere" --detector color_blob --
 
 Without `--config`, the near-duplicate filter keeps one of the five views and the CLI warns about it.
 
-The real-model failure above (GPU). On WSL2 with an 8 GB card the five-view run failed with
-`CUDA driver error: device not ready` unless the allocator setting below was turned off:
+The real-model failure above (GPU):
 
 ```bash
-PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False countonce run examples/tiny_scene --prompt "red sphere" --assoc v2 --config configs/readme_real_failure.yaml --out results/tiny_real
+countonce run examples/tiny_scene --prompt "red sphere" --assoc v2 --config configs/readme_real_failure.yaml --out results/tiny_real
 ```
 
 The figures are drawn from those two runs by `python scripts/make_readme_figures.py --standin results/tiny --real results/tiny_real`.

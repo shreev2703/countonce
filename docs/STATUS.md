@@ -74,6 +74,4 @@ evidence about real-model accuracy.
   (`docs/RESULTS_FUJI_ANALYSIS.md`); the owner's decision is open.
 - The v3 synthetic result is a component test: the tuned-baseline, noisy-depth re-run (M5) was not
   completed (`docs/RESULTS_V3_SYNTH.md`).
-- On WSL2 with an 8 GB GPU the five-view CLI run fails unless
-  `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False` is set (`docs/GATES.md`).
 - Nothing is hosted, and there are no own captures.

@@ -353,8 +353,9 @@ Run once on the laptop: start the API and `web/` dev server (see `web/README.md`
 ## M20: live demo URL (yours; README has no link yet)
 No hosted frontend exists (see M18 above). After deploying, replace the "Live demo: not hosted yet" line in `README.md` with the URL.
 
-## M20: five-view VGGT run fails through the CLI on WSL2 8 GB (open bug)
-`countonce run examples/tiny_scene --prompt "red sphere" --assoc v2 --config configs/readme_real_failure.yaml` gives `reconstruction failed: cuda_error: CUDA driver error: device not ready` (3 of 3 attempts, including with `PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512`). `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False` works. Suspect: `configure_allocator()` in `countonce/oom.py`. Peak VRAM is at the 8 GB limit. The worker may be affected; check before the M19 GPU run.
+## M20: five-view VGGT run failed through the CLI on WSL2 8 GB (resolved 2026-11-25)
+The CLI's `expandable_segments:True` gave `CUDA driver error: device not ready`. `configure_allocator()`
+now leaves the allocator alone on WSL (`countonce/oom.py`); 3 of 3 five-view runs succeed without an override.
 
 ## M21: one step left for a human (2026-11-25)
 `CLAUDE.md` is still tracked and still contains personal paths, so M21 is not done. The user-level
@@ -371,11 +372,10 @@ Before merging into `main` (which still tracks the agent files): back up the loc
 them and their personal paths; history was not rewritten.
 
 ## M22: §0.6 rows left unticked (2026-11-25)
-The consistency pass is committed, but its "done when" is not met: only the tiny-scene and README rows
-could honestly be ticked. M22 is left unchecked. What each other no-photo row needs:
+The consistency pass is committed, but its "done when" is not met: only the reliable-path, tiny-scene and
+README rows could honestly be ticked. M22 is left unchecked. What each other no-photo row needs:
 - **Gate G3 (yours):** confirm or reject the "not met" recommendation above.
 - **Repo hygiene (yours):** the M21 `CLAUDE.md` step, then push and check hosted CI.
-- **Reliable path (code):** root-cause the five-view CUDA failure (M20 entry). Reproduced from a clean venv.
 - **Lighthouse (code):** `/demo/tiny` performance 0.58-0.60 (mobile preset, headless software rendering,
   LCP 5.2-5.5 s, TBT 900-970 ms). `/` 0.95 and `/benchmark` 0.95 pass.
 - **Failure sources:** separating geometry from association needs data with oracle geometry.

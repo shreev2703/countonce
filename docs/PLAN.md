@@ -117,7 +117,7 @@ Recruit 3–10 users from H3 interviews; run 2–4 weeks with the laptop worker;
 Checked in the M22 consistency pass (2026-11-25). A box is ticked only where the evidence meets the row as written; notes say what is left. Component evidence is in `docs/STATUS.md`.
 
 **Core done (required):**
-- [ ] One reliable path works from a clean install; STATUS table accurate — *STATUS updated; a clean `uv` venv with the README packages runs the real path; open: the five-view run crashes on the 8 GB WSL2 GPU without an allocator override*
+- [x] One reliable path works from a clean install; STATUS table accurate — *a clean `uv` venv (not plain `pip`) with the README packages runs the real path, including all five views on the 8 GB WSL2 GPU*
 - [x] Tiny scene counts correctly with the real detector + VGGT (single-frame path, `score_threshold=0.5`; see DEVIATIONS)
 - [ ] Fuji-SfM held-out results with CIs, error decomposition and gate G3 decided — *results, CIs and a k=10 decomposition exist; G3 is recommended "not met" and awaits the owner*
 - [ ] 20–30 own scenes (≥3 zero-target) benchmarked with frozen splits
@@ -788,7 +788,7 @@ Log every run (config, commit, data version, metrics, curves) with a local track
 5. **Batching:** batch per-image detection; overlap CPU preprocessing with GPU work (data-loader threads, pinned memory).
 6. **Caching:** reuse features across confidence-range sweeps; skip recomputation on re-runs.
 6b. **Content-addressable stage caching (Strong):** hash the uploaded image set (SHA-256 over sorted per-file hashes + preprocessing settings + backbone version) and store the `Recon` output in R2/disk with a TTL. When a user re-runs the same photos with a new prompt ("red apples" → "green apples"), skip reconstruction and only re-run detection + association. Cache detections the same way per prompt. Measure the repeat-job latency and GPU-time savings and report them (don't assume a number).
-6c. **Memory hygiene + OOM fallback ladder (Strong):** set `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` before torch is imported (reduces fragmentation-related OOMs). Wrap each GPU stage in a degradation ladder: on CUDA OOM → free cached memory → retry with smaller chunks → retry at a lower resolution tier → fail with a clear `ERR_GPU_OOM` and a user tip. Log which rung succeeded so the memory calibration improves over time.
+6c. **Memory hygiene + OOM fallback ladder (Strong):** set `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` before torch is imported (reduces fragmentation-related OOMs; not on WSL, where it broke the five-view run, see DEVIATIONS). Wrap each GPU stage in a degradation ladder: on CUDA OOM → free cached memory → retry with smaller chunks → retry at a lower resolution tier → fail with a clear `ERR_GPU_OOM` and a user tip. Log which rung succeeded so the memory calibration improves over time.
 7. **Report:** a table of each optimization's speedup, VRAM change and accuracy change, plus end-to-end p50/p90 job time before and after.
 
 **Moon-tier additions:**
