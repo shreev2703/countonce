@@ -214,6 +214,34 @@ def align_window(gt_ext: np.ndarray, recon_ext: np.ndarray) -> Sim3:
     return align_chunk(gt_ext[reg], recon_ext[reg])
 
 
+def align_to_reference(ref_ext: np.ndarray, recon_ext: np.ndarray) -> tuple[Sim3, float]:
+    """Sim(3) placing another backbone's window into the reference window's *aligned* frame.
+
+    Rotation is the chordal mean of the per-view camera orientation differences, so it is fixed
+    even when the camera centres are collinear; scale and translation then come from the centres.
+    Registered views only. Also returns the median orientation residual in degrees. This does not
+    repair the reference's own alignment (docs/GATES.md): both backbones share that frame."""
+    from scipy.spatial.transform import Rotation
+
+    reg = registered_views(recon_ext)
+    if int(reg.sum()) < MIN_OVERLAP:
+        raise ChunkAlignmentError(f"only {int(reg.sum())} registered views")
+    ref, ext = np.asarray(ref_ext, float)[reg], np.asarray(recon_ext, float)[reg]
+    per_view = np.transpose(ref[:, :3, :3], (0, 2, 1)) @ ext[:, :3, :3]
+    rot = Rotation.from_matrix(per_view).mean()
+    resid = (Rotation.from_matrix(per_view) * rot.inv()).magnitude()
+    r = rot.as_matrix()
+    c_ref, c = camera_centers(ref), camera_centers(ext)
+    a = (c - c.mean(0)) @ r.T
+    b = c_ref - c_ref.mean(0)
+    var = float((a**2).sum())
+    scale = float((a * b).sum()) / var if var > 1e-18 else float("nan")
+    if not np.isfinite(scale) or scale <= 0:
+        raise ChunkAlignmentError(f"cannot estimate scale from camera centres ({scale})")
+    sim = Sim3(scale, r, c_ref.mean(0) - scale * r @ c.mean(0))
+    return sim, float(np.degrees(np.median(resid)))
+
+
 def scaled_depth(depth: np.ndarray, sim: Sim3) -> np.ndarray:
     """Depth maps in GT-frame metres. ``transform_extrinsics`` expresses camera coordinates in
     destination units (``s * x_c``), so reconstruction-frame depth must be multiplied by ``s``

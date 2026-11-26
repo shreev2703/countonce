@@ -69,5 +69,6 @@ Treat every number on this page as unreliable. Windows are aligned to the overvi
 from camera centres only (three or more views). Short windows have collinear centres, so the
 rotation about the camera path is not determined. Checked VGGT windows were 26 to 156 degrees off
 in median camera orientation. That affects which GT apples count as visible and which predictions
-fall in the region of interest. The COLMAP comparison has not been run for this reason. See
+fall in the region of interest. The COLMAP backbone rows (table above) were run in the
+VGGT window's frame so the two backbones share this error; they must be rerun after the fix. See
 `docs/GATES.md`.

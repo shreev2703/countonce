@@ -6,9 +6,10 @@
 
     python scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600
 
-``--backbone colmap`` (frozen v2 only) runs COLMAP on the same windows, cached detections, GT and
-alignment; the window's GT is taken from the VGGT reference reconstruction. Failed registrations
-are recorded as ``status=failed`` rows.
+``--backbone colmap`` (frozen v2 only) runs COLMAP on the same windows, cached detections and GT.
+The window's GT and frame come from the VGGT reference reconstruction; COLMAP's cameras are placed
+in that frame (``fuji_core.align_to_reference``). Failed registrations are recorded as
+``status=failed`` rows.
 
 Outputs go to ``runs/fuji_core/`` (git-ignored) and ``results/bench.csv`` (append-only).
 Run from the repo root inside ``.venv-gpu`` with ``PYTHONPATH=.``.
@@ -197,6 +198,7 @@ def cmd_bench(args: argparse.Namespace) -> None:
     }  # fmt: skip
     if colmap:
         model_cfg["gt_reference"] = "vggt_window_visibility"
+        model_cfg["alignment"] = "colmap_cameras_to_vggt_aligned_window"
     t_start = time.time()
     memo: dict[tuple[str, str, int], dict[str, Any]] = {}
 
@@ -237,10 +239,11 @@ def cmd_bench(args: argparse.Namespace) -> None:
         ref = run(paths, PROMPT, cfg, detector=det, reconstructor=rec, export=False)
         ref_rec = load_recon(cfg, ref.recon_cache_key or "")
         ref_sim = fc.align_window(gt_ext, ref_rec.extrinsics)
+        ref_ext = transform_extrinsics(ref_rec.extrinsics, ref_sim)
         visible = fc.visible_gt(
             scene.gt_xyz,
             ref_rec.intrinsics,
-            transform_extrinsics(ref_rec.extrinsics, ref_sim),
+            ref_ext,
             fc.scaled_depth(ref_rec.depth, ref_sim),
         )
         n_gt = len({int(i) for v in visible for i in v})
@@ -251,16 +254,16 @@ def cmd_bench(args: argparse.Namespace) -> None:
         try:
             res = run(paths, PROMPT, cfg, detector=det, reconstructor=col, export=False)
             recon = load_recon(cfg, res.recon_cache_key or "")
-            sim = fc.align_window(gt_ext, recon.extrinsics)
+            sim, rot_resid = fc.align_to_reference(ref_ext, recon.extrinsics)
             # same tolerance as a fraction of the image width as on the VGGT grid
             match_px = fc.MATCH_PX * recon.depth.shape[2] / ref_rec.depth.shape[2]
-            ev = fc.evaluate_window(res, recon, sim, scene.gt_ids, scene.gt_xyz, box, gt_ext,
+            ev = fc.evaluate_window(res, recon, sim, scene.gt_ids, scene.gt_xyz, box, ref_ext,
                                     visible=visible, match_px=match_px)  # fmt: skip
         except (ReconAdaptError, ChunkAlignmentError, fc.AlignmentError) as e:
             print(tree, side, k, "FAILED", e, flush=True)
             raise SkipRun("failed", f"{type(e).__name__}: {e}") from e
         n_reg = int(fc.registered_views(recon.extrinsics).sum())
-        return {"ev": ev, "res": res, "n_registered": n_reg}
+        return {"ev": ev, "res": res, "n_registered": n_reg, "rot_resid_deg": rot_resid}
 
     def jobs() -> Iterator[Job]:
         for k in args.ks:
@@ -281,6 +284,7 @@ def cmd_bench(args: argparse.Namespace) -> None:
             out = fc.run_output(got["ev"], job.method, res, res.timings["total"])
             assert out.timings is not None
             out.timings["n_registered"] = float(got["n_registered"])
+            out.timings["rot_resid_deg"] = got["rot_resid_deg"]
             print(job.scene_id, job.sample, job.n_views, job.method, "pred", out.pred, "gt",
                   out.gt, "registered", got["n_registered"], flush=True)  # fmt: skip
             return out

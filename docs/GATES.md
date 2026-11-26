@@ -497,3 +497,21 @@ alone cannot succeed: queue the alignment fix (steps 1 and 2 above) ahead of it.
 code since f2d08ac, `results/bench.csv` has 0 `_colmap` rows, no bench process is running. Not launched;
 task left unticked. The 128-slice run would be scored in a wrongly rotated GT frame; fix alignment first
 (steps 1-2 above).
+
+## Fuji COLMAP test-split run in progress (OPEN, 2026-11-25)
+
+**Do not start a second copy.** Launched detached (setsid) from the main checkout; PID 1969296, 39 of 64
+`countonce_v2_colmap` rows in `results/bench.csv` when this was written (0 with status `error`). The
+split has 64 windows, not 128. Log: `runs/fuji_core/test_colmap.log`; `runs/fuji_core/test_colmap.done`
+holds the exit code when it ends. k=10 windows took about 50-80 s each; k=20 is not yet timed.
+
+- This supersedes the "not launched" status above: COLMAP is now placed in the VGGT window's frame
+  (DEVIATIONS). The VGGT alignment bug itself is **still open**, so all rows still need a rerun after it.
+- So far: k=3 and k=5 each have 14/16 registration failures (`no_model`).
+- The rows were produced from a dirty tree (the code of the commit that adds this note).
+- While it runs, a full pytest in this checkout errors in the `results/` write guard; test in a copy.
+
+**When it has ended:** if it died, rerun the same command (it skips finished slices):
+`PYTHONPATH=. setsid nohup .venv-gpu/bin/python -u scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600 > runs/fuji_core/test_colmap.log 2>&1 &`
+Then run `python -m bench.fuji_report`, commit the report and summary CSV, and tick the task once
+there are 64 ok-or-failed rows.

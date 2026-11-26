@@ -1002,3 +1002,18 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - `ColmapMethod` now copies inputs from several directories into one (`recon/staging.py`). The
   pipeline's sanitized frames are one directory each, so `--backbone colmap` raised before.
 - The 128-slice run is blocked on the alignment problem in `docs/GATES.md`.
+
+## Fuji COLMAP rows: frame taken from the VGGT window (2026-11-25)
+
+- The earlier gate held the run because COLMAP, aligned on its own from camera centres, would sit
+  in a differently rotated frame than the VGGT-built GT. COLMAP's cameras are now placed directly
+  in the VGGT window's aligned frame (`fuji_core.align_to_reference`: mean orientation difference
+  for rotation, then centres for scale and translation, registered views only). This is "same GT
+  alignment as the VGGT rows", and removes the between-backbone rotation confound.
+- It does **not** fix the VGGT window alignment (docs/GATES.md, still open). The rows share that
+  frame, so absolute errors stay unreliable and these rows must be rerun after the fix.
+- COLMAP's placement uses VGGT's cameras, so VGGT pose error within a window carries into it. The
+  median orientation residual per window is stored as `rot_resid_deg` in the row timings, next to
+  `n_registered`. The misfit gate (`check_alignment`) is applied against the VGGT cameras.
+- The test split has 64 windows (8 trees x 2 sides x 4 k), not the 128 the task names, so one
+  method has 64 rows.

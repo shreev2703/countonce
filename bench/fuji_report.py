@@ -156,9 +156,13 @@ def backbone_table(report: dict[str, Any]) -> str:
     lines = [
         "## Backbone: COLMAP lifting vs VGGT (both v2)",
         "",
-        "Same windows, cached detections, GT set (VGGT reference visibility) and alignment to the "
-        "overview poses. A failure is a window COLMAP could not register or align; it has no "
-        "count. MAE and the paired difference use only the windows where COLMAP succeeded "
+        "Same windows, cached detections, GT set (VGGT reference visibility) and GT frame: "
+        "COLMAP's cameras are placed in the VGGT window's aligned frame using camera orientations "
+        "and centres. That frame has the unfixed rotation problem described under 'Known "
+        "problem', so absolute errors of both backbones are unreliable and the difference is only "
+        "a same-conditions comparison, to be rerun after the fix. A failure is a window COLMAP "
+        "could not register or align; it has no count. MAE and the paired difference use only the "
+        "windows where COLMAP succeeded "
         "(per tree, mean over those sides), so they are conditional on success and flatter COLMAP "
         "when failures are frequent. diff = COLMAP - VGGT, positive favours VGGT.",
         "",

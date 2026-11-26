@@ -16,6 +16,7 @@ from bench import fuji_core as fc
 from bench import fuji_report as fr
 from bench.runner import COLUMNS, read_rows
 from countonce.recon.adapter import ReconAdaptError
+from countonce.recon.align import transform_extrinsics
 from countonce.recon.chunked import ChunkAlignmentError, align_chunk
 from countonce.recon.staging import single_root
 
@@ -62,6 +63,22 @@ def test_window_alignment_recovers_rotation_for_collinear_cameras() -> None:
     roll[:3, :3] = Rotation.from_euler("x", 90, degrees=True).as_matrix()  # about the path
     rec = np.stack([(np.vstack([e, [0, 0, 0, 1]]) @ roll)[:3] for e in gt])
     np.testing.assert_allclose(align_chunk(gt, rec).R, roll[:3, :3], atol=1e-6)
+
+
+def test_align_to_reference_fixes_roll_for_collinear_cameras() -> None:
+    ref = _line_cameras(3)
+    world = np.eye(4)
+    world[:3, :3] = Rotation.from_euler("x", 90, degrees=True).as_matrix()  # about the path
+    world[:3, 3] = (1.0, 2.0, 3.0)
+    rec = np.stack([(np.vstack([e, [0, 0, 0, 1]]) @ world)[:3] for e in ref])
+    rec[1] = 0.0  # unregistered
+    sim, resid = fc.align_to_reference(ref, rec)
+    got = transform_extrinsics(rec[[0, 2]], sim)
+    np.testing.assert_allclose(got, ref[[0, 2]], atol=1e-6)
+    assert resid == pytest.approx(0.0, abs=1e-6)
+    rec[2] = 0.0
+    with pytest.raises(ChunkAlignmentError):
+        fc.align_to_reference(ref, rec)
 
 
 def test_single_root(tmp_path: Path) -> None:
