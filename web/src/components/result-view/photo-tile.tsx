@@ -1,6 +1,6 @@
 "use client";
 
-import { objectLabel, statusLabel, type CameraPose, type Detection } from "@/lib/result-view/model";
+import { objectLabel, type CameraPose, type Detection } from "@/lib/result-view/model";
 import { cn } from "@/lib/utils";
 
 /** Side of the drawn box in image pixels. The export keeps only the detection centre (uv). */
@@ -54,17 +54,21 @@ export function PhotoTile({
           .map((d) => {
             const [u, v] = d.uv as [number, number];
             const hot = d.objectId !== null && d.objectId === highlightObject;
-            const label = statusLabel(d);
+            const label =
+              d.status === "rejected"
+                ? "discarded sighting"
+                : `object ${objectLabel(d.objectId ?? 0)}, ${d.status === "new" ? "first sighting" : "seen again"}`;
             const select = () => onSelectObject(d.objectId);
             return (
               <g
                 key={d.id}
                 role={interactive ? "button" : undefined}
                 tabIndex={interactive ? 0 : undefined}
-                aria-label={interactive ? `Photo ${cam.view + 1}, detection ${d.id}: ${label}` : undefined}
+                aria-label={interactive ? `Photo ${cam.view + 1}: ${label}` : undefined}
                 data-testid={interactive ? `box-${d.id}` : undefined}
                 data-status={d.status}
                 data-hot={hot}
+                opacity={highlightObject !== null && !hot ? 0.35 : 1}
                 className="cursor-pointer outline-none focus-visible:[&>rect]:stroke-[3]"
                 onClick={select}
                 onKeyDown={(e) => {

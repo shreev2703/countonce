@@ -2,8 +2,10 @@ import Link from "next/link";
 
 import { DemoSceneCard } from "@/components/chrome/demo-card";
 import { PageShell } from "@/components/chrome/site-chrome";
+import { HeroDiagram } from "@/components/landing/hero-diagram";
+import { MotionProvider } from "@/components/motion/motion-provider";
+import { SpotlightCard } from "@/components/motion/spotlight-card";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { loadFuji, type FujiSummary } from "@/lib/benchmark";
 import { listDemoScenes } from "@/lib/demo-index";
 
@@ -47,109 +49,101 @@ export default function Home() {
   const scenes = listDemoScenes();
   const hero = scenes[0];
   const points = proofPoints(loadFuji());
+  const rise = (i: number) => ({ animationDelay: `${i * 80}ms` });
+  const heading = "text-2xl font-semibold tracking-tight";
   return (
-    <PageShell>
-      <section className="mx-auto grid max-w-5xl gap-8 px-4 py-12 md:grid-cols-2 md:items-center">
-        <div>
-          <h1 className="text-4xl font-semibold leading-tight">
-            Count anything from a few photos, without counting it twice.
-          </h1>
-          <p className="mt-4 text-lg text-muted-foreground">
-            CountOnce merges what every photo saw into one 3D scene, so an object that appears in
-            five photos is counted once.
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            A research prototype: it is not yet accurate on real photos.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Button asChild size="lg">
-              <Link href={hero ? `/demo/${hero.id}` : "/demo"}>Try a live example</Link>
-            </Button>
-            <Button size="lg" variant="outline" disabled>
-              Count your own photos: coming soon
-            </Button>
+    <PageShell obsidian>
+      <MotionProvider>
+        <section className="mx-auto grid max-w-6xl gap-10 px-4 py-14 lg:grid-cols-[1fr_1.05fr] lg:items-center lg:py-20">
+          <div>
+            <p className="rise surface mb-5 inline-flex rounded-full px-3 py-1 text-xs text-muted-foreground" style={rise(0)}>
+              Research prototype
+            </p>
+            <h1 className="rise text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl" style={rise(1)}>
+              Count anything from a few photos, without counting it twice.
+            </h1>
+            <p className="rise mt-5 text-lg text-muted-foreground" style={rise(2)}>
+              CountOnce merges what every photo saw into one 3D scene, so an object that appears in
+              five photos is counted once.
+            </p>
+            <p className="rise mt-2 text-sm text-muted-foreground" style={rise(3)}>
+              It is not yet accurate on real photos.
+            </p>
+            <div className="rise mt-7 flex flex-wrap gap-3" style={rise(4)}>
+              <Button asChild size="lg">
+                <Link href={hero ? `/demo/${hero.id}` : "/demo"}>Explore the interactive demo</Link>
+              </Button>
+              <Button size="lg" variant="outline" disabled>
+                Count your own photos: coming soon
+              </Button>
+            </div>
           </div>
-        </div>
-        {hero?.thumb ? (
-          <figure>
-            {/* eslint-disable-next-line @next/next/no-img-element -- tiny static thumbnail */}
-            <img
-              src={hero.thumb}
-              alt={`One of ${hero.nFrames} photos from the ${hero.label}, with detections drawn on it`}
-              width={160}
-              height={120}
-              fetchPriority="high"
-              className="aspect-[4/3] w-full rounded-lg border border-border object-cover shadow-md"
-            />
-            <figcaption className="mt-2 text-sm text-muted-foreground">
-              {hero.label}: {hero.count} counted. Open it to explore the 3D scene.
-            </figcaption>
-          </figure>
-        ) : null}
-      </section>
+          <HeroDiagram />
+        </section>
 
-      <section aria-labelledby="proof" className="mx-auto max-w-5xl px-4 py-8">
-        <h2 id="proof" className="text-2xl font-semibold">
-          What we claim, and the evidence
-        </h2>
-        <p className="mt-1 text-sm">
-          <Link href="/benchmark" className="underline underline-offset-4">
-            See the full benchmark
-          </Link>
-        </p>
-        <ul className="mt-4 grid gap-4 md:grid-cols-3">
-          {points.map((p) => (
-            <li key={p.title}>
-              <Card className="h-full p-5">
-                <h3 className="font-semibold">{p.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{p.body}</p>
-                {p.evidence ? (
-                  <p className="tabular mt-3 text-sm">{p.evidence}</p>
-                ) : (
-                  <p className="mt-3 rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
-                    No published number yet.
-                  </p>
-                )}
-              </Card>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section aria-labelledby="how" className="mx-auto max-w-5xl px-4 py-8">
-        <h2 id="how" className="text-2xl font-semibold">
-          How it works
-        </h2>
-        <ol className="mt-4 grid gap-4 md:grid-cols-4">
-          {STEPS.map(([title, body], i) => (
-            <li key={title}>
-              <Card className="h-full p-5">
-                <p className="tabular text-sm text-muted-foreground">Step {i + 1}</p>
-                <h3 className="font-semibold">{title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{body}</p>
-              </Card>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section aria-labelledby="gallery" className="mx-auto max-w-5xl px-4 py-8">
-        <div className="flex items-baseline justify-between">
-          <h2 id="gallery" className="text-2xl font-semibold">
-            Demo gallery
+        <section aria-labelledby="how" className="mx-auto max-w-6xl px-4 py-10">
+          <h2 id="how" className={heading}>
+            How it works
           </h2>
-          <Link href="/demo" className="text-sm underline underline-offset-4">
-            See all
-          </Link>
-        </div>
-        <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {scenes.map((s) => (
-            <li key={s.id}>
-              <DemoSceneCard scene={s} />
-            </li>
-          ))}
-        </ul>
-      </section>
+          <ol className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map(([title, body], i) => (
+              <li key={title}>
+                <SpotlightCard>
+                  <p className="tabular text-xs text-muted-foreground">Step {i + 1}</p>
+                  <h3 className="mt-1 font-semibold">{title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+                </SpotlightCard>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section aria-labelledby="proof" className="mx-auto max-w-6xl px-4 py-10">
+          <h2 id="proof" className={heading}>
+            What we claim, and the evidence
+          </h2>
+          <p className="mt-1 text-sm">
+            <Link href="/benchmark" className="underline underline-offset-4">
+              See the full benchmark
+            </Link>
+          </p>
+          <ul className="mt-5 grid gap-4 md:grid-cols-3">
+            {points.map((p) => (
+              <li key={p.title}>
+                <SpotlightCard>
+                  <h3 className="font-semibold">{p.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{p.body}</p>
+                  {p.evidence ? (
+                    <p className="tabular mt-3 border-t border-border pt-3 text-sm">{p.evidence}</p>
+                  ) : (
+                    <p className="mt-3 rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
+                      No published number yet.
+                    </p>
+                  )}
+                </SpotlightCard>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section aria-labelledby="gallery" className="mx-auto max-w-6xl px-4 py-10">
+          <div className="flex items-baseline justify-between">
+            <h2 id="gallery" className={heading}>
+              Demo gallery
+            </h2>
+            <Link href="/demo" className="text-sm underline underline-offset-4">
+              See all
+            </Link>
+          </div>
+          <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {scenes.map((s) => (
+              <li key={s.id}>
+                <DemoSceneCard scene={s} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      </MotionProvider>
     </PageShell>
   );
 }

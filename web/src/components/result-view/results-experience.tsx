@@ -1,8 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { m } from "framer-motion";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import type * as THREE from "three";
 
 import { loadDemoPoints, type DemoScene } from "@/lib/result-view/demo";
@@ -14,11 +15,13 @@ import {
   objectLabel,
   stepObject,
 } from "@/lib/result-view/model";
+import { useMedia } from "@/lib/use-media";
+import { MotionProvider } from "@/components/motion/motion-provider";
 import { cn } from "@/lib/utils";
 
 import { CountCard } from "./count-card";
 import { PhotoTile } from "./photo-tile";
-import { DetailsTab, ExplainTab, PhotosTab, WarningsTab, type PanelCtx } from "./panels";
+import { ExplainTab, PhotosTab, TechnicalDetails, WarningsTab, type PanelCtx } from "./panels";
 import type { ViewCommand } from "./viewer";
 import { ViewerBoundary } from "./viewer-boundary";
 
@@ -43,21 +46,8 @@ function LiveViewer(props: Omit<ComponentProps<typeof Viewer>, "maxPoints" | "re
   return <Viewer {...props} maxPoints={phone ? MAX_POINTS_PHONE : MAX_POINTS_DESKTOP} reducedMotion={reducedMotion} />;
 }
 
-const TABS = ["Photos", "Explain", "Warnings", "Details"] as const;
+const TABS = ["Photos", "Explain", "Warnings"] as const;
 type Tab = (typeof TABS)[number];
-
-/** Media query as external store: false on the server, live value on the client. */
-function useMedia(query: string): boolean {
-  return useSyncExternalStore(
-    (cb) => {
-      const m = window.matchMedia(query);
-      m.addEventListener("change", cb);
-      return () => m.removeEventListener("change", cb);
-    },
-    () => window.matchMedia(query).matches,
-    () => false,
-  );
-}
 
 export function ResultsExperience({ scene }: { scene: DemoScene }) {
   const sceneId = decodeURIComponent(scene.base.split("/").pop() ?? "");
@@ -76,6 +66,7 @@ export function ResultsExperience({ scene }: { scene: DemoScene }) {
   const [hoverObject, setHoverObject] = useState<number | null>(null);
   const [selectedCamera, setSelectedCamera] = useState<number | null>(null);
   const [showRejected, setShowRejected] = useState(false);
+  const [inspector, setInspector] = useState(true);
   const [command, setCommand] = useState<ViewCommand>({ kind: "reset", n: 0 });
   const glRef = useRef<THREE.WebGLRenderer | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -164,185 +155,200 @@ export function ResultsExperience({ scene }: { scene: DemoScene }) {
     onHoverObject: setHoverObject,
   };
   const camPhoto = selectedCamera !== null ? scene.manifest.frames[selectedCamera] : null;
-  const toolBtn = "rounded border border-border bg-card px-2.5 py-1 text-sm";
 
   return (
-    <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6">
-      <header>
-        <h1 className="text-2xl font-semibold">{scene.manifest.label}</h1>
-        <p className="text-sm text-muted-foreground" data-testid="honesty">
-          Precomputed example. Results produced by CountOnce (schema {scene.result.schema_version}, commit{" "}
-          {scene.provenance.commit.slice(0, 7)}) on {scene.provenance.timestamp.slice(0, 10)}.
-          {scene.provenance.synthetic && " This is a synthetic test scene, not a real photo capture."}
-        </p>
-      </header>
-      <CountCard scene={scene} />
+    <MotionProvider>
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6">
+        <header>
+          <h1 className="text-2xl font-semibold tracking-tight first-letter:uppercase">{scene.manifest.label}</h1>
+          <p className="text-sm text-muted-foreground" data-testid="honesty">
+            Precomputed example.
+            {scene.provenance.synthetic && " This is a synthetic test scene, not a real photo capture."}
+          </p>
+        </header>
+        <CountCard scene={scene} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[3fr_2fr]">
-        <section aria-label="3D viewer" className="flex flex-col gap-2">
-          <div
-            ref={frameRef}
-            tabIndex={0}
-            role="application"
-            aria-label={`3D view of ${scene.markers.markers.length} counted objects. Arrow keys step through objects, T top view, R reset, Escape clears.`}
-            onKeyDown={onKeyDown}
-            data-testid="viewer"
-            data-selected={selectedObject ?? ""}
-            data-camera={selectedCamera ?? ""}
-            className="relative h-[55vh] min-h-72 w-full overflow-hidden rounded-lg bg-muted lg:h-[60vh]"
-          >
-            {!pts.data ? (
-              <div className="grid h-full place-items-center p-6 text-center" data-testid="viewer-poster">
-                <div className="flex max-w-sm flex-col items-center gap-3">
-                  <p className="text-sm text-muted-foreground">
-                    {view3d && !pts.isError
-                      ? "Loading 3D scene…"
-                      : "The 3D point cloud loads on request so the count and photos appear fast."}
-                  </p>
-                  {pts.isError && <p role="alert" className="text-sm">Could not load the point cloud.</p>}
-                  <button
-                    type="button"
-                    className={toolBtn}
-                    disabled={view3d && !pts.isError}
-                    onClick={() => (pts.isError ? void pts.refetch() : setView3d(true))}
-                  >
-                    {pts.isError ? "Retry 3D view" : "Load 3D view"}
-                  </button>
-                </div>
+        <div className={cn("grid grid-cols-1 gap-4", inspector && "lg:grid-cols-[minmax(0,1fr)_380px]")}>
+          <section aria-label="3D viewer" className="flex min-w-0 flex-col gap-2">
+            <div ref={frameRef} className="surface relative h-[62vh] min-h-96 w-full overflow-hidden rounded-2xl lg:h-[70vh]">
+              <div
+                tabIndex={0}
+                role="application"
+                aria-label={`3D view of ${scene.markers.markers.length} counted objects. Arrow keys step through objects, T top view, R reset, Escape clears.`}
+                onKeyDown={onKeyDown}
+                data-testid="viewer"
+                data-selected={selectedObject ?? ""}
+                data-camera={selectedCamera ?? ""}
+                className="relative h-full w-full"
+              >
+                {!pts.data ? (
+                  <div className="grid h-full place-items-center p-6 text-center" data-testid="viewer-poster">
+                    <div className="flex max-w-sm flex-col items-center gap-3">
+                      <p className="text-sm text-muted-foreground">
+                        {view3d && !pts.isError
+                          ? "Loading 3D scene…"
+                          : "The 3D view loads on request so the count and photos appear fast."}
+                      </p>
+                      {pts.isError && <p role="alert" className="text-sm">Could not load the 3D points.</p>}
+                      <button
+                        type="button"
+                        className="glass-btn"
+                        disabled={view3d && !pts.isError}
+                        onClick={() => (pts.isError ? void pts.refetch() : setView3d(true))}
+                      >
+                        {pts.isError ? "Retry 3D view" : "Load 3D view"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <ViewerBoundary>
+                    <LiveViewer
+                      xyz={pts.data.xyz}
+                      rgb={pts.data.rgb}
+                      markers={scene.markers.markers}
+                      cameras={cameras}
+                      rejected={rejected}
+                      showRejected={showRejected}
+                      selectedObject={selectedObject}
+                      highlightObject={highlightObject}
+                      selectedCamera={selectedCamera}
+                      command={command}
+                      onSelectObject={selectObject}
+                      onHoverObject={setHoverObject}
+                      onSelectCamera={selectCamera}
+                      onReady={onReady}
+                    />
+                  </ViewerBoundary>
+                )}
+                {camPhoto && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    data-testid="camera-photo"
+                    src={`${scene.base}/thumbs/${camPhoto}.jpg`}
+                    alt={`What photo ${(selectedCamera ?? 0) + 1} saw`}
+                    className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-60 transition-opacity duration-500 motion-reduce:transition-none [image-rendering:pixelated]"
+                  />
+                )}
               </div>
-            ) : (
-              <ViewerBoundary>
-                <LiveViewer
-                  xyz={pts.data.xyz}
-                  rgb={pts.data.rgb}
-                  markers={scene.markers.markers}
-                  cameras={cameras}
-                  rejected={rejected}
-                  showRejected={showRejected}
-                  selectedObject={selectedObject}
-                  highlightObject={highlightObject}
-                  selectedCamera={selectedCamera}
-                  command={command}
-                  onSelectObject={selectObject}
-                  onHoverObject={setHoverObject}
-                  onSelectCamera={selectCamera}
-                  onReady={onReady}
-                />
-              </ViewerBoundary>
-            )}
-            {camPhoto && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                data-testid="camera-photo"
-                src={`${scene.base}/thumbs/${camPhoto}.jpg`}
-                alt={`What photo ${(selectedCamera ?? 0) + 1} saw`}
-                className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-60 transition-opacity duration-500 motion-reduce:transition-none [image-rendering:pixelated]"
-              />
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2" role="toolbar" aria-label="Viewer controls">
-            <button type="button" className={toolBtn} onClick={() => { setSelectedCamera(null); run("reset"); }}>Reset</button>
-            <button type="button" className={toolBtn} onClick={() => run("top")}>Top view</button>
-            <button type="button" className={toolBtn} onClick={screenshot}>Screenshot</button>
-            <button type="button" className={toolBtn} onClick={fullscreen}>Fullscreen</button>
-            <label className="flex items-center gap-1.5 text-sm">
-              <input
-                type="checkbox"
-                checked={showRejected}
-                disabled={rejected.length === 0}
-                onChange={(e) => setShowRejected(e.target.checked)}
-              />
-              Rejected detections ({rejected.length})
-            </label>
-          </div>
-          <div role="group" aria-label="Counted objects" className="flex flex-wrap gap-2">
-            {scene.markers.markers.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                data-testid={`object-${m.id}`}
-                aria-pressed={selectedObject === m.id}
-                onClick={() => selectObject(selectedObject === m.id ? null : m.id)}
-                onPointerEnter={() => setHoverObject(m.id)}
-                onPointerLeave={() => setHoverObject(null)}
-                className={cn(
-                  "rounded-full border border-border px-3 py-1 text-sm tabular-nums",
-                  highlightObject === m.id && "bg-accent text-accent-foreground",
+
+              <div className="glass absolute left-3 right-3 top-3 flex flex-wrap items-center gap-1 rounded-xl p-1.5 sm:right-auto" role="toolbar" aria-label="Viewer controls">
+                <button type="button" className="glass-btn" onClick={() => { setSelectedCamera(null); run("reset"); }}>Reset</button>
+                <button type="button" className="glass-btn" onClick={() => run("top")}>Top view</button>
+                <button type="button" className="glass-btn" onClick={screenshot} disabled={!pts.data}>Screenshot</button>
+                <button type="button" className="glass-btn" onClick={fullscreen}>Fullscreen</button>
+                <button type="button" className="glass-btn max-lg:hidden" aria-expanded={inspector} aria-controls="inspector" onClick={() => setInspector((v) => !v)}>
+                  {inspector ? "Hide panel" : "Show panel"}
+                </button>
+                {rejected.length > 0 && (
+                  <label className="flex items-center gap-1.5 px-2 text-sm">
+                    <input type="checkbox" checked={showRejected} onChange={(e) => setShowRejected(e.target.checked)} />
+                    Show discarded ({rejected.length})
+                  </label>
                 )}
-              >
-                Object {objectLabel(m.id)}
-              </button>
+              </div>
+
+              <div role="group" aria-label="Counted objects" className="glass absolute bottom-3 left-1/2 flex w-max max-w-[calc(100%-24px)] -translate-x-1/2 gap-1 overflow-x-auto rounded-full p-1.5">
+                {scene.markers.markers.map((marker) => (
+                  <button
+                    key={marker.id}
+                    type="button"
+                    data-testid={`object-${marker.id}`}
+                    aria-pressed={selectedObject === marker.id}
+                    aria-label={`Object ${objectLabel(marker.id)}`}
+                    onClick={() => selectObject(selectedObject === marker.id ? null : marker.id)}
+                    onPointerEnter={() => setHoverObject(marker.id)}
+                    onPointerLeave={() => setHoverObject(null)}
+                    className={cn(
+                      "shrink-0 rounded-full px-3 py-1 text-sm tabular-nums transition-colors",
+                      highlightObject === marker.id ? "bg-accent text-accent-foreground" : "hover:bg-muted",
+                    )}
+                  >
+                    {objectLabel(marker.id)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Drag to rotate, scroll or pinch to zoom. Pick a number to fly to that object, or a photo below to stand
+              where it was taken.
+            </p>
+          </section>
+
+          <section id="inspector" aria-label="Details panel" className={cn("surface min-w-0 rounded-2xl p-3", !inspector && "lg:hidden")}>
+            <div role="tablist" aria-label="Result details" className="mb-3 flex gap-1 rounded-xl bg-muted p-1">
+              {TABS.map((t, i) => (
+                <button
+                  key={t}
+                  role="tab"
+                  id={`tab-${t}`}
+                  type="button"
+                  aria-selected={tab === t}
+                  aria-controls={`panel-${t}`}
+                  tabIndex={tab === t ? 0 : -1}
+                  onClick={() => setTab(t)}
+                  onKeyDown={(e) => {
+                    const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+                    if (!d) return;
+                    e.stopPropagation();
+                    const next = TABS[(i + d + TABS.length) % TABS.length] ?? "Photos";
+                    setTab(next);
+                    document.getElementById(`tab-${next}`)?.focus();
+                  }}
+                  className={cn("relative flex-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-sm font-medium", tab === t ? "text-foreground" : "text-muted-foreground")}
+                >
+                  {tab === t && (
+                    <m.span aria-hidden layoutId="tab-indicator" className="absolute inset-0 rounded-lg border border-border bg-white/10" transition={{ type: "spring", stiffness: 480, damping: 38 }} />
+                  )}
+                  <span className="relative">
+                    {t}
+                    {t === "Warnings" && scene.result.warnings.length > 0 && ` (${scene.result.warnings.length})`}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} tabIndex={0} className="max-h-[60vh] overflow-y-auto p-1">
+              {tab === "Photos" && <PhotosTab ctx={ctx} />}
+              {tab === "Explain" && <ExplainTab ctx={ctx} />}
+              {tab === "Warnings" && <WarningsTab scene={scene} />}
+            </div>
+          </section>
+        </div>
+
+        <section aria-label="Photo strip">
+          <ul className="flex gap-2 overflow-x-auto p-1">
+            {cameras.map((cam) => (
+              <li key={cam.view} className="w-40 shrink-0">
+                <button
+                  type="button"
+                  data-testid={`strip-${cam.view}`}
+                  aria-pressed={selectedCamera === cam.view}
+                  aria-label={`Photo ${cam.view + 1}: fly to this camera`}
+                  onClick={() => selectCamera(selectedCamera === cam.view ? null : cam.view)}
+                  className={cn("block w-full rounded-md transition-transform hover:-translate-y-0.5", selectedCamera === cam.view && "ring-2 ring-accent")}
+                >
+                  <PhotoTile
+                    base={scene.base}
+                    frame={scene.manifest.frames[cam.view] ?? ""}
+                    cam={cam}
+                    detections={detections.filter((d) => d.view === cam.view)}
+                    highlightObject={highlightObject}
+                    onSelectObject={() => {}}
+                    onHoverObject={setHoverObject}
+                    interactive={false}
+                  />
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
 
-        <section aria-label="Details panel">
-          <div role="tablist" aria-label="Result details" className="mb-3 flex gap-1 border-b border-border">
-            {TABS.map((t, i) => (
-              <button
-                key={t}
-                role="tab"
-                id={`tab-${t}`}
-                type="button"
-                aria-selected={tab === t}
-                aria-controls={`panel-${t}`}
-                tabIndex={tab === t ? 0 : -1}
-                onClick={() => setTab(t)}
-                onKeyDown={(e) => {
-                  const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-                  if (!d) return;
-                  e.stopPropagation();
-                  const next = TABS[(i + d + TABS.length) % TABS.length] ?? "Photos";
-                  setTab(next);
-                  document.getElementById(`tab-${next}`)?.focus();
-                }}
-                className={cn(
-                  "-mb-px border-b-2 px-3 py-2 text-sm font-medium",
-                  tab === t ? "border-accent text-foreground" : "border-transparent text-muted-foreground",
-                )}
-              >
-                {t}
-                {t === "Warnings" && scene.result.warnings.length > 0 && ` (${scene.result.warnings.length})`}
-              </button>
-            ))}
+        <details className="surface rounded-2xl p-4" data-testid="tech-details">
+          <summary className="cursor-pointer text-sm font-semibold">Technical details</summary>
+          <div className="mt-4">
+            <TechnicalDetails scene={scene} />
           </div>
-          <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="max-h-[60vh] overflow-y-auto pr-1">
-            {tab === "Photos" && <PhotosTab ctx={ctx} />}
-            {tab === "Explain" && <ExplainTab ctx={ctx} />}
-            {tab === "Warnings" && <WarningsTab scene={scene} />}
-            {tab === "Details" && <DetailsTab scene={scene} />}
-          </div>
-        </section>
+        </details>
       </div>
-
-      <section aria-label="Photo strip">
-        <ul className="flex gap-2 overflow-x-auto pb-1">
-          {cameras.map((cam) => (
-            <li key={cam.view} className="w-40 shrink-0">
-              <button
-                type="button"
-                data-testid={`strip-${cam.view}`}
-                aria-pressed={selectedCamera === cam.view}
-                aria-label={`Photo ${cam.view + 1}: fly to this camera`}
-                onClick={() => selectCamera(selectedCamera === cam.view ? null : cam.view)}
-                className={cn("block w-full rounded-md ring-offset-2", selectedCamera === cam.view && "ring-2 ring-accent")}
-              >
-                <PhotoTile
-                  base={scene.base}
-                  frame={scene.manifest.frames[cam.view] ?? ""}
-                  cam={cam}
-                  detections={detections.filter((d) => d.view === cam.view)}
-                  highlightObject={highlightObject}
-                  onSelectObject={() => {}}
-                  onHoverObject={() => {}}
-                  interactive={false}
-                  className="pointer-events-none"
-                />
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </main>
+    </MotionProvider>
   );
 }

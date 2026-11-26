@@ -1,11 +1,11 @@
 import Link from "next/link";
 
-import { Card } from "@/components/ui/card";
+import { SpotlightCard } from "@/components/motion/spotlight-card";
 import type { DemoCard } from "@/lib/demo-index";
 
 export function DemoSceneCard({ scene }: { scene: DemoCard }) {
   return (
-    <Card className="flex flex-col gap-3 p-4">
+    <SpotlightCard className="[&>div:last-child]:gap-3">
       {scene.thumb ? (
         // eslint-disable-next-line @next/next/no-img-element -- tiny static thumbnail
         <img
@@ -15,7 +15,7 @@ export function DemoSceneCard({ scene }: { scene: DemoCard }) {
           height={120}
           loading="lazy"
           decoding="async"
-          className="aspect-[4/3] w-full rounded-md border border-border object-cover"
+          className="aspect-[4/3] w-full rounded-md border border-border object-cover [image-rendering:pixelated]"
         />
       ) : null}
       <div>
@@ -30,13 +30,13 @@ export function DemoSceneCard({ scene }: { scene: DemoCard }) {
       </div>
       <p className="tabular text-sm">
         <span className="text-2xl font-semibold">{scene.count}</span> counted
-        {scene.gtCount !== null ? <span className="text-muted-foreground"> · hand count {scene.gtCount}</span> : null}
+        {scene.gtCount !== null ? <span className="text-muted-foreground"> · {scene.synthetic ? "known true count" : "hand count"} {scene.gtCount}</span> : null}
       </p>
       {scene.synthetic ? (
         <p className="text-xs text-muted-foreground">
           Synthetic test scene, not a real-world capture.
         </p>
       ) : null}
-    </Card>
+    </SpotlightCard>
   );
 }

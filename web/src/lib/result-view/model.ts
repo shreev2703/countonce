@@ -160,8 +160,8 @@ export function explainPair(result: Result, a: Detection, b: Detection): Explana
   const decision = sameObject ? "same" : "different";
   const where = a.view === b.view ? "the same photo" : `photos ${a.view + 1} and ${b.view + 1}`;
   const sentence = sameObject
-    ? `Detections ${a.id} and ${b.id} (${where}) are the same physical object, counted once as ${objectLabel(a.objectId as number)}.`
-    : `Detections ${a.id} and ${b.id} (${where}) are different objects${a.view === b.view ? " because one photo cannot show the same object twice" : ""}.`;
+    ? `The two sightings (${where}) are the same physical object, counted once as ${objectLabel(a.objectId as number)}.`
+    : `The two sightings (${where}) are different objects${a.view === b.view ? " because one photo cannot show the same object twice" : ""}.`;
   return {
     sentence,
     distanceInSizes,

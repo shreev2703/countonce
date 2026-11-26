@@ -16,8 +16,9 @@ test("proof points show measured numbers or an empty state, and the example link
   // Fuji numbers come from the committed benchmark summary; phone photos have none yet.
   await expect(page.getByText("40.1 for CountOnce v2")).toBeVisible();
   await expect(page.getByText("No published number yet")).toHaveCount(1);
-  await expect(page.getByRole("link", { name: "Count your own photos" })).toHaveAttribute("href", "/new");
-  await page.getByRole("link", { name: "Try a live example" }).click();
+  await expect(page.getByRole("button", { name: "Count your own photos: coming soon" })).toBeDisabled();
+  await expect(page.getByText("Illustration of the idea, not a measured result.")).toBeVisible();
+  await page.getByRole("link", { name: "Explore the interactive demo" }).click();
   await expect(page).toHaveURL(/\/demo\/tiny$/);
 });
 

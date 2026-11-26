@@ -58,21 +58,22 @@ test.describe("results experience on the tiny demo (no backend)", () => {
     await expect(viewer).toHaveAttribute("data-selected", "4"); // wraps
   });
 
-  test("tabs: Photos, Explain, Warnings, Details", async ({ page }) => {
+  test("tabs: Photos, Explain, Warnings; technical details drawer", async ({ page }) => {
     await expect(page.getByRole("tab", { name: "Photos" })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("tab", { name: "Explain" }).click();
     await page.getByRole("group", { name: "Objects", exact: true }).getByRole("button", { name: "#1", exact: true }).click();
     await expect(page.getByTestId("explanation")).toContainText("same physical object");
     await page.getByRole("tab", { name: /Warnings/ }).click();
     await expect(page.getByTestId("warning")).toHaveCount(2);
-    await page.getByRole("tab", { name: "Details" }).click();
+    await page.getByRole("tab", { name: /Warnings/ }).press("ArrowLeft");
+    await expect(page.getByRole("tab", { name: "Explain" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText("color_blob@1")).toBeHidden();
+    await page.getByText("Technical details").click();
     await expect(page.getByText("color_blob@1")).toBeVisible();
-    await page.getByRole("tab", { name: "Details" }).press("ArrowLeft");
-    await expect(page.getByRole("tab", { name: /Warnings/ })).toHaveAttribute("aria-selected", "true");
   });
 
   test("photo status filter", async ({ page }) => {
-    await page.getByRole("button", { name: "new", exact: true }).click();
+    await page.getByRole("button", { name: "First sighting", exact: true }).click();
     await expect(page.locator('[data-testid^="box-"][data-status="duplicate"]')).toHaveCount(0);
     await expect(page.locator('[data-testid^="box-"][data-status="new"]')).toHaveCount(5);
   });

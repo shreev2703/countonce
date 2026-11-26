@@ -71,6 +71,7 @@ function Marker({
   m,
   active,
   selected,
+  dimmed,
   reducedMotion,
   onSelect,
   onHover,
@@ -78,6 +79,7 @@ function Marker({
   m: MarkersDoc["markers"][number];
   active: boolean;
   selected: boolean;
+  dimmed: boolean;
   reducedMotion: boolean;
   onSelect: () => void;
   onHover: (on: boolean) => void;
@@ -104,7 +106,7 @@ function Marker({
         onPointerOut={() => onHover(false)}
       >
         <sphereGeometry args={[Math.max(m.size / 2, 0.05), 24, 16]} />
-        <meshStandardMaterial color={color} transparent opacity={0.8} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.25} transparent opacity={dimmed ? 0.3 : 0.85} />
       </mesh>
       <Billboard follow lockZ={false}>
         <mesh position={[0, 0, 0.001]} renderOrder={10}>
@@ -121,7 +123,8 @@ function Marker({
         >
           {objectLabel(m.id)}
         </Text>
-      </Billboard>    </group>
+      </Billboard>
+    </group>
   );
 }
 
@@ -158,7 +161,21 @@ function Frustum({
   );
 }
 
-/** Animates the camera and orbit target to the last command (camera fly-to, top view, reset). */
+const FLIGHT_SECONDS = 0.9;
+
+interface Flight {
+  fromPos: THREE.Vector3;
+  fromLook: THREE.Vector3;
+  fromFov: number;
+  pos: THREE.Vector3;
+  look: THREE.Vector3;
+  fov: number;
+  t: number;
+}
+
+const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+
+/** Flies the camera and orbit target to the last command (object, camera, top view, reset). */
 /* r3f camera/controls are mutable by design; the react-hooks immutability rule does not apply. */
 /* eslint-disable react-hooks/immutability */
 function CameraRig({
@@ -178,48 +195,64 @@ function CameraRig({
 }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const controls = useThree((s) => s.controls) as unknown as OrbitControlsImpl | null;
-  const goal = useRef<{ pos: THREE.Vector3; look: THREE.Vector3; fov: number } | null>(null);
+  const flight = useRef<Flight | null>(null);
+
+  // Dragging or zooming takes over from a flight in progress.
+  useEffect(() => {
+    if (!controls) return;
+    const cancel = () => {
+      flight.current = null;
+    };
+    controls.addEventListener("start", cancel);
+    return () => controls.removeEventListener("start", cancel);
+  }, [controls]);
 
   useEffect(() => {
     const c = new THREE.Vector3(...center);
+    const from = {
+      fromPos: camera.position.clone(),
+      fromLook: controls?.target.clone() ?? c.clone(),
+      fromFov: camera.fov,
+      t: 0,
+    };
+    let goal: { pos: THREE.Vector3; look: THREE.Vector3; fov: number } | null = null;
     if (command.kind === "reset") {
-      goal.current = { pos: c.clone().add(new THREE.Vector3(1.4, -1.6, 1.1).multiplyScalar(radius)), look: c, fov: 50 };
+      goal = { pos: c.clone().add(new THREE.Vector3(1.4, -1.6, 1.1).multiplyScalar(radius)), look: c, fov: 50 };
     } else if (command.kind === "top") {
-      goal.current = { pos: c.clone().add(new THREE.Vector3(0, -0.02, 2.8 * radius)), look: c, fov: 50 };
+      goal = { pos: c.clone().add(new THREE.Vector3(0, -0.02, 2.8 * radius)), look: c, fov: 50 };
     } else if (command.kind === "camera") {
       const cam = cameras.find((x) => x.view === command.id);
-      if (!cam) return;
-      const pos = new THREE.Vector3(...cam.center);
-      const look = pos.clone().add(new THREE.Vector3(...cam.forward).multiplyScalar(pos.distanceTo(c)));
-      goal.current = { pos, look, fov: cameraFovDeg(cam) };
+      if (cam) {
+        const pos = new THREE.Vector3(...cam.center);
+        const look = pos.clone().add(new THREE.Vector3(...cam.forward).multiplyScalar(pos.distanceTo(c)));
+        goal = { pos, look, fov: cameraFovDeg(cam) };
+      }
     } else if (command.kind === "object") {
       const m = markers.find((x) => x.id === command.id);
-      if (!m) return;
-      const look = new THREE.Vector3(...m.xyz);
-      const offset = camera.position.clone().sub(controls?.target ?? c);
-      goal.current = { pos: look.clone().add(offset), look, fov: 50 };
+      if (m) {
+        // Keep the viewing direction, centre on the object and move in closer.
+        const look = new THREE.Vector3(...m.xyz);
+        const offset = from.fromPos.clone().sub(from.fromLook);
+        offset.setLength(THREE.MathUtils.clamp(offset.length(), radius * 0.7, radius * 1.3));
+        goal = { pos: look.clone().add(offset), look, fov: 50 };
+      }
     }
-    if (reducedMotion && goal.current) {
-      camera.position.copy(goal.current.pos);
-      camera.fov = goal.current.fov;
-      camera.updateProjectionMatrix();
-      controls?.target.copy(goal.current.look);
-      controls?.update();
-      goal.current = null;
-    }
+    flight.current = goal && { ...from, ...goal };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [command]);
 
   useFrame((_, dt) => {
-    const g = goal.current;
-    if (!g || !controls) return;
-    const a = 1 - Math.exp(-6 * dt);
-    camera.position.lerp(g.pos, a);
-    controls.target.lerp(g.look, a);
-    camera.fov += (g.fov - camera.fov) * a;
+    const f = flight.current;
+    if (!f || !controls) return;
+    // dt is capped so a stalled first frame does not skip the whole flight.
+    f.t = reducedMotion ? 1 : Math.min(1, f.t + Math.min(dt, 0.05) / FLIGHT_SECONDS);
+    const e = easeInOut(f.t);
+    camera.position.lerpVectors(f.fromPos, f.pos, e);
+    controls.target.lerpVectors(f.fromLook, f.look, e);
+    camera.fov = THREE.MathUtils.lerp(f.fromFov, f.fov, e);
     camera.updateProjectionMatrix();
     controls.update();
-    if (camera.position.distanceTo(g.pos) < 1e-3 && Math.abs(camera.fov - g.fov) < 0.05) goal.current = null;
+    if (f.t >= 1) flight.current = null;
   });
   return null;
 }
@@ -253,6 +286,7 @@ export default function Viewer(props: ViewerProps) {
       gl={{ preserveDrawingBuffer: true }}
       onPointerMissed={() => props.onSelectObject(null)}
     >
+      <color attach="background" args={["#0b0d13"]} />
       <Ready onReady={props.onReady} />
       <ambientLight intensity={0.9} />
       <directionalLight position={[3, -4, 6]} intensity={1.2} />
@@ -263,6 +297,7 @@ export default function Viewer(props: ViewerProps) {
           m={m}
           active={m.id === highlightObject}
           selected={m.id === selectedObject}
+          dimmed={(highlightObject ?? selectedObject) !== null && m.id !== highlightObject && m.id !== selectedObject}
           reducedMotion={props.reducedMotion}
           onSelect={() => props.onSelectObject(m.id)}
           onHover={(on) => props.onHoverObject(on ? m.id : null)}

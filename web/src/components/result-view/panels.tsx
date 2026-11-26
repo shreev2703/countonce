@@ -6,12 +6,13 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import type { DemoScene } from "@/lib/result-view/demo";
 import {
   explainPair,
+  intervalText,
   objectLabel,
-  statusLabel,
   type CameraPose,
   type Detection,
   type Status,
 } from "@/lib/result-view/model";
+import { plainWarning } from "@/lib/result-view/plain";
 import { cn } from "@/lib/utils";
 
 import { PhotoTile } from "./photo-tile";
@@ -28,26 +29,31 @@ export interface PanelCtx {
 
 export function PhotosTab({ ctx }: { ctx: PanelCtx }) {
   const [filter, setFilter] = useState<Status | "all">("all");
-  const filters: (Status | "all")[] = ["all", "new", "duplicate", "rejected"];
+  const filters: [Status | "all", string][] = [
+    ["all", "All"],
+    ["new", "First sighting"],
+    ["duplicate", "Seen again"],
+    ["rejected", "Discarded"],
+  ];
   return (
     <div>
       <div role="group" aria-label="Filter detections by status" className="mb-3 flex flex-wrap gap-2">
-        {filters.map((f) => (
+        {filters.map(([f, label]) => (
           <button
             key={f}
             type="button"
             aria-pressed={filter === f}
             onClick={() => setFilter(f)}
             className={cn(
-              "rounded-full border border-border px-3 py-1 text-sm capitalize",
+              "rounded-full border border-border px-3 py-1 text-sm",
               filter === f && "bg-accent text-accent-foreground",
             )}
           >
-            {f}
+            {label}
           </button>
         ))}
       </div>
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
         {ctx.cameras.map((cam) => {
           const frame = ctx.scene.manifest.frames[cam.view] ?? "";
           const dets = ctx.detections.filter((d) => d.view === cam.view && (filter === "all" || d.status === filter));
@@ -63,7 +69,7 @@ export function PhotosTab({ ctx }: { ctx: PanelCtx }) {
                 onHoverObject={ctx.onHoverObject}
               />
               <p className="mt-1 text-sm text-muted-foreground">
-                Photo {cam.view + 1}: {dets.length} shown
+                Photo {cam.view + 1}: {dets.length} {dets.length === 1 ? "sighting" : "sightings"}
               </p>
             </li>
           );
@@ -87,14 +93,14 @@ export function ExplainTab({ ctx }: { ctx: PanelCtx }) {
   const exp = a && b && a.id !== b.id ? explainPair(scene.result, a, b) : null;
   const options = detections.map((d) => (
     <option key={d.id} value={d.id}>
-      {d.id} · photo {d.view + 1} · {statusLabel(d)}
+      Photo {d.view + 1} · {d.objectId === null ? "discarded" : `object ${objectLabel(d.objectId)}`} · {d.id}
     </option>
   ));
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Select an object to list its detections, or pick any two detections to see why they were (or were not)
-        merged.
+        Pick an object to see where it appears, or compare any two sightings to see why they were (or were not)
+        counted as one.
       </p>
       <div role="group" aria-label="Objects" className="flex flex-wrap gap-2">
         {scene.result.instances.map((i) => (
@@ -115,14 +121,12 @@ export function ExplainTab({ ctx }: { ctx: PanelCtx }) {
       {selectedObject !== null && (
         <section aria-label={`Members of ${objectLabel(selectedObject)}`}>
           <h3 className="text-sm font-semibold">
-            {objectLabel(selectedObject)} was seen in {members.length} detections
+            Object {objectLabel(selectedObject)} was seen {members.length} times
           </h3>
           <ul className="mt-1 text-sm">
             {members.map((d) => (
               <li key={d.id} className="flex items-center gap-2 py-0.5">
-                <span className="tabular-nums">
-                  {d.id} (photo {d.view + 1})
-                </span>
+                <span className="tabular-nums">Photo {d.view + 1}</span>
                 <StatusBadge status={d.status} />
               </li>
             ))}
@@ -131,7 +135,7 @@ export function ExplainTab({ ctx }: { ctx: PanelCtx }) {
       )}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <label className="text-sm">
-          Detection A
+          First sighting to compare
           <select
             className="mt-1 block w-full rounded border border-border bg-card p-2"
             value={a?.id ?? ""}
@@ -142,7 +146,7 @@ export function ExplainTab({ ctx }: { ctx: PanelCtx }) {
           </select>
         </label>
         <label className="text-sm">
-          Detection B
+          Second sighting to compare
           <select
             className="mt-1 block w-full rounded border border-border bg-card p-2"
             value={b?.id ?? ""}
@@ -154,25 +158,28 @@ export function ExplainTab({ ctx }: { ctx: PanelCtx }) {
         </label>
       </div>
       {exp ? (
-        <section aria-label="Match explanation" data-testid="explanation" className="rounded-md border border-border p-3">
+        <section aria-label="Match explanation" data-testid="explanation" className="rounded-lg border border-border p-3">
           <p className="font-medium">{exp.sentence}</p>
-          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm tabular-nums">
-            <dt>3D distance</dt>
-            <dd>{exp.distanceInSizes === null ? "n/a" : `${fmt(exp.distanceInSizes)} object sizes`}</dd>
-            <dt>Reprojection error</dt>
-            <dd>{exp.reprojectionPx === null ? "n/a" : `${fmt(exp.reprojectionPx)} px`}</dd>
-            <dt>Appearance similarity</dt>
-            <dd>{fmt(exp.appearance)}</dd>
-            <dt>Match probability</dt>
-            <dd>{fmt(exp.matchProb)}</dd>
-            <dt>Decision</dt>
-            <dd>{exp.decision === "same" ? "Same object" : "Different objects"}</dd>
-            <dt>Rule</dt>
-            <dd>{exp.rule}</dd>
-          </dl>
+          <details className="mt-2 text-sm">
+            <summary className="cursor-pointer text-muted-foreground">Measurements behind this</summary>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
+              <dt>Distance apart in 3D</dt>
+              <dd>{exp.distanceInSizes === null ? "n/a" : `${fmt(exp.distanceInSizes)} object sizes`}</dd>
+              <dt>Position mismatch in the photo</dt>
+              <dd>{exp.reprojectionPx === null ? "n/a" : `${fmt(exp.reprojectionPx)} px`}</dd>
+              <dt>Look-alike score</dt>
+              <dd>{fmt(exp.appearance)}</dd>
+              <dt>Match probability</dt>
+              <dd>{fmt(exp.matchProb)}</dd>
+              <dt>Decision</dt>
+              <dd>{exp.decision === "same" ? "Same object" : "Different objects"}</dd>
+              <dt>Rule</dt>
+              <dd>{exp.rule}</dd>
+            </dl>
+          </details>
         </section>
       ) : (
-        <p className="text-sm text-muted-foreground">Choose two different detections.</p>
+        <p className="text-sm text-muted-foreground">Choose two different sightings.</p>
       )}
     </div>
   );
@@ -185,7 +192,7 @@ export function WarningsTab({ scene }: { scene: DemoScene }) {
     <ul className="space-y-3">
       {warnings.map((w) => (
         <li key={w.code} className="rounded-md border border-border p-3" data-testid="warning">
-          <p className="font-medium">{w.message}</p>
+          <p className="font-medium">{plainWarning(w, scene.result)}</p>
           {w.fix && (
             <p className="mt-1 text-sm text-muted-foreground">
               <span className="font-semibold">How to fix: </span>
@@ -198,20 +205,20 @@ export function WarningsTab({ scene }: { scene: DemoScene }) {
   );
 }
 
-export function DetailsTab({ scene }: { scene: DemoScene }) {
+export function TechnicalDetails({ scene }: { scene: DemoScene }) {
   const { result, manifest, provenance } = scene;
   const rows: [string, string][] = [
     ["Detector", result.model_versions.detector],
     ["Backbone", result.model_versions.backbone],
     ["Associator", result.model_versions.associator],
-    ["Interval method", result.interval.method],
+    ["Interval (raw)", intervalText(result)],
     ["Schema version", result.schema_version],
     ["Recon cache hit", result.recon_cache_hit ? "yes" : "no"],
     ["Peak VRAM", `${result.peak_vram_mb.toFixed(0)} MB`],
     ["Commit", provenance.commit.slice(0, 10)],
     ["Run at (UTC)", provenance.timestamp],
     ["Photos", String(manifest.frames.length)],
-    ["Points shown / total", `${manifest.n_points}`],
+    ["3D points", `${manifest.n_points}`],
   ];
   return (
     <div className="space-y-4">
@@ -233,6 +240,18 @@ export function DetailsTab({ scene }: { scene: DemoScene }) {
           ))}
         </ul>
       </section>
+      {result.warnings.length > 0 && (
+        <section aria-label="Raw warnings">
+          <h3 className="text-sm font-semibold">Warnings as recorded</h3>
+          <ul className="mt-1 text-sm">
+            {result.warnings.map((w) => (
+              <li key={w.code}>
+                <code>{w.code}</code>: {w.message}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <a className="text-sm font-medium text-accent underline" href={`${scene.base}/result.json`}>
         Raw result.json
       </a>
