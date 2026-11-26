@@ -592,3 +592,21 @@ changed. Task left unticked; when `test_colmap.done` says `exit=0`, follow "Resu
 **Resolved (2026-11-26):** the run finished (`exit=0`), 64 of 64 rows (36 ok, 28 failed `no_model`).
 The report and docs are updated, the task is ticked and the `countonce_prefix` worktree is removed.
 The "Resume" steps above are done. Still open: the joint rerun of all Fuji rows after the alignment fix.
+
+## Real-data Fuji ablations: BLOCKED on the joint rerun (2026-11-26)
+
+Not started; no code changed, no rows added. Task left unticked.
+
+- **Why:** every `countonce_v2` row in `results/bench.csv` (protocol `fuji_core_v2`) and the frozen
+  thresholds in `configs/fuji_core.yaml` predate the window-alignment rotation fix (see the
+  "Next" note in the handoff and DEVIATIONS). The task needs *paired* differences against the
+  frozen v2. Ablation rows scored with the fixed alignment against stale v2 rows would pair two
+  different GT frames. The cached chunked reconstructions are also pre-fix, so "reuse cached
+  reconstructions" would reuse misaligned chunks.
+- **Also:** `scripts/tune_fuji_cdog.py` (PID 2130274) and its `run_fuji_core.py` child were using the
+  GPU and the same `runs/fuji_core/cache` when this session started; a second writer is unsafe.
+- **Resume (in order):** (1) bump `fc.PROTOCOL`, record VGGT alignment rejections as `failed`;
+  (2) invalidate/recompute the chunked recon cache; (3) re-tune on val and refreeze
+  `configs/fuji_core.yaml`; (4) rerun v2 on the test trees; (5) then add `--ablation` to
+  `scripts/run_fuji_core.py` (flip one `Config` switch from the frozen v2, method
+  `countonce_v2__<ablation>`, k=10 only, masks last) and run the 64 rows.
