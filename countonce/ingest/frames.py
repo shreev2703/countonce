@@ -1,4 +1,4 @@
-# Ported from ~/vggtProject (vggt-sparse-recon): vggt_bench/io/frames.py. Adapted for countonce.
+# Ported from vggt-sparse-recon: vggt_bench/io/frames.py. Adapted for countonce.
 """Choosing input frames for a reconstruction.
 
 Phase 1's scripts carry their own copy of this logic and are left alone

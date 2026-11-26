@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from collections import defaultdict
 from collections.abc import Sequence
 from pathlib import Path
@@ -20,19 +19,32 @@ from typing import Any
 
 import numpy as np
 
+from bench import fuji_core
 from bench.runner import read_rows
 from bench.stats import bootstrap_ci, paired_compare
 
 TODO = "TODO: fill from results"
-METHODS = ("countonce_v1", "countonce_v2", "sum", "max", "median")
+METHODS = ("countonce_v1", "countonce_v2", "countonce_sync", "countonce_v3", "sum", "max", "median")
 KS = (3, 5, 10, 20)
 TEST_TREES = tuple(f"Tree{i:02d}" for i in range(1, 9))
 SIDES = ("east", "west")
-PROTOCOL = "fuji_core_v1"
+PROTOCOL = fuji_core.PROTOCOL
 N_BOOT = 1000
-METRICS = ("mae", "mape", "assoc_f1", "duplicate_rate", "miss_rate")
-PIPELINE = ("countonce_v1", "countonce_v2")
-BEGIN, END = "<!-- fuji-core:begin -->", "<!-- fuji-core:end -->"
+METRICS = ("mae", "signed_bias", "mape", "assoc_f1", "duplicate_rate", "miss_rate")
+PIPELINE = ("countonce_v1", "countonce_v2", "countonce_sync", "countonce_v3")
+# Paired MAE comparisons (a, b); negative difference favours a.
+PAIRS = (
+    ("countonce_v2", "countonce_v1"),
+    ("countonce_v2", "sum"),
+    ("countonce_v2", "max"),
+    ("countonce_v2", "median"),
+    ("countonce_sync", "countonce_v2"),
+    ("countonce_v3", "countonce_v2"),
+)
+
+
+COLMAP = "countonce_v2_colmap"
+VGGT_REF = "countonce_v2"
 
 
 class MissingBackingRow(ValueError):
@@ -63,6 +75,8 @@ def _metric(r: dict[str, str], metric: str) -> float:
     pred, gt = _num(r["pred"]), _num(r["gt"])
     if metric == "mae":
         return abs(pred - gt)
+    if metric == "signed_bias":
+        return pred - gt
     if metric == "mape":
         return float("nan") if gt == 0 else 100.0 * abs(pred - gt) / gt
     return _num(r[metric])
@@ -77,7 +91,8 @@ def tree_values(
     sides: Sequence[str] = SIDES,
 ) -> dict[str, float] | None:
     """Per-tree value (mean over its sides), or None unless all (tree, side) slices have ok rows
-    and the metric is defined for each of them."""
+    and the metric is defined for each of them. MAPE is the exception: slices with GT = 0 are
+    skipped (trees with no GT apple on any side drop out), never counted as 0 or NaN."""
     per: dict[tuple[str, str], float] = {}
     for r in rows:
         if r["status"] == "ok" and r["method"] == method and r["n_views"] == str(k):
@@ -85,10 +100,91 @@ def tree_values(
     out: dict[str, float] = {}
     for t in trees:
         vals = [per.get((t, s), float("nan")) for s in sides]
-        if any(np.isnan(v) for v in vals):
+        if metric == "mape":
+            # GT = 0 makes MAPE undefined: skip that slice, but a missing row still blocks the cell
+            if any((t, s) not in per for s in sides):
+                return None
+            vals = [v for v in vals if not np.isnan(v)]
+            if not vals:
+                continue  # every side of this tree has GT = 0
+        elif any(np.isnan(v) for v in vals):
             return None
         out[t] = float(np.mean(vals))
+    return out if out else None
+
+
+def backbone_compare(rows: Sequence[dict[str, str]]) -> dict[str, Any]:
+    """COLMAP vs VGGT (both v2) per k. A k is reported only when all 16 slices have a COLMAP row
+    (ok or failed) and an ok VGGT row. MAE is compared on the slices where COLMAP succeeded (per
+    tree, mean over those sides), so it is conditional on registration."""
+    out: dict[str, Any] = {}
+    slices = [(t, s) for t in TEST_TREES for s in SIDES]
+    for k in KS:
+        by: dict[str, dict[tuple[str, str], dict[str, str]]] = {COLMAP: {}, VGGT_REF: {}}
+        for r in rows:  # later rows win, so a retried error is superseded
+            if r["method"] in by and r["n_views"] == str(k):
+                by[r["method"]][(r["scene_id"], r["sample"])] = r
+        col = {s: r for s, r in by[COLMAP].items() if r["status"] in ("ok", "failed")}
+        ref = {s: r for s, r in by[VGGT_REF].items() if r["status"] == "ok"}
+        if any(s not in col or s not in ref for s in slices):
+            continue
+        good = [s for s in slices if col[s]["status"] == "ok"]
+        e: dict[str, Any] = {
+            "n_slices": len(slices),
+            "n_failed": len(slices) - len(good),
+            "failure_rate": (len(slices) - len(good)) / len(slices),
+            "n_ok": len(good),
+            "vggt_mae_all": float(np.mean([_metric(ref[s], "mae") for s in slices])),
+        }
+        trees = [t for t in TEST_TREES if any(g[0] == t for g in good)]
+        e["n_trees"] = len(trees)
+        va, vb = (
+            [float(np.mean([_metric(src[g], "mae") for g in good if g[0] == t])) for t in trees]
+            for src in (col, ref)
+        )
+        if len(trees) >= 2:
+            p = paired_compare(va, vb, N_BOOT)
+            e.update(
+                colmap_mae=float(np.mean(va)), vggt_mae=float(np.mean(vb)), diff=p.diff,
+                ci_low=p.ci_low, ci_high=p.ci_high, p_wilcoxon=p.p_wilcoxon,
+            )  # fmt: skip
+        out[str(k)] = e
     return out
+
+
+def backbone_table(report: dict[str, Any]) -> str:
+    lines = [
+        "## Backbone: COLMAP lifting vs VGGT (both v2)",
+        "",
+        "Same windows, cached detections, GT set (VGGT reference visibility) and GT frame: "
+        "COLMAP's cameras are placed in the VGGT window's aligned frame using camera orientations "
+        "and centres. These rows use the alignment from before the rotation fix described under "
+        "'Known problem', so absolute errors of both backbones are unreliable and the difference "
+        "is only a same-conditions comparison, to be rerun. A failure is a window COLMAP "
+        "could not register or align; it has no count. MAE and the paired difference use only the "
+        "windows where COLMAP succeeded "
+        "(per tree, mean over those sides), so they are conditional on success and flatter COLMAP "
+        "when failures are frequent. diff = COLMAP - VGGT, positive favours VGGT.",
+        "",
+        "| k | registration failures | trees compared | COLMAP MAE | VGGT MAE (same windows) "
+        "| diff [95% CI] | p (Wilcoxon) | VGGT MAE (all 16) |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for k in KS:
+        e = report.get("backbone", {}).get(str(k))
+        if e is None:
+            lines.append(f"| {k} | " + " | ".join([TODO] * 7) + " |")
+            continue
+        fail = f"{e['n_failed']}/{e['n_slices']} ({100 * e['failure_rate']:.0f}%)"
+        if "diff" in e:
+            mid = (
+                f"{e['colmap_mae']:.2f} | {e['vggt_mae']:.2f} | {e['diff']:+.2f} "
+                f"[{e['ci_low']:.2f}, {e['ci_high']:.2f}] | {e['p_wilcoxon']:.3f}"
+            )
+        else:
+            mid = "n/a | n/a | n/a (fewer than 2 trees) | n/a"
+        lines.append(f"| {k} | {fail} | {e['n_trees']} | {mid} | {e['vggt_mae_all']:.2f} |")
+    return "\n".join(lines)
 
 
 def compute(rows: Sequence[dict[str, str]]) -> dict[str, Any]:
@@ -106,9 +202,7 @@ def compute(rows: Sequence[dict[str, str]]) -> dict[str, Any]:
                 }  # fmt: skip
     paired: dict[str, dict[str, Any]] = {}
     for k in KS:
-        for a, b in [("countonce_v2", "countonce_v1")] + [
-            ("countonce_v2", x) for x in ("sum", "max", "median")
-        ]:
+        for a, b in PAIRS:
             va, vb = tree_values(rows, a, k, "mae"), tree_values(rows, b, k, "mae")
             if va is None or vb is None:
                 continue
@@ -117,7 +211,12 @@ def compute(rows: Sequence[dict[str, str]]) -> dict[str, Any]:
                 "diff": r.diff, "ci_low": r.ci_low, "ci_high": r.ci_high,
                 "p_bootstrap": r.p_bootstrap, "p_wilcoxon": r.p_wilcoxon, "n": r.n,
             }  # fmt: skip
-    return {"n_boot": N_BOOT, "cells": cells, "paired": paired}
+    return {
+        "n_boot": N_BOOT,
+        "cells": cells,
+        "paired": paired,
+        "backbone": backbone_compare(rows),
+    }
 
 
 def write_cell(report: dict[str, Any], key: str, fmt: str = "{:.2f}") -> str:
@@ -137,12 +236,14 @@ def cell_or_todo(report: dict[str, Any], key: str, fmt: str = "{:.2f}") -> str:
 
 
 def markdown_table(report: dict[str, Any]) -> str:
-    head = "| Method | k | MAE (apples) | MAPE (%) | assoc F1 | duplicate rate | miss rate |"
-    lines = [head, "|---|---|---|---|---|---|---|"]
+    head = "| Method | k | MAE (apples) | signed bias (apples) | MAPE (%) |"
+    head += " assoc F1 (explains errors) | duplicate rate | miss rate |"
+    lines = [head, "|---|---|---|---|---|---|---|---|"]
     for m in METHODS:
         for k in KS:
             c = [
                 cell_or_todo(report, f"{m}|{k}|mae"),
+                cell_or_todo(report, f"{m}|{k}|signed_bias", "{:+.2f}"),
                 cell_or_todo(report, f"{m}|{k}|mape", "{:.1f}"),
             ]
             for metric in ("assoc_f1", "duplicate_rate", "miss_rate"):
@@ -156,13 +257,14 @@ def markdown_table(report: dict[str, Any]) -> str:
         "|---|---|---|---|---|",
     ]
     for k in KS:
-        for b in ("countonce_v1", "sum", "max", "median"):
-            p = report["paired"].get(f"countonce_v2|{b}|{k}|mae")
+        for a, b in PAIRS:
+            p = report["paired"].get(f"{a}|{b}|{k}|mae")
+            label = f"{a.removeprefix('countonce_')} vs {b.removeprefix('countonce_')}"
             if p is None:
-                lines.append(f"| v2 vs {b} | {k} | {TODO} | {TODO} | {TODO} |")
+                lines.append(f"| {label} | {k} | {TODO} | {TODO} | {TODO} |")
             else:
                 lines.append(
-                    f"| v2 vs {b} | {k} | {p['diff']:.2f} [{p['ci_low']:.2f}, {p['ci_high']:.2f}]"
+                    f"| {label} | {k} | {p['diff']:.2f} [{p['ci_low']:.2f}, {p['ci_high']:.2f}]"
                     f" | {p['p_bootstrap']:.3f} | {p['p_wilcoxon']:.3f} |"
                 )
     return "\n".join(lines)
@@ -228,19 +330,12 @@ def failure_analysis(rows: Sequence[dict[str, str]], top: int = 5) -> str:
     return "\n".join(lines)
 
 
-def replace_block(text: str, block: str) -> str:
-    new = f"{BEGIN}\n{block}\n{END}"
-    if BEGIN in text and END in text:
-        return re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), lambda _: new, text, flags=re.S)
-    return text.rstrip("\n") + "\n\n" + new + "\n"
-
-
 def build(csv_path: Path, root: Path) -> dict[str, Any]:
     rows = fuji_rows(csv_path)
     report = compute(rows)
     done = sum(1 for r in rows if r["status"] == "ok")
     report["n_rows"] = len(rows)
-    fa = failure_analysis(rows)
+    fa = failure_analysis([r for r in rows if r["method"] in METHODS])  # VGGT-backbone rows
     md = (
         "# Fuji-SfM Core results (generated)\n\n"
         "Generated by `python -m bench.fuji_report` from the Fuji test-split rows of "
@@ -249,22 +344,19 @@ def build(csv_path: Path, root: Path) -> dict[str, Any]:
         "8 trees x 2 sides have an ok row; otherwise it stays TODO. Own-capture cells are "
         "not covered here. See [[HANDOFF]].\n\n"
         + markdown_table(report)
+        + "\n\n"
+        + backbone_table(report)
         + "\n\n## Failure analysis\n\n"
         + fa
         + "\n"
     )
+    extra = root / "docs/RESULTS_FUJI_ANALYSIS.md"  # hand-written reading of the numbers above
+    if extra.exists():
+        md += "\n" + extra.read_text()
     (root / "docs").mkdir(exist_ok=True)
     (root / "docs/RESULTS_FUJI.md").write_text(md)
-    readme = root / "README.md"
-    section = (
-        "### Fuji-SfM Core (test trees 01-08)\n\n"
-        "Generated by `python -m bench.fuji_report`; details in `docs/RESULTS_FUJI.md`.\n\n"
-        + markdown_table(report)
-    )
-    if readme.exists():
-        readme.write_text(replace_block(readme.read_text(), section))
-    (root / "paper/tables").mkdir(parents=True, exist_ok=True)
-    (root / "paper/tables/fuji_core.tex").write_text(latex_table(report))
+    (root / "experimental/paper/tables").mkdir(parents=True, exist_ok=True)
+    (root / "experimental/paper/tables/fuji_core.tex").write_text(latex_table(report))
     out = root / "results/fuji_core_report.json"
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(report, indent=1))
@@ -277,6 +369,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--root", type=Path, default=Path("."))
     a = p.parse_args(argv)
     rep = build(a.csv, a.root)
+    from bench import web_summary  # lazy: web_summary imports this module
+
+    web_summary.write(a.csv, a.root / "results/benchmark_summary.csv")
     print(f"{rep['n_rows']} Fuji rows, {len(rep['cells'])} cells filled")
     return 0
 

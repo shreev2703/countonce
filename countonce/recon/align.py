@@ -73,6 +73,37 @@ def align_by_camera_centers(src_extrinsics: np.ndarray, dst_extrinsics: np.ndarr
     return umeyama(camera_centers(src_extrinsics), camera_centers(dst_extrinsics))
 
 
+def rotation_angles_deg(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Geodesic angle in degrees between paired (N,3,3) rotations ``a`` and ``b``."""
+    tr = np.einsum("nij,nij->n", np.asarray(a, np.float64), np.asarray(b, np.float64))
+    return np.asarray(np.degrees(np.arccos(np.clip((tr - 1.0) / 2.0, -1.0, 1.0))))
+
+
+def align_by_poses(src_extrinsics: np.ndarray, dst_extrinsics: np.ndarray) -> Sim3:
+    """Sim(3) from shared cameras using their orientations, not only their centres.
+
+    Centres alone leave the roll about the camera path free when they are collinear (a camera
+    walking along a row). So the rotation is the chordal mean of the per-view orientation
+    differences ``R_dst^T R_src``; scale and translation then come from the centres.
+    """
+    src = np.asarray(src_extrinsics, dtype=np.float64)
+    dst = np.asarray(dst_extrinsics, dtype=np.float64)
+    if src.shape != dst.shape or src.ndim != 3 or len(src) < 2:
+        raise ValueError(f"expected matching (N>=2,3,4) arrays, got {src.shape} and {dst.shape}")
+    U, _, Vt = np.linalg.svd((np.transpose(dst[:, :3, :3], (0, 2, 1)) @ src[:, :3, :3]).sum(0))
+    R = U @ np.diag([1.0, 1.0, np.sign(np.linalg.det(U @ Vt))]) @ Vt
+    c_src, c_dst = camera_centers(src), camera_centers(dst)
+    a = (c_src - c_src.mean(0)) @ R.T
+    b = c_dst - c_dst.mean(0)
+    var = float((a**2).sum())
+    if var < 1e-18:
+        raise ValueError("degenerate source cameras (centres coincide)")
+    s = float((a * b).sum()) / var
+    if not np.isfinite(s) or s <= 0:
+        raise ValueError(f"cannot estimate a positive scale from camera centres ({s})")
+    return Sim3(s, R, c_dst.mean(0) - s * R @ c_src.mean(0))
+
+
 def transform_extrinsics(extrinsics: np.ndarray, sim: Sim3) -> np.ndarray:
     """Express world-to-camera extrinsics of the source world in the destination world.
 

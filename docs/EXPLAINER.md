@@ -1,8 +1,12 @@
-# CountOnce EXPLAINER (draft)
+# CountOnce EXPLAINER
 
-A study guide to how CountOnce works, written from the implemented code. Sections 8, 9, 11 and
-12 are stubs for work that does not exist yet. Every result is `TODO: fill from results`; this
-guide states no measured numbers.
+A study guide to how CountOnce works, written from the implemented code. Measured numbers are
+copied from the report each one names; anything not measured says so. What has been run, component
+by component, is in [STATUS.md](STATUS.md), which wins if this guide disagrees.
+
+**The short version:** the pipeline runs end to end, and on held-out orchard trees its errors are
+large. The "geometry beats simple baselines" gate (G3) was not met (recommendation; the owner's
+decision is open in [GATES.md](GATES.md)). No own photos have been captured or hand-counted.
 
 Module map: [`countonce/detect/`](../countonce/detect/), [`countonce/recon/`](../countonce/recon/),
 [`countonce/lift.py`](../countonce/lift.py), [`countonce/merge/`](../countonce/merge/),
@@ -65,11 +69,15 @@ benchmark repo). What the code relies on:
 - The detector interface is [`detect/base.py`](../countonce/detect/base.py). A detector takes
   frames plus a text prompt (and optionally exemplar boxes) and returns scored boxes.
 - **Text prompt:** "apple". **Exemplar prompt:** a box around one example, tied to a frame
-  (`Exemplar(frame_id, box_xyxy)`). **Negative prompts** (things *not* to count) are a CountGD++ idea
-  and are not implemented here.
-- [`detect/countgd.py`](../countonce/detect/countgd.py): adapter around CountGD; its forward pass is a
-  stub until weights exist. [`detect/groundingdino.py`](../countonce/detect/groundingdino.py): adapter
-  around GroundingDINO (never run here). Both reduce per-token logits to a per-query score.
+  (`Exemplar(frame_id, box_xyxy)`); the default detector ignores exemplars. **Negative prompts**
+  ("red apples, not leaves") are handled in the pipeline by dropping a box whose best negative
+  phrase scores higher than its positive one; this is not CountGD++'s mechanism and its effect on
+  accuracy is not measured.
+- **Default:** GroundingDINO-tiny through Hugging Face `transformers`
+  ([`detect/groundingdino.py`](../countonce/detect/groundingdino.py)), run on the tiny scene and on
+  Fuji-SfM. Text prompts only; it reduces per-token logits to a per-query score.
+- **CountGD / CountGD++** are *planned*: selecting them raises an error that says so
+  ([`detect/countgd.py`](../countonce/detect/countgd.py) has a stub forward pass).
 - The detection **cache** ([`detect/cache.py`](../countonce/detect/cache.py)) stores every raw
   detection above a low floor (0.05), keyed by frame hash, prompt, detector, version and config.
   The score threshold can then be swept (§8.8 confidence range) without re-running the model.
@@ -120,6 +128,13 @@ Each chunk aligns to the already-merged result, so errors accumulate along the c
 
 ## 7. v2: geometric cross-view matching
 
+**v2 is the default associator** (`Config.assoc`, CLI and demo exporter). The rule (PLAN §0.1) was
+"v2, or sync if it wins on validation". On 12 Fuji validation windows (3 trees) count MAE was v2
+61.25 [27.5, 122.75] and sync 61.83 [27.25, 121.25], so sync did not win. v1 was lower than both,
+54.75 [16.5, 113.0] (95% bootstrap CIs over trees; its difference from v2 includes 0). The default
+therefore follows the rule, not the lowest validation number
+([DEVIATIONS.md](DEVIATIONS.md), "Default associator").
+
 [`merge/match.py`](../countonce/merge/match.py) processes frames in increasing id, keeping running
 instance tracks:
 
@@ -139,35 +154,63 @@ instance tracks:
    in several other views where nothing matched, is probably a false positive. It is dropped or
    down-weighted (`hallucination: off | downweight | drop`).
 
-Output is independent of input order of views and detections (frames and ids are sorted).
+**Photo order.** Greedy track building depends on the order frames are visited. v2 used to visit
+them by frame id, so uploading the same photos in another order could change the count. It now
+visits them in order of camera centre ([`merge/order.py`](../countonce/merge/order.py)). See
+Q "Does photo order change the count?" in §13.
 
 **Synchronization baseline** ([`merge/sync.py`](../countonce/merge/sync.py)): pairwise matches built
 from v2's cost are noisy and not transitive. Spectral permutation synchronization (Pachauri et al.,
 2013) takes the top eigenvectors of the block match matrix and rounds to a consistent partition,
 with a per-view Hungarian step so same-view detections never merge. It is a baseline for the
-learned matcher (v3, not implemented).
+learned matcher (v3, §8).
 
-## 8. v3: learned matching — stub
+## 8. v3: learned matching
 
-`TODO` after Track C: graph neural network, self/cross attention, Sinkhorn with a dustbin, training
-loss, instance formation. [`countonce/match/`](../countonce/match/) is an empty package today.
+[`merge/v3.py`](../countonce/merge/v3.py), [`match/`](../countonce/match/). **Trained and tested on
+synthetic geometry only.**
 
-## 9. Synthetic data — stub
+- One graph node per detection: 3D position, size, box, score, lift confidence, viewing ray, camera
+  centre and log depth, all normalized by scene scale.
+- Layers alternate **self-attention** (within a view) and **cross-attention** (across views), each
+  with a learned bias from the relative 3D position of the two detections. No view index is
+  embedded, so permuting views permutes the output.
+- **Sinkhorn with a dustbin** ([`match/sinkhorn.py`](../countonce/match/sinkhorn.py)) turns pair
+  scores into a soft assignment; the extra row and column absorb detections with no partner.
+- **Loss** ([`match/train.py`](../countonce/match/train.py)): negative log-likelihood of the true
+  assignment, plus a soft-count term and an optional cycle-consistency term (off in the first run).
+- **Instance formation** ([`match/instances.py`](../countonce/match/instances.py)): threshold the
+  probabilities, take connected components, and split any component holding two detections of one
+  photo with a min-cut.
+- **Result** ([RESULTS_V3_SYNTH.md](RESULTS_V3_SYNTH.md), 100 synthetic test episodes, finite noisy
+  depth): mean absolute count error 19.1 for v3 against 1.8 for tuned v1, 9.0 for tuned v2 and 8.1
+  for tuned sync (v3+sync 5.6). v3 beat the untuned defaults (63.8 to 85.5) but not the baselines
+  tuned on validation. This is a component test on generated geometry, not rendered images. It is
+  not evidence about real photos, and v3 has no real-data result.
 
-`TODO` after Track C: Kubric, domain randomization, running the real pipeline on synthetic images,
-the sim-to-real gap.
+## 9. Synthetic data
+
+[`synth/geometry.py`](../synth/geometry.py) is a seeded numpy generator, **not a renderer**: random
+3D instances, random cameras, noisy 2D detections with drops and false positives, and identity
+labels. Kubric or BlenderProc renders pushed through the real detector and VGGT are planned
+(PLAN §10.2) and not done. Until then the sim-to-real gap is unmeasured.
 
 ## 10. Evaluation
 
 - **Baselines** ([`bench/baselines.py`](../bench/baselines.py)): `sum`, `max`, `median` of per-image
   detection counts, computed from the *same* cached detections and score threshold as CountOnce,
   so the only difference is association. The COLMAP backbone is a second comparison.
-- **Count metrics** ([`bench/metrics.py`](../bench/metrics.py)): MAE, MAPE (undefined where the
-  ground truth is 0), within-10%, interval coverage.
+- **Count metrics lead** ([`bench/metrics.py`](../bench/metrics.py)): MAE, signed bias, MAPE
+  (undefined where the ground truth is 0), within-10%, interval coverage, and the **error
+  decomposition**: `duplicates + false positives − missed − wrong merges = predicted − true`.
+  Association F1 is reported only to explain a count error.
 - **Association metrics:** detections are labelled with a ground-truth object id by projecting GT 3D
   points into each frame and taking the nearest within a pixel threshold
   ([`bench/gt_matching.py`](../bench/gt_matching.py)). From those labels: duplicate rate, miss rate,
-  pairwise precision/recall/F1, cluster purity.
+  pairwise precision/recall/F1, cluster purity. Pairwise F1 ignores unlabelled detections, so an
+  injected false positive does not lower it.
+- **Failure-source harness** ([`bench/failure_sources.py`](../bench/failure_sources.py)): swap the
+  detector or the geometry for an oracle, one at a time, with identical inputs for every associator.
 - **Zero-count scenes:** false-positive rate, mean false count, rate at which the interval
   includes 0.
 - **Statistics** ([`bench/stats.py`](../bench/stats.py)): the resampling unit is the *scene*, not the
@@ -180,136 +223,246 @@ the sim-to-real gap.
   scene covariates (density, views, depth confidence, blur, …) with bootstrap "significantly worse" flags.
 - **Fair comparison:** same detector cache, same frames, same threshold; the grid and seeds are in
   the config; no result is committed from a run that did not happen.
-- **Results:** `TODO: fill from results`.
-- **Failure cases and causes.** Expected failure modes from the design (to be confirmed or
-  refuted by results, each with the evidence slice that tests it):
-  - *Over-merging* of adjacent objects in v1 when `k` is large: duplicate-rate vs. `merge_k` ablation.
-  - *Splitting* of one object when the reconstruction is poor: depth-confidence slice.
-  - *Chunk drift* on long captures: error vs. chunk count.
-  - *Detector hallucinations* that survive because they appear in one view: hallucination filter on/off.
-  - *Moving objects:* not handled.
-  - Observed failures: `TODO: fill from results`.
+### Results on Fuji-SfM
 
-## 11. Inference optimization — stub
+8 held-out test trees, thresholds frozen on training trees, mean absolute error in apples
+([RESULTS_FUJI.md](RESULTS_FUJI.md), with CIs and paired tests):
 
-`TODO` (Track F): profiling, SDPA/FlashAttention, bf16, compile/TensorRT, what worked. Only the
-memory guard and the recon/detection caches exist today.
+| Method | k=3 | k=5 | k=10 | k=20 |
+|---|---|---|---|---|
+| v1 | 61.6 | 67.2 | 52.6 | 100.0 |
+| v2 | 62.8 | 65.7 | 40.1 | 101.8 |
+| Sum | 61.0 | 68.2 | 68.2 | 157.4 |
+| Max | 66.2 | 60.1 | 31.1 | 153.8 |
+| Median | 72.6 | 57.9 | 43.8 | 185.0 |
 
-## 12. System design — stub
+- G3 ("v1/v2 beat Sum and Max on most scenes") holds only at k=20. At k=10, Max is best.
+- **Failure sources** (k=10): with the real detector, about 121 false positives and 52 misses per
+  window; with perfect detections, about 34–37 duplicates remain. So the detector is the largest
+  source, then duplicates from association under estimated geometry. Fuji has no oracle geometry,
+  so the geometry share is **not** separated from the associator's. Some "false positives" may be
+  real apples missing from the ground truth.
 
-`TODO` (Track G): queue with `SKIP LOCKED`, heartbeats, retries, SSE, signed URLs, scale-to-zero
-workers. No web product exists in this repo yet.
+### Failure cases and causes
+
+- **Tiny scene, 7 instead of 5** ([DEVIATIONS.md](DEVIATIONS.md)): the near-duplicate filter kept
+  1 of 5 views, and blue and green distractors scored above the 0.3 detector threshold. A 0.5
+  threshold chosen on this scene gives 5.
+- **Tiny scene, all five views: 14 (v2):** VGGT recovers poor cameras on this small, flat-shaded,
+  symmetric scene, so views of one sphere do not land close enough to merge.
+- **Many short Fuji windows have no visible ground-truth apple** (7 of 16 at k=3), which makes MAPE
+  very unstable there.
+- Not yet tested by results: over-merging of adjacent objects, chunk drift, the hallucination
+  filter's effect, moving objects.
+
+## 11. Inference optimization
+
+[PROFILE.md](PROFILE.md), RTX 5070 Laptop GPU (8 GB), a small synthetic profiling scene:
+
+- In the baseline profile, VGGT reconstruction was 88.7% of wall time at 10 frames.
+- **bf16** weights: about the same speed (1.04x), but peak VRAM 7298 → 3833 MB.
+- `torch.compile` (default mode) was slower (0.87x); `reduce-overhead` crashed with a CUDA error.
+- **Stage caching:** a new prompt on the same photos is 4.8x faster (reconstruction reused); an
+  exact repeat 42x. A first-time job gets nothing from it.
+- Confidence stage: 2.5 s → 1.05 s by lifting each detection once and memoising sweep cells.
+- Matcher training: 703 s → 85 s per epoch by batching all view pairs into one padded Sinkhorn.
+
+PLAN's ≥1.5x end-to-end speedup on a first-time job has **not** been reached.
+
+## 12. System design
+
+- **Web** ([`web/`](../web/)): Next.js. Demo pages are static files and need no backend. Signed-in
+  pages call the API through a server-side proxy, so the browser never holds an API key.
+- **API** ([`countonce/api/`](../countonce/api/)): FastAPI; imports no torch. Long work never runs
+  in a request. Progress over SSE, capped for serverless hosts, with polling as the fallback.
+- **Queue** ([`countonce/jobs/`](../countonce/jobs/)): a database table. Postgres claims with
+  `FOR UPDATE SKIP LOCKED`; sqlite stands in locally. Idempotency keys stop double submits.
+- **Worker:** heartbeats every 15 s; a job silent for 120 s is requeued, at most 2 tries. Reported
+  retryable errors back off exponentially, then go to a dead-letter state an operator can retry.
+  Jobs older than 30 days are purged by the worker loop.
+- **Storage:** local disk or S3/R2 behind one `BlobStore` interface.
+- **Not verified:** no hosted deployment, no real Google sign-in, no run from browser to real GPU
+  worker, never run against real R2.
 
 ## 13. Interview Q&A
 
+### Method
+
 **1. Why lift to 3D instead of tracking through video? When does tracking win?**
-3D lifting works for unordered photos and wide baselines, where there is no temporal continuity to
-track. Association depends only on geometry, so shuffled photos give the same answer (the bench has an
-`ordered` vs `shuffled` axis to test that). Tracking wins on dense, short-baseline video where objects
-move, since the static-scene assumption fails there and 2D motion is a strong cue.
+Lifting works for unordered photos and wide baselines, where there is no temporal continuity to
+track. Tracking should win on dense, short-baseline video where objects move, because the
+static-scene assumption fails there and 2D motion is a strong cue. Neither claim has been measured
+against a tracker here.
 
 **2. How is this different from CountVid and DG-Net?**
-Those target counting in video with temporal tracking. CountOnce targets a static scene from a few
-photos and makes the geometric association explicit and inspectable (`MatchEvidence` per pair).
-The related-work comparison is in `docs/RELATED_WORK.md`, written from abstracts with `TODO: verify` claims.
+Both count in video by tracking: CountVid propagates SAM 2.1 masks; DG-Net adds depth (sensor, or
+estimated in some of its results) to detection and to the matching cost, so "RGB only" is not a
+difference. CountOnce targets a static scene from a few unordered photos, associates through
+estimated camera geometry, and keeps the evidence inspectable (`MatchEvidence` per pair). Whether
+that counts better is a hypothesis: neither system has been run here. Open-vocabulary multi-view 3D
+detectors (See and Detect, SMOV3D, OpenM3D, VGGT-Det) also merge or fuse boxes across views, but they report
+detection mAP, not unique-object counts, so they neither support nor refute it. See `RELATED_WORK.md` §3.
 
 **3. Why can't same-photo detections merge?**
-One physical object projects to one region of an image, so two separate detections in a single photo
-are two objects. v1 enforces it at the cluster level (`cluster_cannot_link`), so it holds even
-transitively. v2 and sync enforce it by construction, with one detection per track per frame.
+One object projects to one region of an image, so two separate detections in one photo are two
+objects. v1 enforces it per cluster, so it holds transitively; v2 and sync by one detection per
+track per frame; v3 by min-cut. A detector that boxes one object twice breaks the assumption, which
+per-frame NMS (`nms_iou`, off by default) addresses.
 
 **4. How do you set thresholds when VGGT has no real units?**
-Make them relative. v1's `k` is in object sizes, where size is `pixel extent × depth / focal`, and
-v2's reprojection error is divided by box size. The scene scale is the median camera-to-scene
-distance. Absolute defaults (`k = 0.5`) are a starting point to be tuned on a validation split.
+Make them relative: v1's `k` is in object sizes (`pixel extent × depth / focal`), v2's reprojection
+error is divided by box size. Then tune on a validation split. For Fuji the score threshold and `k`
+were frozen on training trees (0.2 and 0.3). 0.2 is the lowest value in that grid, so the grid may
+be too narrow.
 
-**5. Why train on synthetic data? How did you check it transfers?**
-Not done yet (Track C). The plan is to run the real pipeline on Kubric renders so the learned matcher
-sees real reconstruction noise. Transfer would be checked by evaluating on real scenes. Results: `TODO: fill from results`.
+**5. Why use the median of world points for a detection's position?**
+Boxes include background and edge pixels where depth is smeared. The median resists those
+outliers; the central-50% region and the confidence filter reduce them further. It still gives a
+point on the visible surface, not the object's centre, so views from opposite sides disagree.
 
-**6. What does the dustbin do in Sinkhorn matching?**
-Not implemented yet. In general it is an extra row and column that absorbs detections with no match
-(false positives, objects visible in one view only), so the assignment need not be one-to-one.
-v2 has an analogue: unmatched detections start new tracks, and gated pairs have infinite cost.
+**6. How does v2 avoid matching to an occluded object?**
+A depth test: the track's projected depth must be within `depth_tol` object sizes of the
+reconstructed depth at that pixel, otherwise the track is not a candidate in that view.
 
-**7. What's the biggest weakness of your benchmark?**
-It has no results yet. Structurally: few scenes (the resampling unit is the scene, so CIs are wide),
-Fuji-SfM covers one fruit type and its license is unresolved, ground truth depends on GT 3D positions
-projected into frames, and the detector cache means detector errors are shared by all methods.
+**7. What is the hallucination filter and when is it wrong?**
+An instance seen in one view but expected in at least two others where nothing matched is probably a
+false detection. It is wrong when the other views' depth or cameras are bad. Its effect on real
+data has not been measured.
 
-**8. Which optimization gave the biggest speedup, and why?**
-None measured. Implemented so far: the reconstruction cache (keyed by input hash, backbone, version,
-config) and the detection cache, which let threshold and `k` sweeps skip the model. Profiling: `TODO: fill from results`.
+**8. Why does the count never increase when `k` increases in v1?**
+A larger `k` admits a superset of merge candidates, and merging only reduces clusters. A Hypothesis
+test checks it.
 
-**9. What happens if a worker dies mid-job?**
-There is no worker or queue in this repo. Locally, cache writes use a temp file plus rename
-(`tempfile`/`os` in the cache modules), so a crash leaves no half-written entry, and corrupt entries are
-treated as cache misses. The queue design is §12, `TODO`.
+### Findings (M2–M8)
 
-**10. How would you scale to 1,000 jobs a day?**
-`TODO` (§12). What the code already supports is stage caching and a frame cap with chunking to bound
-per-job VRAM. Throughput numbers: `TODO: fill from results`.
+**9. Your demo scene had 5 objects and the real pipeline said 7. Why?**
+I checked each stage. The near-duplicate filter had kept 1 of 5 views (the views are 72 degrees
+apart but look almost identical to a thumbnail metric), and blue and green distractors scored
+0.40–0.50 as "red sphere", above the 0.3 threshold: 5 + 2 = 7. Duplicate boxes, lifting and merge
+radius were not the cause of that number.
 
-**11. Why is the count's range called a "sensitivity range" and not a confidence interval?**
-It is the 10th–90th percentile of counts over a grid of `k` and detector thresholds
-([`confidence.py`](../countonce/confidence.py)), widened to include the reported count. It measures
-how fragile the answer is to tuning. It has no coverage guarantee. `Interval.method` is `"sensitivity"`
-and `level` is nominal. Empirical coverage is measured in the bench (`interval_coverage`) and is `TODO: fill from results`.
+**10. Did you fix it?**
+Only narrowly. `score_threshold=0.5` gives 5 on the single-view path, but it is a threshold picked on
+that scene, so defaults are unchanged and the default run still says 7. With all five views the
+count gets worse (v2: 14) because VGGT's cameras are poor on this synthetic scene. The pipeline now
+warns when the filter keeps one frame.
 
-**12. Why use the median of world points for a detection's position?**
-Boxes include background and edge pixels where predicted depth is smeared. The median is robust to
-those outliers, and the central-50% box region plus the confidence filter further reduce them.
+**11. Why isn't association F1 your headline metric?**
+The product is a count. v3 has F1 0.964 on synthetic episodes and still a mean count error of 19.1.
+Pairwise F1 also ignores unlabelled detections, so false positives cost nothing. Reports lead with
+MAE, signed bias and the error decomposition.
 
-**13. Why does the count never increase when `k` increases in v1?**
-A larger `k` admits a superset of merge candidates, and merging only reduces the number of clusters. The
-code is order-independent (tie-break on ids), and a Hypothesis test checks monotonicity.
+**12. What is the error decomposition?**
+`duplicates + false positives − missed − wrong merges = predicted − true`, an exact identity on
+scenes with identity labels. It says which way each stage pushes the count, and shows when two large
+errors cancel into a good-looking number.
 
-**14. How does v2 avoid matching to an occluded object?**
-The depth test in `_Views.project`: the track's projected depth must be within `depth_tol` object
-sizes of the reconstructed depth at that pixel. Otherwise the track is not a candidate in that view.
+**13. Does photo order change the count?**
+It did. My first test shuffled input lists but kept frame ids, so it passed without testing
+anything. A real test permutes which photo gets which id, with its camera arrays: v2 partitions
+changed in 38 of 40 runs at moderate box noise, with a count range of 3. Visiting frames in
+camera-centre order fixed it (0 changes for v1, v2, sync, v3, v3+sync). Scope: synthetic scenes;
+duplicated cameras still fall back to id; not yet measured on real photos.
 
-**15. What is the hallucination filter and when is it wrong?**
-An instance seen in one view but expected (visible by projection) in at least two others where nothing
-matched is probably a false detection. Wrong when the other views' depth or cameras are bad, or when
-the object is truly hidden but the depth map says it should be visible.
+**14. Does the canonical order make v2 better?**
+No claim. It makes the result a function of the photos. The greedy matching is still not optimal,
+and quality against the old order was not compared.
 
-**16. Why Hungarian per frame instead of global clustering?**
-It gives optimal one-to-one assignment per frame, and one-to-one is exactly the cannot-link rule.
-The cost is order dependence in principle; processing frames in sorted id order and sorting
-detections by id makes the output deterministic. Sync is the alternative that treats all views jointly.
+**15. How do you know whether detection, geometry or association is to blame?**
+Replace one stage at a time with an oracle and give every associator identical inputs (checked by
+an input hash). On Fuji at k=10 the real detector brings about 121 false positives and 52 misses per
+window; with perfect detections about 34–37 duplicates remain.
 
-**17. What does spectral synchronization buy over v2?**
-Transitive consistency. Pairwise matches can say A=B, B=C, A≠C. Synchronization finds a global
-partition close to the pairwise evidence. Whether it improves counting is `TODO: fill from results`.
+**16. What can't that experiment tell you?**
+Fuji ships no per-pixel depth or camera poses for these photos, so there is no oracle-geometry
+condition: bad cameras and bad association are not separated. Oracle boxes also assume a 4 cm apple
+radius, and its predictions are not ROI-filtered, so its MAE differs from the main table.
 
-**18. What does the chunk stitcher need, and how does it fail?**
-At least two shared frames with non-degenerate camera centres (`MIN_OVERLAP = 2`; with two, axis
-tips are added). Too little overlap raises `ChunkAlignmentError`. Success still accumulates drift
-because each chunk aligns to the previous merged result.
+**17. Does your method beat the simple baselines?**
+Not consistently. v1/v2 beat Max in most slices only at k=20 (v2 vs Max MAE difference −51.9, CI
+[−81.7, −20.3]). At k=10 Max has the lowest MAE (31.1 against v2's 40.1), and at k=3 and 5 the
+methods are within noise. The gate's recommendation is "not met".
 
-**19. How does the pipeline avoid recomputing expensive stages?**
-The recon cache key includes input hash, backbone, version and config, and the detection cache key
-includes frame hash, prompt, detector, version and config. `CountResult` records `recon_cache_key`
-and whether it hit.
+**18. Why are the Fuji errors so large?**
+Detection first: at score 0.2 most visible ground-truth apples are still missed at k=20 (miss rate
+about 0.95) while many boxes match nothing. Then duplicates. Foliage occlusion is not scored
+separately, so I can't say how much it contributes.
 
-**20. What does a quality warning look like and why?**
-A `{code, message, fix}` dict ([`warnings.py`](../countonce/warnings.py)): too few frames, low overlap
-(few instances seen in ≥ 2 views), low median depth confidence, many failed lifts, or a wide range.
-Each includes a concrete fix such as "move less between photos". Thresholds are uncalibrated defaults.
+**19. How did you keep the Fuji numbers honest?**
+Thresholds frozen on training trees first, failed rows kept (none failed in 320), CIs resampled over
+the 8 trees rather than 16 slices, cells left unfilled where identity labels are incomplete.
+Weaknesses: the runs came from a working tree with uncommitted changes, and the test trees had
+already been run once before scoring bugs were found and the protocol was revised (`fuji_core_v2`,
+re-tuned on training trees, same thresholds). So they are not untouched.
 
-**21. How are results kept reproducible?**
-`CountResult` carries config, model versions and cache keys, and the bench writes one CSV row per
-(scene, views, sampling, order, method) with a seeded view sampler. Provenance helpers live in
-[`provenance.py`](../countonce/provenance.py).
+**20. Which Fuji baselines are missing?**
+CountVid and a vision-language model. COLMAP, permutation sync and v3 rows exist, but they predate
+the window-alignment fix and need a rerun.
 
-**22. How do you test geometry code without a GPU?**
-Tests build synthetic `Recon` objects (planes, known cameras, known Sim(3) per chunk) and fake
-detectors, so CPU tests check clustering, matching, chunk alignment and the end-to-end pipeline. Real
-VGGT and detector weights are never used in tests; marks `slow` and `gpu` are reserved for that.
+**21. What changed between your first v3 comparison and an honest one?**
+The ranking flipped. The first table compared v3 with untuned v1/v2/sync. After tuning them on the
+validation split, with finite noisy depth so the occlusion test fires and injected false positives
+counted, tuned v1 has the lowest test count MAE (1.8, against 19.1 for v3). v3 only wins against
+untuned defaults. See `RESULTS_V3_SYNTH.md`; still a component test on generated geometry.
 
-**23. What should you not claim from the current repo?**
-Any accuracy figure. Only synthetic and toy inputs have been run. The golden test pins a seeded
-synthetic scene's count; it checks for regressions and says nothing about real-world accuracy.
+**22. What does the dustbin do in Sinkhorn matching?**
+An extra row and column absorb detections with no match (false positives, objects seen in one view),
+so the assignment need not be one-to-one. v2's analogue: unmatched detections start new tracks.
+
+**23. Why train on synthetic data? How did you check it transfers?**
+Identity labels across views are expensive to annotate and free to generate. I have **not** checked
+transfer: training and testing were both on numpy geometry episodes.
+
+### Evaluation, systems and honesty
+
+**24. Why is the count's range a "sensitivity range" and not a confidence interval?**
+It is the 10th–90th percentile of counts over a grid of `k` and detector thresholds, widened to
+include the reported count. It shows fragility to tuning and has no coverage guarantee. Coverage has
+not been evaluated.
+
+**25. When would you use conformal intervals?**
+Split conformal and Jackknife+ are implemented but need real calibration scenes (at least 15 for
+split conformal), and coverage is average over scenes like the calibration set. I have none yet.
+
+**26. What's the biggest weakness of your benchmark?**
+One fruit, 8 test trees, no own captures, no zero-target scenes, missing baselines, and ground truth
+that depends on projecting 3D labels into frames with a visibility test.
+
+**27. Which optimization gave the biggest speedup, and why?**
+For repeat jobs, stage caching (4.8x for a new prompt) because VGGT dominates and its output does
+not depend on the prompt. For a first-time job nothing helped much; bf16 mainly halved peak VRAM.
+For matcher training, batching Sinkhorn (703 s to 85 s per epoch) removed thousands of tiny GPU
+launches.
+
+**28. What happens if a worker dies mid-job?**
+Its heartbeats stop; after 120 s the job is requeued, and after 2 tries marked failed. Cache writes
+go to a temp file and rename, so a crash leaves no half-written entry.
+
+**29. How would you scale to 1,000 jobs a day?**
+That averages under one job a minute, but arrivals are bursty and one laptop GPU is the bottleneck.
+Add workers (the `SKIP LOCKED` claim supports it), keep caches in shared storage, move the database
+off sqlite. I load-tested the API with fake workers only (SERVING.md), so I have no real GPU
+throughput or cost figure.
+
+**30. Tell me about a bug you fixed late.**
+On WSL2 with an 8 GB card, the five-view CLI run failed with `CUDA driver error: device not ready`,
+while the Python API path worked. The difference was that the CLI set
+`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` to reduce fragmentation. With it, the run failed
+3 of 3 times; with the fix (not setting it on WSL) it succeeded 3 of 3 times. I know the trigger, not
+why the driver fails.
+
+**31. How does the pipeline avoid recomputing expensive stages?**
+The reconstruction cache is keyed by input hash, backbone, version and config; the detection cache by
+frame hash, prompt, detector, version and config.
+
+**32. How do you test geometry code without a GPU?**
+Synthetic `Recon` objects with known cameras and fake detectors. Real weights appear only in
+GPU-marked tests. A golden test pins a seeded synthetic count to catch regressions; it says nothing
+about accuracy.
+
+**33. What should you not claim from this repo?**
+That it counts accurately on real photos; that geometry beats simple baselines; that the learned
+matcher transfers to real data; that any user has used it.
 
 ## 14. Glossary
 

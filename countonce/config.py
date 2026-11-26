@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 DetectorName = Literal["countgd", "gdino", "groundingdino", "countgdpp", "color_blob"]
 BackboneName = Literal["vggt", "vggt_omega", "vggt_t3", "colmap", "fixture"]
-AssocName = Literal["v1", "v2", "v3", "sync"]
+AssocName = Literal["v1", "v2", "v3", "sync", "cdog"]
 HallucinationMode = Literal["off", "downweight", "drop"]
 LiftRegion = Literal["mask", "box"]
 MasksMode = Literal["none", "box_fill", "sam"]
@@ -24,13 +24,17 @@ IntervalMethodName = Literal["sensitivity", "conformal", "jackknife_plus"]
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    detector: DetectorName = "countgd"
+    detector: DetectorName = "gdino"
     backbone: BackboneName = "vggt"
-    assoc: AssocName = "v1"
+    # PLAN 0.1 rule 1; chosen on Fuji-SfM validation windows (docs/DEVIATIONS.md).
+    assoc: AssocName = "v2"
 
     # Ablation switches (PLAN 9.6). Defaults reproduce the shipped behaviour.
     cannot_link: bool = True  # v1/v2: never merge two detections from the same frame
     appearance: bool = True  # v2/sync: use Detection.feature (cost, gate, split check)
+    # v2/sync: embed detections that carry no feature with this DINOv2 model. None (default)
+    # computes nothing, so no detector in the repo gives the associator any appearance.
+    appearance_model: Literal["dinov2_vits14"] | None = None
     # Natural-language prompts (PLAN 15): "red apples, not leaves" -> positives + negatives.
     # Off passes the prompt to the detector verbatim. A box is dropped when its best negative
     # phrase score exceeds its positive score by more than ``negative_margin``.
@@ -51,6 +55,11 @@ class Config(BaseModel):
     motion_min_agree: float = Field(0.5, ge=0, le=1)  # flag if agreeing share of views is below
     motion_min_views: int = Field(2, ge=1)  # checked views needed before flagging
     motion_conf_factor: float = Field(0.5, ge=0, le=1)  # conf multiplier, fully flagged instance
+    # C-DOG comparison baseline (assoc: cdog, bench/baselines_cdog.py): epipolar distance gate in
+    # recon-grid pixels, neighbourhood-overlap threshold, IQR multiplier of the outlier filter.
+    cdog_tau_px: float = Field(4.0, gt=0)
+    cdog_delta: float = Field(0.5, ge=0, lt=1)
+    cdog_iqr_alpha: float = Field(2.0, gt=0)
 
     # Ingest
     fps: float = Field(2.0, gt=0)  # video sampling rate
@@ -66,6 +75,8 @@ class Config(BaseModel):
 
     # Detect / lift / associate
     score_threshold: float = Field(0.3, ge=0, le=1)
+    # Per-frame box NMS on raw detections (IoU above this drops the lower score); 0 = off.
+    nms_iou: float = Field(0.0, ge=0, le=1)
     merge_k: float = Field(0.5, gt=0)  # v1 distance threshold, in object sizes
     # Lift rules; None = dense defaults (5 pixels, 30th percentile) or, for the sparse COLMAP
     # backbone, 3 pixels and no percentile cut.

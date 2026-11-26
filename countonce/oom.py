@@ -17,6 +17,7 @@ from __future__ import annotations
 import gc
 import logging
 import os
+import platform
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -36,14 +37,24 @@ MIN_CHUNK = 3  # must exceed the default chunk overlap floor (2)
 T = TypeVar("T")
 
 
+def is_wsl() -> bool:
+    """True under Windows Subsystem for Linux (its kernel release names Microsoft)."""
+    return "microsoft" in platform.release().lower()
+
+
 def configure_allocator() -> bool:
     """Set ``expandable_segments:True`` in ``PYTORCH_CUDA_ALLOC_CONF`` if torch is not loaded yet.
 
     Keeps any other options the user already set, and leaves an explicit
-    ``expandable_segments`` choice alone. Returns True when the variable is in effect for torch.
+    ``expandable_segments`` choice alone. Does nothing on WSL, where the setting made the
+    five-view VGGT run fail with ``CUDA driver error: device not ready`` on an 8 GB card.
+    Returns True unless the call changed nothing for one of those two environment reasons
+    (torch already loaded, or WSL).
     """
     if "torch" in sys.modules:
         log.warning("torch was imported before %s was set; the setting has no effect", ALLOC_ENV)
+        return False
+    if is_wsl():
         return False
     current = os.environ.get(ALLOC_ENV, "")
     if "expandable_segments" not in current:

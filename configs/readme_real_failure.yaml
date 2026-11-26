@@ -1,0 +1,9 @@
+# README "representative failure": the real path on all five views of examples/tiny_scene, with the
+# threshold and per-frame NMS that make the single-frame run count correctly (docs/DEVIATIONS.md, M2).
+detector: gdino
+backbone: vggt
+dedup_threshold: 0
+score_threshold: 0.5
+nms_iou: 0.7
+backbone_options:
+  weights_dtype: fp32

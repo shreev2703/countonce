@@ -81,8 +81,9 @@ def test_upgrade_head_then_downgrade_base_on_sqlite(tmp_path: Path) -> None:
 
 def test_revisions_form_one_linear_chain() -> None:
     versions = sorted((migrate.MIGRATIONS_DIR / "versions").glob("0*.py"))
-    assert [v.name[:4] for v in versions] == ["0001", "0002"]
+    assert [v.name[:4] for v in versions] == ["0001", "0002", "0003"]
     assert 'down_revision: str | None = "0001"' in versions[1].read_text()
+    assert 'down_revision: str | None = "0002"' in versions[2].read_text()
 
 
 def test_pg_store_translates_placeholders() -> None:

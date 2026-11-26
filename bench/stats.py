@@ -40,7 +40,8 @@ Values = Sequence[float] | npt.NDArray[Any]  # per-scene numbers: list or ndarra
 
 def _clean(x: Values) -> np.ndarray:
     a = np.asarray(x, dtype=float)
-    return a[~np.isnan(a)]
+    out: np.ndarray = a[~np.isnan(a)]
+    return out
 
 
 def _boot_stats(
@@ -48,7 +49,8 @@ def _boot_stats(
 ) -> np.ndarray:
     idx = rng.integers(0, len(values), size=(n_boot, len(values)))
     if statistic is np.mean:
-        return values[idx].mean(axis=1)
+        means: np.ndarray = values[idx].mean(axis=1)
+        return means
     return np.array([statistic(values[i]) for i in idx])
 
 

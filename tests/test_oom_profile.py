@@ -111,7 +111,8 @@ def test_ladder_logs_rung(caplog):
 
 def test_env_var_set_before_torch_import():
     code = (
-        "import sys, os\n"
+        "import sys, os, platform\n"
+        "platform.release = lambda: '6.8.0-generic'\n"  # native Linux, whatever the test host is
         "assert 'torch' not in sys.modules\n"
         "from countonce import cli\n"
         "assert 'torch' not in sys.modules\n"
@@ -126,6 +127,7 @@ def test_configure_allocator_keeps_user_options(monkeypatch):
 
     monkeypatch.setenv(ALLOC_ENV, "max_split_size_mb:128")
     monkeypatch.delitem(sys.modules, "torch", raising=False)
+    monkeypatch.setattr(oom, "is_wsl", lambda: False)
     assert oom.configure_allocator()
     import os
 
@@ -133,6 +135,16 @@ def test_configure_allocator_keeps_user_options(monkeypatch):
     monkeypatch.setenv(ALLOC_ENV, "expandable_segments:False")
     oom.configure_allocator()
     assert os.environ[ALLOC_ENV] == "expandable_segments:False"
+
+
+def test_configure_allocator_leaves_env_alone_on_wsl(monkeypatch):
+    from countonce import oom
+
+    monkeypatch.delenv(ALLOC_ENV, raising=False)
+    monkeypatch.delitem(sys.modules, "torch", raising=False)
+    monkeypatch.setattr(oom.platform, "release", lambda: "6.18.58.1-microsoft-standard-WSL2")
+    assert oom.configure_allocator() is False
+    assert ALLOC_ENV not in __import__("os").environ
 
 
 def test_configure_allocator_warns_if_torch_loaded(monkeypatch):

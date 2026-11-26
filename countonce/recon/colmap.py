@@ -1,4 +1,4 @@
-# Ported from ~/vggtProject (vggt-sparse-recon): vggt_bench/methods/colmap_method.py. Adapted.
+# Ported from vggt-sparse-recon: vggt_bench/methods/colmap_method.py. Adapted.
 """COLMAP wrapped behind the ReconMethod interface.
 
 Uses pycolmap 4.2, whose options API differs from older releases: SIFT settings
@@ -30,6 +30,7 @@ import pycolmap
 import yaml
 
 from countonce.recon.result import Recon
+from countonce.recon.staging import single_root
 from countonce.resources import packaged_config
 
 DEFAULT_CONFIG = Path("configs/colmap.yaml")
@@ -179,14 +180,17 @@ class ColmapMethod:
 
     def reconstruct(self, image_paths: list[Path]) -> Recon:
         image_paths = [Path(p) for p in image_paths]
-        image_dir, image_names = _split_image_paths(image_paths)
+        if not image_paths:
+            raise ValueError("no input images")
         # A local, not instance state: one method instance is reused across a
         # whole Phase 3 sweep, so nothing about a run may outlive it.
         matcher = self._choose_matcher(len(image_paths))
         timings: dict[str, float] = {}
         detail: str | None = None
 
-        with self._open_workspace() as work:
+        with self._open_workspace() as work, tempfile.TemporaryDirectory() as stage:
+            staged = single_root(image_paths, Path(stage))
+            image_dir, image_names = _split_image_paths(staged)
             database = work / "database.db"
             sparse = work / "sparse"
             _clear_stale(database, sparse)
@@ -223,7 +227,8 @@ class ColmapMethod:
                 recon = Recon.failure(self.name, image_paths, "colmap_error")
                 detail = f"{type(exc).__name__}: {exc}"
             else:
-                recon = self._finish(models, image_paths)
+                recon = self._finish(models, staged)
+                recon.image_paths = image_paths
 
         # One exit, so no future branch can ship a run without its provenance.
         recon.timings = dict(timings)

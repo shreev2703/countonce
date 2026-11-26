@@ -1,0 +1,12 @@
+# Frozen Fuji-SfM Core settings for the sync association (assoc: sync), chosen on the TRAINING-split
+# trees only (Tree09, Tree10, Tree11; `val` in bench/splits_fuji_sfm.json), windows of 5 and 10
+# views, GroundingDINO-tiny "apple" + VGGT-1B, protocol fuji_core_v2. Same procedure as
+# configs/fuji_core.yaml: lowest mean absolute count error with all 12 window rows complete.
+# Grid: score_threshold {0.2,0.3,0.4,0.5} (merge_k fixed at 0.3). merge_k does not change sync's
+# point count (its gate scales as k/merge_k = 1 at the configured value), so it is not swept.
+# MAE by score_threshold: 0.2 -> 61.83, 0.3 -> 81.75, 0.4 -> 89.17, 0.5 -> 91.42.
+# Evidence: results/fuji_tune_sync_s*_k0.3.csv. 0.2 is the lowest value in the grid (as for v1/v2).
+# v3 has no tuned setting: it uses the registered checkpoint (models/checkpoints/v001.pt) as-is,
+# with the same score_threshold and merge_k. Never edit after looking at test-split numbers.
+score_threshold: 0.2
+merge_k: 0.3

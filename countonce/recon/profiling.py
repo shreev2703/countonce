@@ -1,4 +1,4 @@
-# Ported from ~/vggtProject (vggt-sparse-recon): vggt_bench/profiling.py. Adapted for countonce.
+# Ported from vggt-sparse-recon: vggt_bench/profiling.py. Adapted for countonce.
 """GPU timing and memory helpers, plus the VGGT frame-count guard."""
 
 from __future__ import annotations

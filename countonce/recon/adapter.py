@@ -88,7 +88,7 @@ def sparse_to_dense(
         if not registered[i] or not (np.isfinite(k).all() and np.isfinite(e).all()):
             continue
         idx = np.flatnonzero(finite_pts) if per_view is None else np.array(per_view[i], np.int64)
-        idx = idx[finite_pts[idx]]
+        idx = idx[np.asarray(finite_pts)[idx]]
         if idx.size == 0:
             continue
         cam = pts[idx] @ e[:, :3].T + e[:, 3]

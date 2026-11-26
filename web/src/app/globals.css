@@ -1,0 +1,231 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens (docs/PLAN.md 17.10). One accent, neutrals, status colours, a 4 px spacing
+ * scale, radius/shadow scales; light and dark themes come from the same variables.
+ * Status colours are never the only signal: each status also has its own outline style and
+ * label (see components/ui/status-badge.tsx).
+ */
+:root {
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.2 0.01 260);
+  --muted: oklch(0.96 0.005 260);
+  --muted-foreground: oklch(0.45 0.01 260);
+  --border: oklch(0.9 0.005 260);
+  --card: oklch(1 0 0);
+  --accent: oklch(0.5 0.17 255);
+  --accent-foreground: oklch(0.99 0 0);
+  --ring: oklch(0.5 0.17 255);
+  --status-new: oklch(0.45 0.13 150);
+  --status-duplicate: oklch(0.45 0.14 70);
+  --status-rejected: oklch(0.45 0.17 25);
+  --shadow-sm: 0 1px 2px oklch(0.2 0.01 260 / 0.08);
+  --shadow-md: 0 4px 12px oklch(0.2 0.01 260 / 0.12);
+  color-scheme: light;
+}
+
+.dark {
+  --background: oklch(0.16 0.01 260);
+  --foreground: oklch(0.96 0 0);
+  --muted: oklch(0.22 0.01 260);
+  --muted-foreground: oklch(0.72 0.01 260);
+  --border: oklch(0.3 0.01 260);
+  --card: oklch(0.2 0.01 260);
+  --accent: oklch(0.72 0.14 255);
+  --accent-foreground: oklch(0.16 0.01 260);
+  --ring: oklch(0.72 0.14 255);
+  --status-new: oklch(0.75 0.14 150);
+  --status-duplicate: oklch(0.8 0.13 80);
+  --status-rejected: oklch(0.72 0.16 25);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px oklch(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: oklch(0.16 0.01 260);
+    --foreground: oklch(0.96 0 0);
+    --muted: oklch(0.22 0.01 260);
+    --muted-foreground: oklch(0.72 0.01 260);
+    --border: oklch(0.3 0.01 260);
+    --card: oklch(0.2 0.01 260);
+    --accent: oklch(0.72 0.14 255);
+    --accent-foreground: oklch(0.16 0.01 260);
+    --ring: oklch(0.72 0.14 255);
+    --status-new: oklch(0.75 0.14 150);
+    --status-duplicate: oklch(0.8 0.13 80);
+    --status-rejected: oklch(0.72 0.16 25);
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+    --shadow-md: 0 4px 12px oklch(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --color-status-new: var(--status-new);
+  --color-status-duplicate: var(--status-duplicate);
+  --color-status-rejected: var(--status-rejected);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --spacing: 4px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --text-count: 4.5rem;
+  --text-count--line-height: 1;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 1rem; /* 16 px+ body */
+  line-height: 1.6;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Categorical chart slots (benchmark page), validated for colour-blind separation. */
+.viz {
+  --series-1: #257de0;
+  --series-2: #f47230;
+  --series-3: #00b894;
+  --series-4: #f2a600;
+  --series-5: #ee7fac;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .viz {
+    --series-1: #338ced;
+    --series-2: #e76624;
+    --series-3: #00a888;
+    --series-4: #d28e05;
+    --series-5: #e24d8b;
+  }
+}
+
+/*
+ * "Obsidian" theme for `/` and the interactive results page: layered dark surfaces, hairline
+ * borders, radial glows. It re-declares the tokens above on a wrapper, so components need no
+ * theme-specific classes.
+ */
+.obsidian {
+  --background: #08090d;
+  --foreground: #f4f6fb;
+  --muted: #151824;
+  --muted-foreground: #a1a8b8;
+  --border: rgb(255 255 255 / 0.09);
+  --card: #10121a;
+  --accent: #8aa8ff;
+  --accent-foreground: #080a12;
+  --ring: #8aa8ff;
+  --status-new: #4ade9a;
+  --status-duplicate: #f5c04e;
+  --status-rejected: #ff8a8a;
+  --spotlight: rgb(138 168 255 / 0.13);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 12px 40px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
+  min-height: 100vh;
+  color: var(--foreground);
+  background:
+    radial-gradient(900px 480px at 15% -80px, rgb(92 118 255 / 0.2), transparent 70%),
+    radial-gradient(700px 420px at 95% 60px, rgb(150 92 255 / 0.13), transparent 70%),
+    var(--background);
+}
+
+body:has(.obsidian) {
+  background: #08090d;
+}
+
+/* Layered surface with a 1px translucent hairline. */
+.surface {
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.015)), var(--card);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), var(--shadow-md);
+}
+
+/* Floating translucent controls over the 3D canvas. */
+.glass {
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background: rgb(16 18 26 / 0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+.glass-btn {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.8125rem;
+  color: var(--foreground);
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.glass-btn:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.08);
+}
+
+.glass-btn:disabled {
+  opacity: 0.55;
+}
+
+/* Hero reveal. Moves and sharpens only (no opacity), so text is paintable from the first frame. */
+@keyframes rise {
+  from {
+    transform: translateY(14px);
+    filter: blur(5px);
+  }
+  to {
+    transform: none;
+    filter: none;
+  }
+}
+
+.rise {
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Printing the report must stay dark-on-white. */
+@media print {
+  .obsidian {
+    --foreground: #111;
+    --muted-foreground: #444;
+    --card: #fff;
+    --muted: #fff;
+    --border: #ccc;
+    background: #fff;
+  }
+  .surface {
+    background: #fff;
+    box-shadow: none;
+  }
+}

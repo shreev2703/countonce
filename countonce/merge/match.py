@@ -20,6 +20,7 @@ from scipy.optimize import linear_sum_assignment
 from countonce.lift import frame_affine
 from countonce.merge.appearance import FeatureExtractor, cosine_sim
 from countonce.merge.base import ClusterResult
+from countonce.merge.order import canonical_frame_order
 from countonce.types import Detection, Frame, Instance, LiftedDetection, MatchEvidence, Recon
 
 _BIG = 1e9
@@ -117,7 +118,7 @@ class _Track:
     size: float = 1.0
 
     def refresh(self) -> None:
-        self.xyz = np.median(np.stack([m.xyz for m in self.members]), axis=0)
+        self.xyz = np.median(np.stack([np.asarray(m.xyz) for m in self.members]), axis=0)
         self.size = float(np.mean([_size(m) for m in self.members]))
 
 
@@ -190,7 +191,7 @@ class V2Associator:
             by_frame.setdefault(ld.det.frame_id, []).append(ld)
 
         tracks: list[_Track] = []
-        for fid in sorted(by_frame):
+        for fid in canonical_frame_order(by_frame, recon, self.frame_to_view):
             dets = sorted(by_frame[fid], key=lambda m: m.det.id)
             self._match_frame(fid, dets, tracks, geo, feats, res)
 
@@ -306,7 +307,7 @@ class V2Associator:
         n_views = geo.recon.n_views
         next_id = 0
         for members in groups:
-            xyz = np.median(np.stack([m.xyz for m in members]), axis=0)
+            xyz = np.median(np.stack([np.asarray(m.xyz) for m in members]), axis=0)
             size = float(np.mean([_size(m) for m in members]))
             frame_ids = {m.det.frame_id for m in members}
             mean_conf = float(np.mean([m.lift_conf for m in members]))
@@ -349,7 +350,7 @@ def _split(
     if len(members) < 2:
         return [members]
     ms = sorted(members, key=lambda m: m.det.id)
-    xyz = np.stack([m.xyz for m in ms])
+    xyz = np.stack([np.asarray(m.xyz) for m in ms])
     size = float(np.mean([_size(m) for m in ms]))
     n = len(ms)
     dist = np.linalg.norm(xyz[:, None] - xyz[None], axis=-1)

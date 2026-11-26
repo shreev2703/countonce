@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Download Fuji-SfM (Zenodo 10.5281/zenodo.3712808, ~6.9 GB).
-# NOT run automatically. The license is unresolved (CC BY 4.0 vs CC BY-NC-SA 4.0 vs research-only):
-# read LICENSE.txt in the record, treat as non-commercial research use, and do not redistribute.
+# NOT run automatically. License: CC BY-NC-SA 4.0 (LICENSE.txt in the record): research use only,
+# no commercial use, do not redistribute the images or derived GT.
 # Usage: scripts/download_fuji_sfm.sh <empty-target-dir>
 set -euo pipefail
 
@@ -34,5 +34,4 @@ while IFS=$'\t' read -r key url checksum; do
   fi
 done < "$dest/.files.txt"
 
-echo "Done. Unpack archives into a fresh directory, then check LICENSE.txt and the layout"
-echo "(bench/datasets/fuji_sfm.py::_read_layout carries the layout TODOs)."
+echo "Done. Unpack the .rar into a fresh directory, then see bench/datasets/fuji_sfm.py for the verified layout."

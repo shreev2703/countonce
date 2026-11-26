@@ -68,10 +68,9 @@ def test_build_with_no_rows_writes_only_todo(tmp_path):
     assert rep["cells"] == {}
     md = (tmp_path / "docs/RESULTS_FUJI.md").read_text()
     assert fr.TODO in md and "No Fuji test-split rows" in md
-    readme = (tmp_path / "README.md").read_text()
-    assert fr.BEGIN in readme
-    fr.build(tmp_path / "missing.csv", tmp_path)  # idempotent
-    assert (tmp_path / "README.md").read_text().count(fr.BEGIN) == 1
+    assert (tmp_path / "README.md").read_text() == "# x\n"  # the front page is hand-written
+    assert (tmp_path / "experimental/paper/tables/fuji_core.tex").exists()
+    assert not (tmp_path / "paper").exists()  # the paper draft is quarantined
 
 
 def test_build_ignores_non_fuji_and_val_rows(tmp_path):

@@ -10,7 +10,7 @@ data it does have (all choices are logged in ``docs/DEVIATIONS.md``):
    to every frame) and to pick the frames that look at each tree. Counts are never aligned to GT.
 2. **Windows**: for each tree and side, ``k`` contiguous frames centred on the frame whose camera
    is nearest the tree along the row. Each window is reconstructed on its own, and aligned to the
-   GT frame with ``countonce.recon.chunked.align_chunk`` (camera centres + axis tips) against the
+   GT frame with ``countonce.recon.chunked.align_chunk`` (camera orientations + centres) against the
    overview pseudo-poses of the same frames, never against apples.
 3. **GT for a window** is the set of GT apples (all 11 trees, since neighbours are in view)
    whose projection lands in a view, in front of the reconstructed surface (depth test), within
@@ -37,7 +37,14 @@ from bench.baselines import BASELINES
 from bench.datasets.fuji_sfm import FujiScene
 from bench.gt_matching import match_detections_to_gt
 from bench.runner import Job, RunOutput, read_rows
-from countonce.recon.align import Sim3, camera_centers, transform_extrinsics, umeyama
+from countonce.recon.align import (
+    Sim3,
+    camera_centers,
+    rotation_angles_deg,
+    transform_extrinsics,
+    umeyama,
+)
+from countonce.recon.chunked import MIN_OVERLAP, ChunkAlignmentError, align_chunk
 from countonce.types import Detection
 
 DOWNSCALE = 3
@@ -121,7 +128,7 @@ def register_to_gt(src: np.ndarray, gt: np.ndarray, inlier_m: float = 0.08) -> R
     for r in cands:
         sim = Sim3(s0, r, gt.mean(0) - s0 * r @ src.mean(0))
         for gate in (1.0, 0.6, 0.4, 0.25, 0.15, 0.1, 0.08, 0.08, 0.08, 0.08):
-            d, j = tree.query(sim.apply(src))
+            d, j = map(np.asarray, tree.query(sim.apply(src)))
             keep = d < gate
             if keep.sum() < 8:
                 break
@@ -129,7 +136,7 @@ def register_to_gt(src: np.ndarray, gt: np.ndarray, inlier_m: float = 0.08) -> R
                 sim = umeyama(src[keep], gt[j[keep]])
             except ValueError:
                 break
-        d, _ = tree.query(sim.apply(src))
+        d, _ = map(np.asarray, tree.query(sim.apply(src)))
         n_in = int((d < inlier_m).sum())
         med = float(np.median(d[d < inlier_m])) if n_in else float("inf")
         reg = Registration(sim, n_in, len(src), n_in / len(src), med, cand)
@@ -173,10 +180,109 @@ def in_roi(xyz: np.ndarray, box: tuple[np.ndarray, np.ndarray]) -> np.ndarray:
 
 
 def window_for_tree(cam_y: np.ndarray, side_len: int, tree_y: float, k: int) -> tuple[int, int]:
-    """[start, stop) of ``k`` contiguous side-local frames centred on the camera nearest a tree."""
+    """[start, stop) of ``k`` contiguous side-local frames centred on the camera nearest a tree.
+
+    ``cam_y`` has one entry per side frame. The window always has exactly ``k`` frames inside
+    ``[0, side_len)``; a side shorter than ``k`` raises instead of returning a negative start.
+    """
+    cam_y = np.asarray(cam_y, float)
+    if k < 1:
+        raise ValueError(f"window size must be >= 1, got {k}")
+    if side_len < k:
+        raise ValueError(f"side has {side_len} frames, fewer than the window size {k}")
+    if len(cam_y) != side_len:
+        raise ValueError(f"cam_y has {len(cam_y)} entries for a side of {side_len} frames")
+    if not np.all(np.isfinite(cam_y)):
+        raise ValueError("cam_y contains non-finite values")
     c = int(np.argmin(np.abs(cam_y - tree_y)))
     start = min(max(c - k // 2, 0), side_len - k)
     return start, start + k
+
+
+class AlignmentError(RuntimeError):
+    """The window's reconstruction does not fit its overview pseudo-poses."""
+
+
+MAX_CAM_RMS_FRAC = 0.5  # camera RMS misfit above this share of the window's camera span fails
+MAX_ROT_ERR_DEG = 30.0  # median camera orientation error above this fails (set a priori, not tuned)
+
+
+def registered_views(extrinsics: np.ndarray) -> np.ndarray:
+    """Mask of views with a camera. Sparse backbones (COLMAP) leave unregistered views all zero."""
+    ext = np.asarray(extrinsics, float)
+    return np.asarray(np.abs(ext[:, :3, :3]).sum((1, 2)) > 0)
+
+
+def align_window(gt_ext: np.ndarray, recon_ext: np.ndarray) -> Sim3:
+    """``align_chunk`` over the registered views only (identical to it when all are)."""
+    reg = registered_views(recon_ext)
+    if int(reg.sum()) < MIN_OVERLAP:
+        raise ChunkAlignmentError(f"only {int(reg.sum())} registered views")
+    return align_chunk(gt_ext[reg], recon_ext[reg])
+
+
+def align_to_reference(ref_ext: np.ndarray, recon_ext: np.ndarray) -> tuple[Sim3, float]:
+    """Sim(3) placing another backbone's window into the reference window's *aligned* frame.
+
+    Same fit as ``align_window``. Also returns the median orientation residual in degrees."""
+    sim = align_window(ref_ext, recon_ext)
+    reg = registered_views(recon_ext)
+    resid = rotation_errors_deg(np.asarray(ref_ext)[reg], np.asarray(recon_ext)[reg], sim)
+    return sim, float(np.median(resid))
+
+
+def rotation_errors_deg(gt_ext: np.ndarray, recon_ext: np.ndarray, sim: Sim3) -> np.ndarray:
+    """Per-view camera orientation error of the aligned reconstruction, in degrees."""
+    aligned = transform_extrinsics(recon_ext, sim)
+    return rotation_angles_deg(np.asarray(gt_ext, float)[:, :3, :3], aligned[:, :3, :3])
+
+
+def scaled_depth(depth: np.ndarray, sim: Sim3) -> np.ndarray:
+    """Depth maps in GT-frame metres. ``transform_extrinsics`` expresses camera coordinates in
+    destination units (``s * x_c``), so reconstruction-frame depth must be multiplied by ``s``
+    to be comparable with the ``z`` that ``project_points`` returns for GT apples."""
+    return np.asarray(depth, float) * sim.s
+
+
+def check_alignment(
+    gt_ext: np.ndarray,
+    recon_ext: np.ndarray,
+    sim: Sim3,
+    max_frac: float = MAX_CAM_RMS_FRAC,
+    max_rot_deg: float = MAX_ROT_ERR_DEG,
+) -> dict[str, float]:
+    """Camera misfit of the aligned window against the overview pseudo-poses.
+
+    Returns ``cam_rms_m``, ``cam_span_m`` and ``cam_rot_deg`` (median orientation error); raises
+    ``AlignmentError`` when the centre misfit is a large share of the span (meaningless scale),
+    the orientation error exceeds ``max_rot_deg`` (the depth test and GT would be built in a
+    rotated frame) or the scale is not finite and positive."""
+    if not np.isfinite(sim.s) or sim.s <= 0:
+        raise AlignmentError(f"non-positive alignment scale {sim.s}")
+    c_gt = camera_centers(gt_ext)
+    c_al = camera_centers(transform_extrinsics(recon_ext, sim))
+    rms = float(np.sqrt(((c_gt - c_al) ** 2).sum(1).mean()))
+    span = float(np.linalg.norm(np.ptp(c_gt, axis=0)))
+    if span > 0 and rms > max_frac * span:
+        raise AlignmentError(f"camera misfit {rms:.3f} m is >{max_frac:.0%} of span {span:.3f} m")
+    rot = float(np.median(rotation_errors_deg(gt_ext, recon_ext, sim)))
+    if not rot <= max_rot_deg:
+        raise AlignmentError(f"camera rotation error {rot:.1f} deg is >{max_rot_deg:g} deg")
+    return {"cam_rms_m": rms, "cam_span_m": span, "cam_rot_deg": rot}
+
+
+def _frame_gt(
+    gt_xyz: np.ndarray, intr: np.ndarray, ext: np.ndarray, hw: tuple[int, int], max_depth: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(indices, uv, z) of GT apples in front of the camera, within ``max_depth`` and the image."""
+    from bench.gt_matching import project_points
+
+    h, w = hw
+    uv, z = project_points(gt_xyz, intr, ext)
+    ok = np.isfinite(z) & (z > 0) & (z < max_depth)
+    ok &= (uv[:, 0] >= 0) & (uv[:, 0] <= w - 1) & (uv[:, 1] >= 0) & (uv[:, 1] <= h - 1)
+    idx = np.flatnonzero(ok)
+    return idx, uv, z
 
 
 def visible_gt(
@@ -187,18 +293,22 @@ def visible_gt(
     tol: float = GT_TOL_OCC_M,
     max_depth: float = GT_MAX_DEPTH_M,
 ) -> list[np.ndarray]:
-    """Per view: indices of GT apples in frame, in front of the reconstructed surface (metres)."""
-    from bench.gt_matching import project_points
+    """Per view: indices of GT apples in frame, in front of the reconstructed surface (metres).
 
+    ``depth_gt`` must already be in GT metres (``scaled_depth``). The depth map is read at the
+    nearest pixel (not truncated), including the last row and column. A pixel with no valid depth
+    (NaN, inf or <= 0) carries no occlusion evidence, so the apple stays visible there.
+    """
+    gt_xyz = np.asarray(gt_xyz, float).reshape(-1, 3)
     out = []
+    h, w = depth_gt.shape[1:]
     for v in range(len(intr)):
-        h, w = depth_gt.shape[1:]
-        uv, z = project_points(gt_xyz, intr[v], ext_gt[v])
-        ok = (z > 0) & (z < max_depth) & (uv[:, 0] >= 0) & (uv[:, 0] < w - 1)
-        ok &= (uv[:, 1] >= 0) & (uv[:, 1] < h - 1)
-        idx = np.flatnonzero(ok)
-        surf = depth_gt[v, uv[idx, 1].astype(int), uv[idx, 0].astype(int)]
-        out.append(idx[z[idx] <= surf + tol])
+        idx, uv, z = _frame_gt(gt_xyz, intr[v], ext_gt[v], (h, w), max_depth)
+        px = np.clip(np.rint(uv[idx, 0]).astype(int), 0, w - 1)
+        py = np.clip(np.rint(uv[idx, 1]).astype(int), 0, h - 1)
+        surf = depth_gt[v, py, px]
+        valid = np.isfinite(surf) & (surf > 0)
+        out.append(idx[~valid | (z[idx] <= surf + tol)])
     return out
 
 
@@ -209,11 +319,26 @@ def evaluate_window(
     gt_ids: list[str],
     gt_xyz: np.ndarray,
     box: tuple[np.ndarray, np.ndarray],
+    gt_ext: np.ndarray | None = None,
+    visible: list[np.ndarray] | None = None,
+    match_px: float = MATCH_PX,
 ) -> dict[str, Any]:
-    """Count, GT, association metrics and per-image baselines of one run, in the GT frame."""
+    """Count, GT, association metrics and per-image baselines of one run, in the GT frame.
+
+    ``gt_ext`` (the window's overview pseudo-poses), when given, is checked against the aligned
+    cameras (``check_alignment``) and the misfit is recorded in the result.
+
+    ``visible`` (per-view GT indices) replaces this reconstruction's own depth test. Another
+    backbone is scored against the reference window's GT this way, so both share one GT.
+    ``match_px`` is in this reconstruction's pixels.
+    """
+    reg = registered_views(recon.extrinsics)
+    align = check_alignment(gt_ext[reg], recon.extrinsics[reg], sim) if gt_ext is not None else {}
     ext_gt = transform_extrinsics(recon.extrinsics, sim)
-    depth_gt = recon.depth * sim.s
-    vis = visible_gt(gt_xyz, recon.intrinsics, ext_gt, depth_gt)
+    if visible is None:
+        vis = visible_gt(gt_xyz, recon.intrinsics, ext_gt, scaled_depth(recon.depth, sim))
+    else:
+        vis = visible
     visible_set = sorted({int(i) for v in vis for i in v})
     h, w = recon.depth.shape[1:]
 
@@ -234,22 +359,28 @@ def evaluate_window(
                 continue
             dets.append(Detection(id=m, frame_id=r.view, score=1.0, point_xy=np.array(r.uv)))
             cluster_of[m] = inst.id
+    # Identity labels: match each detection to the nearest GT apple *in frame* (visible or not),
+    # then keep the label only if that apple is in the visible set. A detection on an occluded
+    # apple is therefore unlabeled instead of being stolen by a different, visible neighbour.
     labels: dict[str, str | None] = {}
     for v in range(len(vis)):
         dv = [d for d in dets if d.frame_id == v]
         if not dv:
             continue
-        sel = vis[v]
+        inframe, _, _ = _frame_gt(gt_xyz, recon.intrinsics[v], ext_gt[v], (h, w), GT_MAX_DEPTH_M)
+        visible_v = {int(i) for i in vis[v]}
+        got = match_detections_to_gt(
+            dv,
+            [gt_ids[i] for i in inframe],
+            gt_xyz[inframe],
+            {v: recon.intrinsics[v]},
+            {v: ext_gt[v]},
+            {v: (w, h)},
+            threshold_px=match_px,
+        )
+        pos = {gt_ids[i]: int(i) for i in inframe}
         labels.update(
-            match_detections_to_gt(
-                dv,
-                [gt_ids[i] for i in sel],
-                gt_xyz[sel],
-                {v: recon.intrinsics[v]},
-                {v: ext_gt[v]},
-                {v: (w, h)},
-                threshold_px=MATCH_PX,
-            )
+            {k: (g if g is not None and pos[g] in visible_v else None) for k, g in got.items()}
         )
     clusters = [cluster_of[d.id] for d in dets]
     gts = [labels.get(d.id) for d in dets]
@@ -266,7 +397,18 @@ def evaluate_window(
         ]
         per_image.append(int(in_roi(np.array(xyz), box).sum()) if xyz else 0)
 
+    # Interval: the pipeline's covers every instance, ours counts only those in the ROI, so shift
+    # both ends by the number of out-of-ROI instances and keep low <= pred <= high.
+    low = high = None
+    iv = getattr(result, "interval", None)
+    if iv is not None:
+        out_of_roi = int(result.count) - pred
+        low = float(max(min(iv.low - out_of_roi, pred), 0))
+        high = float(max(iv.high - out_of_roi, pred))
     return {
+        **align,
+        "low": low,
+        "high": high,
         "pred": pred,
         "gt": len(visible_set),
         "raw_count": int(result.count),
@@ -291,12 +433,99 @@ def config_hash(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:12]
 
 
+def file_hash(path: Path) -> str:
+    """Short sha256 of a file's bytes (checkpoint provenance in config_json)."""
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:16]
+
+
+PROTOCOL = "fuji_core_v3"  # v3: window-alignment rotation fix; failed windows kept as rows
+
+# Pipeline method name per association. All of them read the same cached detections and
+# reconstruction of a window, so their upstream inputs are identical.
+ASSOC_METHODS: dict[str, str] = {
+    "v1": "countonce_v1",
+    "v2": "countonce_v2",
+    "sync": "countonce_sync",
+    "v3": "countonce_v3",
+    "cdog": "countonce_cdog",  # C-DOG re-implementation, bench/baselines_cdog.py
+}
+BACKBONES = ("vggt", "colmap")
+METHOD_ASSOC: dict[str, str] = {m: a for a, m in ASSOC_METHODS.items()}
+METHOD_ASSOC.update({f"{m}_colmap": a for a, m in ASSOC_METHODS.items()})
+BASELINE_METHODS = ("sum", "max", "median")
+
+
+def method_for_assoc(assoc: str, backbone: str = "vggt") -> str:
+    """Bench method name; VGGT (the default backbone) carries no suffix."""
+    if backbone not in BACKBONES:
+        raise ValueError(f"unknown backbone {backbone!r}; expected one of {BACKBONES}")
+    try:
+        return ASSOC_METHODS[assoc] + ("" if backbone == "vggt" else f"_{backbone}")
+    except KeyError:
+        known = sorted(ASSOC_METHODS)
+        raise ValueError(f"unknown assoc {assoc!r}; expected one of {known}") from None
+
+
+def methods_for(assocs: Any, baselines: bool = True, backbone: str = "vggt") -> tuple[str, ...]:
+    """Method names to schedule for ``assocs`` (order kept, duplicates dropped), plus the
+    per-image baselines when ``baselines`` (finished slices are skipped on resume anyway)."""
+    out = tuple(dict.fromkeys(method_for_assoc(a, backbone) for a in assocs))
+    # per-image baselines do not use a reconstruction, so only the VGGT run records them
+    return out + BASELINE_METHODS if baselines and backbone == "vggt" else out
+
+
+# One-switch ablations of the frozen v2 (PLAN §9.6): name -> the single Config field it changes.
+# Frozen v2 computes no appearance features, so its "± appearance" arm *adds* DINOv2 (switching
+# Config.appearance off would change nothing).
+ABLATIONS: dict[str, dict[str, Any]] = {
+    "no_cannot_link": {"cannot_link": False},
+    "no_hallucination_filter": {"hallucination": "off"},
+    "with_appearance": {"appearance_model": "dinov2_vits14"},
+    "sam_masks": {"masks": "sam"},  # frozen v2 has masks="none", i.e. box-centre lifting
+}
+# Protocols whose rows predate the window-alignment fix: nothing may be paired against them.
+STALE_PROTOCOLS = frozenset({"fuji_core_v2"})
+
+
+def ablation_method(name: str) -> str:
+    if name not in ABLATIONS:
+        raise ValueError(f"unknown ablation {name!r}; expected one of {sorted(ABLATIONS)}")
+    return f"{ASSOC_METHODS['v2']}__{name}"
+
+
+def check_ablation_request(name: str, split: str, ks: Any, backbone: str) -> None:
+    """Ablations are test-split, k=10, VGGT only, and need current-protocol v2 rows to pair with."""
+    ablation_method(name)
+    if (split, list(ks), backbone) != ("test", [10], "vggt"):
+        raise ValueError("--ablation needs --split test --ks 10 and the vggt backbone")
+    if PROTOCOL in STALE_PROTOCOLS:
+        raise ValueError(
+            f"protocol {PROTOCOL} rows predate the alignment fix; rerun v2 under a new "
+            "protocol before running ablations (docs/GATES.md)"
+        )
+
+
+def _row_protocol(r: dict[str, Any]) -> str | None:
+    try:
+        protocol: str | None = json.loads(r.get("config_json") or "{}").get("protocol")
+        return protocol
+    except ValueError:
+        return None
+
+
 def done_slices(csv_path: Path, split: str) -> set[tuple[str, str, int, str]]:
-    """(tree, side, k, method) of every finished (status ok) row of ``split`` in the CSV."""
+    """(tree, side, k, method) of every finished row of ``split`` in the CSV: status ``ok``, or
+    ``failed`` (a recorded reconstruction failure is a result, PLAN §9.8; ``error`` is retried).
+
+    Only rows of the current protocol count, so rows from an older scoring protocol are
+    never reused as finished work."""
     return {
         (r["scene_id"], r["sample"], int(r["n_views"]), r["method"])
         for r in read_rows(csv_path)
-        if r["status"] == "ok" and r["split"] == split and r["n_views"]
+        if r["status"] in ("ok", "failed")
+        and r["split"] == split
+        and r["n_views"]
+        and _row_protocol(r) == PROTOCOL
     }
 
 
@@ -334,6 +563,8 @@ def run_output(ev: dict[str, Any], method: str, res: Any, runtime_s: float) -> R
     return RunOutput(
         pred=pred,
         gt=float(ev["gt"]),
+        low=ev.get("low") if is_pipe else None,
+        high=ev.get("high") if is_pipe else None,
         runtime_s=runtime_s,
         peak_vram_mb=float(res.peak_vram_mb),
         timings={k: float(v) for k, v in res.timings.items()},
@@ -428,13 +659,13 @@ def register_dense(
                 continue
             sim = Sim3(s0, r, dst.mean(0) - s0 * r @ src.mean(0))
             for _ in range(iters):
-                d, j = tree.query(sim.apply(src))
+                d, j = map(np.asarray, tree.query(sim.apply(src)))
                 keep = d <= np.quantile(d, trim)
                 try:
                     sim = umeyama(src[keep], dst[j[keep]])
                 except ValueError:
                     break
-            d, _ = tree.query(sim.apply(src))
+            d, _ = map(np.asarray, tree.query(sim.apply(src)))
             n_in = int((d < 0.05).sum())
             med = float(np.median(d[d < 0.05])) if n_in else float("inf")
             reg = Registration(sim, n_in, len(src), n_in / len(src), med, cand)

@@ -64,7 +64,8 @@ def ece(probs: np.ndarray, labels: np.ndarray, n_bins: int = 10) -> float:
 
 def _logit(p: np.ndarray) -> np.ndarray:
     p = np.clip(p, _EPS, 1 - _EPS)
-    return np.log(p) - np.log1p(-p)
+    out: np.ndarray = np.log(p) - np.log1p(-p)
+    return out
 
 
 def apply_temperature(probs: np.ndarray, temperature: float) -> np.ndarray:

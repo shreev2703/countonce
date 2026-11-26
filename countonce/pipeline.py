@@ -14,7 +14,7 @@ import numpy as np
 from countonce.confidence import k_grid, sensitivity_range, threshold_grid
 from countonce.config import Config
 from countonce.conformal import CalibrationArtifact, interval_from_artifact, resolve_method
-from countonce.detect.base import Detector, filter_by_score
+from countonce.detect.base import Detector, filter_by_score, nms_per_frame
 from countonce.detect.cache import CachedDetector, DetectionCache
 from countonce.detect.masks import MaskCache, SamMaskProducer, attach_masks, build_mask_producer
 from countonce.detect.prompts import (
@@ -35,6 +35,7 @@ from countonce.ingest.privacy import (
 from countonce.ingest.sanitize import SanitizeReport, sanitize_image, validate_video
 from countonce.ingest.select import cap_frames, drop_near_duplicates
 from countonce.lift import LiftKwargs, apply_lift_region, compute_scene_scale, lift_detections
+from countonce.merge.appearance import load_extractor
 from countonce.merge.base import Associator
 from countonce.merge.cluster import V1Associator
 from countonce.merge.match import V2Associator, V2Config
@@ -148,10 +149,13 @@ def build_detector(config: Config) -> Detector:
         from countonce.detect.groundingdino import GroundingDinoDetector
 
         return GroundingDinoDetector(**config.detector_options)
-    if config.detector == "countgd":
-        from countonce.detect.countgd import CountGDDetector
+    if config.detector in ("countgd", "countgdpp"):
+        from countonce.errors import PlannedComponentError
 
-        return CountGDDetector(**config.detector_options)
+        raise PlannedComponentError(
+            f"detector {config.detector!r} is planned, not implemented (weights are gated and the "
+            "forward pass is a stub); use 'gdino' (the default). See docs/STATUS.md."
+        )
     if config.detector == "color_blob":  # test backend only (docs/DEVIATIONS.md)
         from countonce.detect.color_blob import ColorBlobDetector
 
@@ -214,6 +218,9 @@ def _make_base_associator(config: Config, k: float) -> Associator:
             "hallucination": config.hallucination,
         }
     )
+    extractor = None
+    if config.appearance and config.appearance_model is not None:
+        extractor = load_extractor(config.appearance_model)
     if config.assoc == "v3":
         from countonce.merge.v3 import V3Associator, load_cached
 
@@ -222,8 +229,21 @@ def _make_base_associator(config: Config, k: float) -> Associator:
         thr = min(max(1.0 - 0.5 * k / config.merge_k, 0.05), 0.95)
         return V3Associator(model=load_cached(config.v3_checkpoint), threshold=thr)
     if config.assoc == "sync":
-        return SyncAssociator(v2_config=v2cfg)
-    return V2Associator(v2cfg)
+        return SyncAssociator(v2_config=v2cfg, extractor=extractor)
+    if config.assoc == "cdog":
+        # comparison baseline kept under bench/ (re-implemented from the paper; the original has
+        # no licence), imported only when selected. Like the other gates, tau scales with k.
+        from bench.baselines_cdog import CDOGAssociator, CDOGConfig
+
+        return CDOGAssociator(
+            CDOGConfig(
+                tau_px=config.cdog_tau_px * k / config.merge_k,
+                delta=config.cdog_delta,
+                iqr_alpha=config.cdog_iqr_alpha,
+            ),
+            v2_config=v2cfg,
+        )
+    return V2Associator(v2cfg, extractor)
 
 
 def make_count_at(
@@ -376,7 +396,7 @@ def _run(
     export: bool,
     privacy_detector: PrivacyRegionDetector | None,
 ) -> CountResult:
-    if config.assoc not in ("v1", "v2", "v3", "sync"):
+    if config.assoc not in ("v1", "v2", "v3", "sync", "cdog"):
         raise NotImplementedError(f"associator {config.assoc!r} is not implemented yet")
     if config.assoc == "v3":
         from countonce.merge.v3 import require_checkpoint
@@ -392,7 +412,14 @@ def _run(
     if config.blur_threshold > 0:
         paths, _ = drop_blurry(paths, config.blur_threshold)
     if config.dedup_threshold > 0:
+        n_before = len(paths)
         paths, _ = drop_near_duplicates(paths, config.dedup_threshold)
+        if n_before > 1 and len(paths) == 1:
+            log.warning(
+                "near-duplicate filter kept 1 of %d frames; multi-view geometry is unused "
+                "(lower dedup_threshold, or 0 to disable, if the views differ)",
+                n_before,
+            )
     if config.max_frames > 0:
         paths = cap_frames(paths, config.max_frames)
     if not paths:
@@ -462,6 +489,7 @@ def _run(
             raw_detections = attach_masks(
                 raw_detections, frames, producer, f"{det.name}@{det.version}", mask_cache
             )
+    raw_detections = nms_per_frame(raw_detections, config.nms_iou)
     detections = filter_by_score(raw_detections, config.score_threshold)
     marks.mark("detect", t)
 

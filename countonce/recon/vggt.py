@@ -1,4 +1,4 @@
-# Ported from ~/vggtProject (vggt-sparse-recon): vggt_bench/methods/vggt_method.py. Adapted.
+# Ported from vggt-sparse-recon: vggt_bench/methods/vggt_method.py. Adapted.
 """VGGT wrapped behind the ReconMethod interface.
 
 Follows the usage in the VGGT README: `VGGT.from_pretrained`, images from

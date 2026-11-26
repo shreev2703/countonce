@@ -126,8 +126,11 @@ class Correction(Base):  # Moon tier (UI in Strong)
     action: Mapped[str] = mapped_column(Text, nullable=False)  # split | merge | reject
     detection_ids: Mapped[Any] = mapped_column(JSON)
     instance_ids: Mapped[Any] = mapped_column(JSON)
+    key: Mapped[str | None] = mapped_column(Text)  # stable identity; repeats are no-ops
+    consent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
     created_at: Mapped[float | None] = mapped_column(Float)
     exported_version: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (UniqueConstraint("job_id", "key", name="corrections_job_key"),)
 
 
 class ShareToken(Base):
@@ -348,5 +351,6 @@ EXTRA_COLUMNS: dict[str, tuple[str, ...]] = {
         "trace_context",  # W3C traceparent of the submit (migration 0002)
     ),
     "api_keys": ("salt",),  # PBKDF2 salt for hashed_key
+    "corrections": ("key", "consent"),  # idempotent replay, reuse consent (migration 0003)
 }
 EXTRA_TABLES = ("rate_buckets", "upload_sessions", "upload_chunks")

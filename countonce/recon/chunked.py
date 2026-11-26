@@ -2,8 +2,9 @@
 
 When a capture has more frames than the backbone can hold (config ``chunk_size`` or the
 memory-guard calibration), reconstruct overlapping chunks, align each chunk to the previously
-merged result with a Sim(3) fitted to the shared frames' camera centres (Umeyama,
-``recon.align``) and merge into one dense ``types.Recon``. Shared frames keep the earlier
+merged result with a Sim(3) fitted to the shared cameras (rotation from orientations, scale and
+translation from centres; ``recon.align.align_by_poses``) and merge into one dense ``types.Recon``.
+Shared frames keep the earlier
 chunk's copy. Chaining is sequential, so scale/rotation drift accumulates with chunk count;
 ``stitch="pose_graph"`` instead solves a global Sim(3) synchronization over every pair of chunks
 that share frames (``recon.posegraph``) and falls back to chaining when the graph is a tree
@@ -18,7 +19,12 @@ from typing import Any
 import numpy as np
 
 from countonce.oom import RungUnavailable
-from countonce.recon.align import Sim3, camera_centers, transform_extrinsics, umeyama
+from countonce.recon.align import (
+    Sim3,
+    align_by_poses,
+    camera_centers,
+    transform_extrinsics,
+)
 from countonce.recon.base import Reconstructor
 from countonce.types import Frame, Recon
 
@@ -45,18 +51,6 @@ def chunk_ranges(n: int, cap: int, overlap: int) -> list[tuple[int, int]]:
         start = end - overlap
 
 
-def _alignment_points(ext: np.ndarray) -> np.ndarray:
-    """Correspondence points for shared cameras: centres, plus (for exactly two cameras, where
-    centres alone leave the rotation about their axis free) each camera's optical-axis and
-    up-axis tips at one baseline length, which is scale-consistent within a chunk."""
-    c = camera_centers(ext)
-    if len(c) >= 3:
-        return c
-    baseline = float(np.linalg.norm(c[1] - c[0]))
-    rot = ext[:, :3, :3]  # camera axes in world are the rows of R
-    return np.concatenate([c, c + baseline * rot[:, 2], c + baseline * rot[:, 1]])
-
-
 def align_chunk(merged_ext: np.ndarray, chunk_ext: np.ndarray) -> Sim3:
     """Sim(3) taking the chunk's world frame to the merged frame from shared cameras."""
     n = len(merged_ext)
@@ -67,7 +61,7 @@ def align_chunk(merged_ext: np.ndarray, chunk_ext: np.ndarray) -> Sim3:
     if np.linalg.norm(np.ptp(camera_centers(merged_ext), axis=0)) < 1e-9:
         raise ChunkAlignmentError("shared cameras coincide; cannot estimate chunk scale")
     try:
-        return umeyama(_alignment_points(chunk_ext), _alignment_points(merged_ext))
+        return align_by_poses(chunk_ext, merged_ext)
     except ValueError as e:
         raise ChunkAlignmentError(f"chunk alignment failed: {e}") from e
 

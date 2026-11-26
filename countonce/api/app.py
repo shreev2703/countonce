@@ -12,7 +12,9 @@ process on the same database) claims and completes it. Error bodies are
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
+import os
 import threading
 import time
 import uuid
@@ -106,6 +108,17 @@ class FeedbackIn(BaseModel):
     correct: bool
     user_count: int | None = None
     comment: str | None = None
+
+
+class AuthExchange(BaseModel):
+    provider: str = Field(min_length=1, max_length=32)
+    subject: str = Field(min_length=1, max_length=256)
+
+
+class CorrectionIn(BaseModel):
+    action: str
+    detection_ids: list[str] = Field(min_length=1)
+    consent: bool = False
 
 
 class UploadCreate(BaseModel):
@@ -226,6 +239,7 @@ def create_app(
     worker_online_s: float = WORKER_ONLINE_S,
     sse_poll_s: float = 0.5,
     sse_max_s: float = 3600.0,
+    auth_secret: str | None = None,
     tracing_cfg: tracing.TracingConfig | None = None,
 ) -> FastAPI:
     """Build the app. ``store.rate_limit`` limits job *submits*; ``request_rate_limit`` limits all
@@ -292,6 +306,29 @@ def create_app(
     def own_session(session_id: str, user: str) -> None:
         if svc.owner(session_id) != user:
             raise ApiError(404, "ERR_NOT_FOUND", f"no such upload session: {session_id}")
+
+    # -- sign-in --------------------------------------------------------------------------
+    @app.post("/auth/exchange")
+    def auth_exchange(
+        body: AuthExchange, x_auth_secret: str | None = Header(default=None)
+    ) -> dict[str, Any]:
+        """Trusted web server -> API key for an identity it already verified (Google OAuth).
+
+        Off (404) unless ``auth_secret`` is set. The web server keeps the key in an encrypted
+        httpOnly cookie, so the browser never sees it. Every sign-in mints a fresh key.
+        """
+        if not auth_secret:
+            raise ApiError(404, "ERR_NOT_FOUND", "sign-in exchange is not enabled")
+        if not x_auth_secret or not hmac.compare_digest(x_auth_secret, auth_secret):
+            raise ApiError(401, "ERR_UNAUTHENTICATED", "bad auth secret")
+        user = f"{body.provider}:{body.subject}"
+        store.ensure_user(user)
+        _, key = store.create_api_key(user)
+        return {"user_id": user, "api_key": key}
+
+    @app.get("/me")
+    def me(user: str = User) -> dict[str, Any]:
+        return {"user_id": user}
 
     # -- jobs -----------------------------------------------------------------------------
     @app.post("/jobs", status_code=201)
@@ -422,6 +459,63 @@ def create_app(
         fid = store.add_feedback(job_id, user, body.correct, body.user_count, body.comment)
         return {"id": fid}
 
+    @app.post("/jobs/{job_id}/corrections")
+    def post_correction(job_id: str, body: CorrectionIn, user: str = User) -> dict[str, Any]:
+        """Split / merge / reject on a finished job. Replayed on the stored result, so the
+        original is never changed; a repeat of the same action is a no-op."""
+        from countonce.corrections import Correction, apply_corrections
+        from countonce.errors import CorrectionError
+        from countonce.schemas import load_result
+
+        job = own_job(job_id, user)
+        res = store.get_result(job_id) if job["status"] == "done" else None
+        if res is None:
+            raise ApiError(409, "ERR_NOT_READY", "corrections need a finished job")
+        try:
+            corr = Correction(
+                job_id, body.action, tuple(body.detection_ids), user, consent=body.consent
+            )
+            raw = _result_view(res)["result_json"]
+            existing = [
+                Correction(job_id, c["action"], tuple(c["detection_ids"]))
+                for c in store.corrections(job_id)
+            ]
+            apply_corrections(load_result(raw), [*existing, corr])  # validates before storing
+        except CorrectionError as exc:
+            raise ApiError(422, exc.code.value, str(exc), user_tip(exc.code)) from exc
+        except (ValueError, KeyError) as exc:
+            raise ApiError(422, ErrorCode.ERR_INVALID_CORRECTION.value, str(exc)) from exc
+        cid, created = store.add_correction(
+            job_id, user, corr.key, corr.action, list(corr.detection_ids), body.consent
+        )
+        return {"id": cid, "idempotent_replay": not created, **_corrected(job_id, raw)}
+
+    def _corrected(job_id: str, raw: dict[str, Any]) -> dict[str, Any]:
+        from countonce.corrections import Correction, apply_corrections
+        from countonce.schemas import load_result
+
+        items = [
+            Correction(job_id, c["action"], tuple(c["detection_ids"]))
+            for c in store.corrections(job_id)
+        ]
+        out = apply_corrections(load_result(raw), items)
+        return {"corrected_count": out.count, "corrections": len(items)}
+
+    @app.get("/jobs/{job_id}/corrections")
+    def get_corrections(job_id: str, user: str = User) -> dict[str, Any]:
+        job = own_job(job_id, user)
+        rows = store.corrections(job_id)
+        out: dict[str, Any] = {"corrections": rows, "corrected_count": None}
+        res = store.get_result(job_id) if job["status"] == "done" else None
+        if res is not None and rows:
+            try:
+                out["corrected_count"] = _corrected(job_id, _result_view(res)["result_json"])[
+                    "corrected_count"
+                ]
+            except (ValueError, KeyError):
+                pass  # a result without detections (older schema) has nothing to correct
+        return out
+
     @app.delete("/jobs/{job_id}")
     def delete_job(job_id: str, user: str = User) -> dict[str, Any]:
         own_job(job_id, user)
@@ -492,7 +586,35 @@ def create_app(
         return out
 
     # -- health ---------------------------------------------------------------------------
-    @app.api_route("/health", methods=["GET", "HEAD"])
+    @app.get("/status")
+    def public_status() -> dict[str, Any]:
+        """Public, read-only: worker and queue state plus timings of recently finished jobs.
+        No ids, users, prompts or worker names."""
+        rows = store._query(
+            "SELECT status, created_at, started_at, finished_at FROM jobs "
+            "WHERE status IN ('done', 'failed', 'dead_letter') AND finished_at IS NOT NULL "
+            "ORDER BY finished_at DESC LIMIT 10",
+            (),
+        )
+        recent = []
+        for r in rows:
+            start = r["started_at"]
+            recent.append(
+                {
+                    "status": r["status"],
+                    "finished_at": r["finished_at"],
+                    "wait_s": None if start is None else max(0.0, start - r["created_at"]),
+                    "run_s": None if start is None else max(0.0, r["finished_at"] - start),
+                }
+            )
+        state = health()
+        return {
+            **{k: state[k] for k in ("workers_online", "processing_paused", "queue")},
+            "recent": recent,
+        }
+
+    @app.head("/health", include_in_schema=False)
+    @app.get("/health")
     def health() -> dict[str, Any]:
         cutoff = store.clock() - worker_online_s
         workers = store._query(
@@ -517,11 +639,13 @@ def open_app(
     *,
     rate_limit: int | None = None,
     request_rate_limit: int | None = None,
+    auth_secret: str | None = None,
     limits_path: Path | None = None,
     store_kind: str = "sqlite",
     pg_url: str | None = None,
     blobs: BlobStore | None = None,
     tracing_cfg: tracing.TracingConfig | None = None,
+    sse_max_s: float | None = None,
 ) -> FastAPI:
     """App for a job database; upload limits from ``configs/uploads.yaml``.
 
@@ -544,5 +668,9 @@ def open_app(
         store,
         UploadService(store, upload_root, limits),
         request_rate_limit=request_rate_limit,
+        auth_secret=auth_secret or os.environ.get("COUNTONCE_AUTH_SECRET"),
         tracing_cfg=tracing_cfg,
+        sse_max_s=sse_max_s
+        if sse_max_s is not None
+        else float(os.environ.get("COUNTONCE_SSE_MAX_S") or 3600.0),
     )

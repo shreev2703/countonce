@@ -32,9 +32,9 @@ _BUCKETS = 10_000  # percent resolution of 0.01
 
 
 class LiveRoute(BaseModel):
-    detector: DetectorName = "countgd"
+    detector: DetectorName = "gdino"
     backbone: BackboneName = "vggt"
-    assoc: str = "v1"
+    assoc: str = Config.model_fields["assoc"].default
 
 
 class ShadowRoute(BaseModel):

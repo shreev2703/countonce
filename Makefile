@@ -23,10 +23,10 @@ lint:
 test:
 	pytest
 
-# Render paper tables from results/bench.csv; builds paper/main.pdf only if latexmk is installed.
+# Render paper tables from results/bench.csv; builds experimental/paper/main.pdf only if latexmk is installed.
 paper:
-	$(PYTHON) scripts/make_paper_tables.py --out paper/tables
-	@if command -v latexmk >/dev/null; then cd paper && latexmk -pdf -interaction=nonstopmode main.tex; \
+	$(PYTHON) scripts/make_paper_tables.py --out experimental/paper/tables
+	@if command -v latexmk >/dev/null; then cd experimental/paper && latexmk -pdf -interaction=nonstopmode main.tex; \
 	else echo "latexmk not found: tables rendered, PDF skipped"; fi
 
 # Static project page (self-contained, placeholders where results are missing).

@@ -1,4 +1,4 @@
-# Ported from ~/vggtProject (vggt-sparse-recon): vggt_bench/plotting.py. Adapted for countonce.
+# Ported from vggt-sparse-recon: vggt_bench/plotting.py. Adapted for countonce.
 """Shared figure style so every plot in the README looks consistent."""
 
 from __future__ import annotations

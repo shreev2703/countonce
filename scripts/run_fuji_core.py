@@ -4,6 +4,17 @@
     python scripts/run_fuji_core.py bench --split val   # thresholds are chosen on val trees
     python scripts/run_fuji_core.py bench --split test --budget-min 90
 
+    python scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600
+
+``--backbone colmap`` (frozen v2 only) runs COLMAP on the same windows, cached detections and GT.
+The window's GT and frame come from the VGGT reference reconstruction; COLMAP's cameras are placed
+in that frame (``fuji_core.align_to_reference``). Failed registrations are recorded as
+``status=failed`` rows.
+
+``--split test --ks 10 --ablation NAME`` changes one ``Config`` field of the frozen v2
+(``fuji_core.ABLATIONS``) and writes ``countonce_v2__NAME`` rows. Each window needs its finished
+v2 row of the current protocol with the same GT. It refuses to run on a stale protocol.
+
 Outputs go to ``runs/fuji_core/`` (git-ignored) and ``results/bench.csv`` (append-only).
 Run from the repo root inside ``.venv-gpu`` with ``PYTHONPATH=.``.
 """
@@ -21,12 +32,13 @@ import numpy as np
 
 from bench import fuji_core as fc
 from bench.datasets.fuji_sfm import FujiScene, load_fuji_sfm
-from bench.runner import DEFAULT_CSV, Job, RunOutput, run_jobs
+from bench.runner import DEFAULT_CSV, Job, RunOutput, SkipRun, read_rows, run_jobs
 from countonce.config import Config
 from countonce.pipeline import build_detector, build_reconstructor, run
+from countonce.recon.adapter import ReconAdaptError
 from countonce.recon.align import camera_centers, transform_extrinsics
 from countonce.recon.cache import ReconCache
-from countonce.recon.chunked import align_chunk
+from countonce.recon.chunked import ChunkAlignmentError
 
 WORK = Path("runs/fuji_core")
 PROMPT = "apple"
@@ -128,15 +140,55 @@ def load_frozen(path: Path, split: str) -> tuple[dict[str, Any], str]:
 
 
 def _mk(args: argparse.Namespace) -> dict[str, Any]:
-    return {} if args.merge_k is None else {"merge_k": args.merge_k}
+    out: dict[str, Any] = {} if args.merge_k is None else {"merge_k": args.merge_k}
+    # C-DOG settings; only read by assoc "cdog" (frozen in configs/fuji_core_cdog.yaml)
+    if args.cdog_tau_px is not None:
+        out["cdog_tau_px"] = args.cdog_tau_px
+    if args.cdog_delta is not None:
+        out["cdog_delta"] = args.cdog_delta
+    return out
+
+
+def _v3_meta(args: argparse.Namespace) -> dict[str, Any]:
+    if "v3" not in args.assocs:
+        return {}
+    ck = Path(args.v3_checkpoint)
+    if not ck.is_file():
+        raise SystemExit(f"v3 checkpoint {ck} is missing")
+    return {"v3_checkpoint": str(ck), "v3_checkpoint_sha256": fc.file_hash(ck)}
+
+
+def reference_gt(csv_path: Path, split: str, tree: str, side: str, k: int) -> float | None:
+    """GT of the finished VGGT v2 row of a window, if the CSV has one."""
+    for r in reversed(read_rows(csv_path)):
+        if (r["status"], r["split"], r["scene_id"], r["sample"], r["n_views"], r["method"]) == (
+            "ok", split, tree, side, str(k), "countonce_v2"
+        ) and fc._row_protocol(r) == fc.PROTOCOL:  # fmt: skip
+            return float(r["gt"])
+    return None
 
 
 def cmd_bench(args: argparse.Namespace) -> None:
+    ablation = args.ablation
+    if ablation:
+        try:
+            fc.check_ablation_request(ablation, args.split, args.ks, args.backbone)
+        except ValueError as e:
+            raise SystemExit(str(e)) from e
+        args.assocs = ["v2"]
+    colmap = args.backbone == "colmap"
+    if colmap and list(args.assocs) == ["v1", "v2"]:  # the parser default
+        args.assocs = ["v2"]
+    if colmap and list(args.assocs) != ["v2"]:
+        raise SystemExit("--backbone colmap runs the frozen v2 settings only")
     frozen, cfg_hash = load_frozen(args.config, args.split)
     if "score_threshold" in frozen:
         args.score_threshold = float(frozen["score_threshold"])
     if "merge_k" in frozen:
         args.merge_k = float(frozen["merge_k"])
+    for key in ("cdog_tau_px", "cdog_delta"):
+        if key in frozen:
+            setattr(args, key, float(frozen[key]))
     scene = load_fuji_sfm("data/fuji_sfm", validate=False)
     imgs = fc.prepare_images(scene, WORK / "img")
     ov = {}
@@ -149,34 +201,62 @@ def cmd_bench(args: argparse.Namespace) -> None:
     trees = scene.trees[split_key]
     box = fc.roi_box(scene.gt_xyz)
     base = base_config(score_threshold=args.score_threshold, **_mk(args))
-    det, rec = build_detector(base), build_reconstructor(base)
+    det, rec = build_detector(base), build_reconstructor(base)  # rec: VGGT (reference)
+    col_cfg = {"backbone": "colmap", "chunked_recon": False}
+    col = build_reconstructor(base_config(**col_cfg)) if colmap else None
+    bench_rec = col if col is not None else rec
     model_cfg = {
         "detector": f"{det.name}@{det.version}",
-        "backbone": rec.config() if hasattr(rec, "config") else str(rec),
+        "backbone": bench_rec.config() if hasattr(bench_rec, "config") else str(bench_rec),
         "prompt": PROMPT, "score_threshold": args.score_threshold, "merge_k": base.merge_k,
         "downscale": fc.DOWNSCALE, "stride": STRIDE, "roi_margin_m": fc.ROI_MARGIN_M,
         "gt_tol_occ_m": fc.GT_TOL_OCC_M, "gt_max_depth_m": fc.GT_MAX_DEPTH_M,
-        "match_px": fc.MATCH_PX, "chunk_size": base.chunk_size, "protocol": "fuji_core_v1",
+        "match_px": fc.MATCH_PX, "chunk_size": base.chunk_size, "protocol": fc.PROTOCOL,
+        "assocs": list(args.assocs), **_v3_meta(args),
         "frozen_config": str(args.config), "frozen_config_hash": cfg_hash,
         "frozen_values": frozen, **fc.host_info(),
     }  # fmt: skip
+    if colmap:
+        model_cfg["gt_reference"] = "vggt_window_visibility"
+        model_cfg["alignment"] = "colmap_cameras_to_vggt_aligned_window"
+    if ablation:
+        model_cfg["ablation"] = ablation
+        model_cfg["ablation_override"] = fc.ABLATIONS[ablation]
     t_start = time.time()
     memo: dict[tuple[str, str, int], dict[str, Any]] = {}
+    failed_windows: dict[tuple[str, str, int], str] = {}
 
     def group(tree: str, side: str, k: int) -> dict[str, Any]:
+        """A window whose VGGT chunk alignment or rotation gate fails is a recorded ``failed``
+        result for every method of that window (PLAN §9.8), not a dropped or retried row."""
+        key = (tree, side, k)
+        if key in failed_windows:
+            raise SkipRun("failed", failed_windows[key])
+        try:
+            return _group(tree, side, k)
+        except (ReconAdaptError, ChunkAlignmentError, fc.AlignmentError) as e:
+            print(tree, side, k, "FAILED", e, flush=True)
+            failed_windows[key] = f"{type(e).__name__}: {e}"
+            raise SkipRun("failed", failed_windows[key]) from e
+
+    def _group(tree: str, side: str, k: int) -> dict[str, Any]:
         key = (tree, side, k)
         if key in memo:
             return memo[key]
         start, stop, paths, gt_ext = _window(scene, imgs, ov, side, tree, k)
         runs: dict[str, Any] = {}
-        for assoc in ("v1", "v2"):
-            cfg = base_config(assoc=assoc, score_threshold=args.score_threshold, **_mk(args))
+        # v1 always runs: it carries the per-image baselines and the shared ingest/detect timings
+        for assoc in dict.fromkeys(("v1", *args.assocs)):
+            extra = {"v3_checkpoint": args.v3_checkpoint} if assoc == "v3" else {}
+            cfg = base_config(
+                assoc=assoc, score_threshold=args.score_threshold, **_mk(args), **extra
+            )
             res = run(paths, PROMPT, cfg, detector=det, reconstructor=rec, export=False)
             recon = load_recon(cfg, res.recon_cache_key or "")
             if recon.n_views != k:
                 raise RuntimeError(f"recon has {recon.n_views} views, expected {k}")
-            sim = align_chunk(gt_ext, recon.extrinsics)
-            ev = fc.evaluate_window(res, recon, sim, scene.gt_ids, scene.gt_xyz, box)
+            sim = fc.align_window(gt_ext, recon.extrinsics)
+            ev = fc.evaluate_window(res, recon, sim, scene.gt_ids, scene.gt_xyz, box, gt_ext)
             runs[assoc] = (ev, res)
         c_gt = camera_centers(gt_ext)
         c_al = camera_centers(transform_extrinsics(recon.extrinsics, sim))
@@ -188,6 +268,59 @@ def cmd_bench(args: argparse.Namespace) -> None:
         memo[key] = runs
         return runs
 
+    def colmap_group(tree: str, side: str, k: int) -> dict[str, Any]:
+        _, _, paths, gt_ext = _window(scene, imgs, ov, side, tree, k)
+        kw: dict[str, Any] = {"score_threshold": args.score_threshold, **_mk(args)}
+        # the window's GT is the VGGT reference's (cached recon and detections)
+        cfg = base_config(assoc="v2", **kw)
+        ref = run(paths, PROMPT, cfg, detector=det, reconstructor=rec, export=False)
+        ref_rec = load_recon(cfg, ref.recon_cache_key or "")
+        ref_sim = fc.align_window(gt_ext, ref_rec.extrinsics)
+        ref_ext = transform_extrinsics(ref_rec.extrinsics, ref_sim)
+        visible = fc.visible_gt(
+            scene.gt_xyz,
+            ref_rec.intrinsics,
+            ref_ext,
+            fc.scaled_depth(ref_rec.depth, ref_sim),
+        )
+        n_gt = len({int(i) for v in visible for i in v})
+        want = reference_gt(args.csv, args.split, tree, side, k)
+        if want is not None and want != n_gt:
+            raise RuntimeError(f"reference GT {n_gt} differs from the VGGT row's {want:g}")
+        cfg = base_config(assoc="v2", **col_cfg, **kw)
+        try:
+            res = run(paths, PROMPT, cfg, detector=det, reconstructor=col, export=False)
+            recon = load_recon(cfg, res.recon_cache_key or "")
+            sim, rot_resid = fc.align_to_reference(ref_ext, recon.extrinsics)
+            # same tolerance as a fraction of the image width as on the VGGT grid
+            match_px = fc.MATCH_PX * recon.depth.shape[2] / ref_rec.depth.shape[2]
+            ev = fc.evaluate_window(res, recon, sim, scene.gt_ids, scene.gt_xyz, box, ref_ext,
+                                    visible=visible, match_px=match_px)  # fmt: skip
+        except (ReconAdaptError, ChunkAlignmentError, fc.AlignmentError) as e:
+            print(tree, side, k, "FAILED", e, flush=True)
+            raise SkipRun("failed", f"{type(e).__name__}: {e}") from e
+        n_reg = int(fc.registered_views(recon.extrinsics).sum())
+        return {"ev": ev, "res": res, "n_registered": n_reg, "rot_resid_deg": rot_resid}
+
+    def ablation_group(tree: str, side: str, k: int) -> dict[str, Any]:
+        want = reference_gt(args.csv, args.split, tree, side, k)
+        if want is None:
+            raise RuntimeError("no finished v2 row of this window to pair with")
+        _, _, paths, gt_ext = _window(scene, imgs, ov, side, tree, k)
+        kw: dict[str, Any] = {"score_threshold": args.score_threshold, **_mk(args)}
+        cfg = base_config(assoc="v2", **kw, **fc.ABLATIONS[ablation])
+        try:
+            res = run(paths, PROMPT, cfg, detector=det, reconstructor=rec, export=False)
+            recon = load_recon(cfg, res.recon_cache_key or "")
+            sim = fc.align_window(gt_ext, recon.extrinsics)
+            ev = fc.evaluate_window(res, recon, sim, scene.gt_ids, scene.gt_xyz, box, gt_ext)
+        except (ReconAdaptError, ChunkAlignmentError, fc.AlignmentError) as e:
+            print(tree, side, k, "FAILED", e, flush=True)
+            raise SkipRun("failed", f"{type(e).__name__}: {e}") from e
+        if ev["gt"] != want:
+            raise RuntimeError(f"GT {ev['gt']} differs from the v2 row's {want:g}")
+        return {"ev": ev, "res": res}
+
     def jobs() -> Iterator[Job]:
         for k in args.ks:
             for tree in trees:
@@ -195,18 +328,41 @@ def cmd_bench(args: argparse.Namespace) -> None:
                     if (time.time() - t_start) / 60 > args.budget_min:
                         print(f"budget hit before {tree}/{side}/k={k}", flush=True)
                         return
-                    for method in ("countonce_v1", "countonce_v2", "sum", "max", "median"):
+                    methods = (
+                        (fc.ablation_method(ablation),)
+                        if ablation
+                        else fc.methods_for(args.assocs, not args.no_baselines, args.backbone)
+                    )
+                    for method in methods:
                         cfg = {**model_cfg, "tree": tree, "side": side}
                         yield fc.make_job(tree, args.split, side, k, method, cfg)
 
     def fn(job: Job) -> RunOutput:
         assert job.n_views is not None
+        if ablation:
+            got = ablation_group(job.scene_id, job.sample, job.n_views)
+            res = got["res"]
+            out = fc.run_output(got["ev"], job.method, res, res.timings["total"])
+            print(job.scene_id, job.sample, job.n_views, job.method, "pred", out.pred, "gt",
+                  out.gt, flush=True)  # fmt: skip
+            return out
+        if colmap:
+            got = colmap_group(job.scene_id, job.sample, job.n_views)
+            res = got["res"]
+            out = fc.run_output(got["ev"], job.method, res, res.timings["total"])
+            assert out.timings is not None
+            out.timings["n_registered"] = float(got["n_registered"])
+            out.timings["rot_resid_deg"] = got["rot_resid_deg"]
+            print(job.scene_id, job.sample, job.n_views, job.method, "pred", out.pred, "gt",
+                  out.gt, "registered", got["n_registered"], flush=True)  # fmt: skip
+            return out
         runs = group(job.scene_id, job.sample, job.n_views)
         v1_ev, v1_res = runs["v1"]
         if job.method.startswith("countonce"):
-            ev, res = runs["v2" if job.method.endswith("v2") else "v1"]
+            assoc = fc.METHOD_ASSOC[job.method]
+            ev, res = runs[assoc]
             t = dict(res.timings)
-            if job.method.endswith("v2"):  # recon and detection are shared; add v2's own stages
+            if assoc != "v1":  # recon and detection are shared; add this association's own stages
                 t = {**v1_res.timings, "associate": t["associate"], "confidence": t["confidence"]}
                 t["total"] = sum(
                     t[x] for x in ("ingest", "detect", "recon", "associate", "confidence")
@@ -238,8 +394,31 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--split", choices=["val", "test"], default="val")
     b.add_argument("--ks", type=int, nargs="+", default=[3, 5, 10, 20])
     b.add_argument("--sides", nargs="+", default=["east", "west"])
+    b.add_argument("--backbone", choices=fc.BACKBONES, default="vggt")
     b.add_argument("--score-threshold", type=float, default=0.3)
     b.add_argument("--merge-k", type=float, default=None, help="v1 association distance (x size)")
+    b.add_argument("--cdog-tau-px", type=float, default=None, help="C-DOG epipolar gate (px)")
+    b.add_argument("--cdog-delta", type=float, default=None, help="C-DOG overlap threshold")
+    b.add_argument(
+        "--assocs",
+        nargs="+",
+        choices=sorted(fc.ASSOC_METHODS),
+        default=["v1", "v2"],
+        help="pipeline associations (identical cached upstream inputs); "
+        "--backbone colmap runs v2 only",
+    )
+    b.add_argument(
+        "--v3-checkpoint",
+        type=Path,
+        default=Path("models/checkpoints/v001.pt"),
+        help="registered matcher checkpoint, used as-is (no Fuji fine-tune)",
+    )
+    b.add_argument(
+        "--no-baselines",
+        action="store_true",
+        help="skip the per-image baseline rows (already in the CSV)",
+    )
+    b.add_argument("--ablation", choices=sorted(fc.ABLATIONS), help="one-switch v2 ablation")
     b.add_argument("--budget-min", type=float, default=90.0)
     b.add_argument("--config", type=Path, default=FROZEN_CONFIG)
     b.add_argument("--csv", type=Path, default=DEFAULT_CSV)

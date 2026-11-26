@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -34,6 +35,7 @@ MODULE_EXTRAS: dict[str, tuple[str, ...]] = {
     "uvicorn": ("api",),
     "scipy": ("test",),
     "cv2": ("test",),
+    "transformers": ("hf",),
 }
 BASE = {"torch"}  # installed by its own step in full-cpu
 
@@ -75,3 +77,24 @@ def test_full_cpu_has_postgres_service_and_url() -> None:
     assert job["services"]["postgres"]["image"] == "postgres:16"
     assert "--health-cmd" in job["services"]["postgres"]["options"]
     assert job["env"]["COUNTONCE_PG_URL"].startswith("postgresql://")
+
+
+def test_every_extra_ci_installs_is_defined() -> None:
+    wf = (ROOT / ".github/workflows/ci.yml").read_text()
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    defined = set(pyproject["project"]["optional-dependencies"])
+    for group in re.findall(r"pip install -e \.\[([^\]]+)\]", wf):
+        missing = {e.strip() for e in group.split(",")} - defined
+        assert not missing, f"ci.yml installs undefined extras: {sorted(missing)}"
+
+
+def test_python_jobs_matrix_covers_running_interpreter() -> None:
+    wf = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
+    running = f"{sys.version_info.major}.{sys.version_info.minor}"
+    for name in ("test", "full-cpu"):
+        job = wf["jobs"][name]
+        versions = [str(v) for v in job["strategy"]["matrix"]["python-version"]]
+        assert running in versions, f"{name} matrix {versions} lacks running Python {running}"
+        assert {"3.11", "3.12"} <= set(versions)
+        setups = [s for s in job["steps"] if s.get("uses", "").startswith("actions/setup-python")]
+        assert setups[0]["with"]["python-version"] == "${{ matrix.python-version }}"

@@ -1,9 +1,9 @@
 # ruff: noqa: E501
-"""Render ``paper/tables/*.tex`` from ``results/bench.csv`` (PLAN §23 Paper).
+"""Render ``experimental/paper/tables/*.tex`` from ``results/bench.csv`` (PLAN §23 Paper).
 
-    python scripts/make_paper_tables.py [--csv results/bench.csv] [--out paper/tables]
+    python scripts/make_paper_tables.py [--csv results/bench.csv] [--out experimental/paper/tables]
 
-Always writes every file in ``TABLES`` so ``paper/main.tex`` never ``\\input``s a missing file.
+Always writes every file in ``TABLES`` so ``experimental/paper/main.tex`` never ``\\input``s a missing file.
 A cell without data renders ``TODO: fill from results``. Values are means over scenes (a scene's
 rows are averaged first) with 95% scene-level bootstrap CIs from ``bench.stats``.
 """
@@ -149,7 +149,7 @@ def render_all(csv_path: Path, out_dir: Path) -> list[Path]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--csv", type=Path, default=Path("results/bench.csv"))
-    ap.add_argument("--out", type=Path, default=Path("paper/tables"))
+    ap.add_argument("--out", type=Path, default=Path("experimental/paper/tables"))
     a = ap.parse_args(argv)
     for p in render_all(a.csv, a.out):
         print(p)

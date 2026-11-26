@@ -1,0 +1,13 @@
+tree,side,k,gt,pred_id_order,pred_camera_order
+Tree09,east,5,0,0,0
+Tree09,west,5,54,19,19
+Tree10,east,5,30,46,46
+Tree10,west,5,327,71,69
+Tree11,east,5,1,33,33
+Tree11,west,5,0,0,0
+Tree09,east,10,122,86,89
+Tree09,west,10,114,72,72
+Tree10,east,10,236,72,72
+Tree10,west,10,119,67,66
+Tree11,east,10,0,52,52
+Tree11,west,10,108,58,58

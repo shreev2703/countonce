@@ -15,9 +15,10 @@ from bench.runner import read_rows
 from bench.sweep import BenchConfig, discover_scenes, run_bench
 from countonce.config import Config
 from countonce.lift import apply_lift_region
+from countonce.merge.appearance import CachedExtractor
 from countonce.merge.cluster import cluster_detections
 from countonce.pipeline import _make_associator
-from countonce.types import Detection
+from countonce.types import Detection, Frame
 
 BENCH = Path(__file__).parents[1] / "configs" / "bench.yaml"
 
@@ -156,3 +157,33 @@ def test_v3_row_skipped_cleanly_in_e2e_sweep(tmp_path):
     assert (ran, skipped, errored) == (1, 1, 0)
     status = {r["method"]: r["status"] for r in read_rows(cfg.csv)}
     assert status == {"co_v1_colmap": "ok", "co_v3_vggt": "skipped_no_checkpoint"}
+
+
+def test_appearance_model_wires_a_shared_extractor():
+    off = _make_associator(Config(assoc="v2"), 0.5)
+    on = _make_associator(Config(assoc="v2", appearance_model="dinov2_vits14"), 0.5)
+    again = _make_associator(Config(assoc="v2", appearance_model="dinov2_vits14"), 1.0)
+    gated = Config(assoc="v2", appearance_model="dinov2_vits14", appearance=False)
+    assert off.extractor is None
+    assert on.extractor is not None and on.extractor is again.extractor
+    assert _make_associator(gated, 0.5).extractor is None
+
+
+def test_cached_extractor_embeds_each_crop_once(tmp_path):
+    seen: list[str] = []
+
+    class Fake:
+        def extract(self, frame, dets):
+            seen.extend(d.id for d in dets)
+            return np.array([[d.box_xyxy[0], 1.0] for d in dets])
+
+    frame = Frame(id=0, path=tmp_path / "a.jpg", width=10, height=10, sha256="abc")
+    a, b = (
+        Detection(id=n, frame_id=0, score=1.0, box_xyxy=np.array([x, 0.0, x + 1, 1.0]))
+        for n, x in (("a", 1.0), ("b", 2.0))
+    )
+    ex = CachedExtractor(Fake())
+    ex.extract(frame, [a])
+    out = ex.extract(frame, [b, a])
+    assert seen == ["a", "b"]
+    assert out[:, 0].tolist() == [2.0, 1.0]

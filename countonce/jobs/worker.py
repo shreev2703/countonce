@@ -27,6 +27,9 @@ log = logging.getLogger("countonce.jobs")
 Runner = Callable[[dict[str, Any], list[Path], Callable[[str, float], None]], CountResult]
 
 
+UI_ONLY_OPTIONS = ("example_box",)
+
+
 def classify(exc: BaseException) -> ErrorCode:
     """Map an exception to an error code. Unknown bugs are permanent so they burn no retries."""
     if isinstance(exc, CountOnceError):
@@ -70,6 +73,9 @@ def pipeline_runner(out_root: Path) -> Runner:
         from countonce.pipeline import run
 
         options = json.loads(job["options_json"])
+        # UI-only hints the web app stores with the job; they are not pipeline Config fields
+        for hint in UI_ONLY_OPTIONS:
+            options.pop(hint, None)
         options["out_dir"] = str(out_root / job["id"])
         progress("pipeline", 0.1)
         arg: Path | list[Path] = inputs[0] if len(inputs) == 1 else inputs
@@ -92,6 +98,9 @@ class Worker:
         tracing_cfg: tracing.TracingConfig | None = None,
         blobs: BlobStore | None = None,
         out_root: Path | None = None,
+        retention_days: float | None = None,
+        retention_every_s: float = 3600.0,
+        idle_beat_s: float = 10.0,
     ) -> None:
         """With ``blobs``, inputs are fetched from it (keys are blob keys) and the files the
         runner wrote under ``out_root/<job id>`` are uploaded to ``outputs/<job id>/``. Without
@@ -103,9 +112,37 @@ class Worker:
         self.tracing_cfg = tracing_cfg  # None or exporter 'none': no spans, no files
         self.worker_id = worker_id or f"w-{uuid.uuid4().hex[:8]}"
         self.heartbeat_interval_s = heartbeat_interval_s
+        self.retention_days = retention_days  # None or <= 0: never purge from this worker
+        self.retention_every_s = retention_every_s
+        self.idle_beat_s = idle_beat_s
+        self._last_purge = float("-inf")
+        self._last_beat = float("-inf")
         store.register_worker(
             self.worker_id, name=self.worker_id, cpu_count=os.cpu_count(), **(info or {})
         )
+
+    def housekeeping(self, now: float | None = None) -> list[str]:
+        """Idle heartbeat (keeps ``/health`` showing a worker online) and the retention job.
+
+        Returns the job ids purged on this call. A failing purge is logged, never fatal."""
+        now = time.monotonic() if now is None else now
+        if now - self._last_beat >= self.idle_beat_s:
+            self._last_beat = now
+            self.store.worker_heartbeat(self.worker_id)
+        purged: list[str] = []
+        if (
+            self.retention_days
+            and self.retention_days > 0
+            and now - self._last_purge >= self.retention_every_s
+        ):
+            self._last_purge = now
+            try:
+                purged = self.store.purge_expired(retention_days=self.retention_days)
+                if purged:
+                    log.info("retention: purged %d job(s)", len(purged))
+            except Exception:
+                log.exception("retention purge failed")
+        return purged
 
     def step(self) -> bool:
         """Reap stale jobs, then claim and process at most one. True if a job was processed."""
@@ -196,6 +233,7 @@ class Worker:
         stop = stop or threading.Event()
         done = 0
         while not stop.is_set():
+            self.housekeeping()
             if self.step():
                 done += 1
             elif until_idle:

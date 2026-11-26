@@ -7,22 +7,26 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install
-        run: pip install -e .[dev]
+        run: pip install -e .[dev,test,data]
       - name: Lint
         run: ruff check .
       - name: Format check
         run: ruff format --check .
-      - name: Type check
-        run: mypy
       - name: Test
         run: pytest -m "not slow and not gpu"
+      - name: Test (experimental, quarantined Moon tier)
+        run: pytest experimental
       - name: Golden gate (CPU synthetic geometry)
         run: |
           python -m bench.golden compare --cpu-synthetic \
@@ -31,12 +35,16 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: golden-cpu-table
+          name: golden-cpu-table-${{ matrix.python-version }}
           path: golden-cpu.md
           if-no-files-found: ignore
 
   full-cpu:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     services:
       postgres:
         image: postgres:16
@@ -57,15 +65,65 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install CPU torch
         run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Install
-        run: pip install -e .[dev,test,data,api,db,dvc]
+        run: pip install -e .[dev,test,data,api,db,dvc,hf]
+      # type checking needs every typed dependency installed, so it runs here only
       - name: Type check
         run: mypy
       - name: Test (report skips)
+        shell: bash  # explicit bash enables pipefail, so a pytest failure is not hidden by tee
         run: pytest -m "not slow and not gpu" -rs | tee pytest-full-cpu.log
       - name: Fail on unexpected skips
         run: python scripts/check_skips.py pytest-full-cpu.log
+      # backend/web schema versions agree and the committed demo assets are current
+      - name: Demo assets check
+        run: python scripts/build_demo.py --check
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      # the job is a no-op while web/package.json is absent
+      - id: detect
+        working-directory: .
+        run: |
+          if [ -f web/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::web/package.json not found; skipping Node steps"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.detect.outputs.present == 'true'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        if: steps.detect.outputs.present == 'true'
+        run: npm ci
+      - name: Lint
+        if: steps.detect.outputs.present == 'true'
+        run: npm run lint --if-present
+      - name: Type check
+        if: steps.detect.outputs.present == 'true'
+        run: npm run typecheck --if-present
+      - name: Test
+        if: steps.detect.outputs.present == 'true'
+        run: npm test --if-present
+      - name: Build
+        if: steps.detect.outputs.present == 'true'
+        run: npm run build
+      - name: Install Playwright browser
+        if: steps.detect.outputs.present == 'true'
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end and accessibility (Playwright + axe)
+        if: steps.detect.outputs.present == 'true'
+        run: npm run test:e2e

@@ -167,6 +167,7 @@ def test_only_runs_a_single_stage(tmp_path):
 
 
 def test_versions_record_dvc_lock_hash_when_present(tmp_path, monkeypatch):
+    pytest.importorskip("torch")  # dag.run() includes the train stage
     from synth.dag import _episodes_version, _train_config, dvc_lock_hash
 
     monkeypatch.chdir(tmp_path)

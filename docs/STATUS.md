@@ -1,0 +1,86 @@
+# Component status
+
+One row per component. Columns are evidence levels, strictest last. Cells say what has been
+done, not what is hoped for. README claims must not go beyond this table; if they disagree, this
+file wins and the README is the bug. Related: [[HANDOFF]], [[DECISIONS]], `docs/GATES.md`,
+`docs/DEVIATIONS.md`.
+
+- **Implemented**: code exists and the code path runs.
+- **Synthetic-tested**: unit/integration tests on toy or rendered synthetic inputs (CPU).
+- **Real-model-tested**: run once or more with real weights (GPU) on at least one real or tiny scene.
+- **Held-out real benchmark**: scored on held-out real scenes (Fuji-SfM test trees, `results/bench.csv`).
+  Own-capture scenes: none yet.
+
+Legend: yes / no / planned (selecting it raises an error that says so) / n/a.
+
+## Detectors
+
+| Component | Config name | Implemented | Synthetic-tested | Real-model-tested | Held-out real benchmark |
+|---|---|---|---|---|---|
+| GroundingDINO via HuggingFace (`IDEA-Research/grounding-dino-tiny`) | `gdino` (**default**), `groundingdino` | yes | yes (fake model) | yes (tiny scene, GPU marked test) | yes (Fuji Core, v1, v2, sync and v3 rows) |
+| GroundingDINO original package path | `detector_options.backend: groundingdino` | yes | gating only | no | no |
+| CountGD | `countgd` | **planned**: forward pass is a stub, weights gated | no | no | no |
+| CountGD++ | `countgdpp` | **planned**: not implemented | no | no | no |
+| Colour blob (test backend only) | `color_blob` | yes | yes | n/a | n/a |
+
+Selecting `countgd` or `countgdpp` raises `PlannedComponentError` from `build_detector`; the CLI prints
+the message and exits non-zero. It never silently falls back to another detector.
+
+## Reconstruction backbones
+
+| Component | Config name | Implemented | Synthetic-tested | Real-model-tested | Held-out real benchmark |
+|---|---|---|---|---|---|
+| VGGT-1B | `vggt` | yes | adapter only | yes (tiny scene, GPU marked test) | yes (Fuji Core) |
+| COLMAP | `colmap` | yes | adapter only | yes (Fuji, real COLMAP output) | yes (Fuji Core v2; fails to register 28 of 32 windows at k=3/5; pre-fix alignment, rerun needed) |
+| Fixture (rendered-scene cameras and depth) | `fixture` | yes (test backend) | yes | n/a | n/a |
+| VGGT-Omega, VGG-T3 | `vggt_omega`, `vggt_t3` | **planned** (names accepted, no adapter) | no | no | no |
+
+## Association
+
+| Component | Config name | Implemented | Synthetic-tested | Real-model-tested | Held-out real benchmark |
+|---|---|---|---|---|---|
+| v1 3D clustering | `v1` | yes | yes | yes (with the real detector and VGGT) | yes (Fuji Core) |
+| v2 reprojection + Hungarian | `v2` (**default**) | yes | yes | yes | yes (Fuji Core) |
+| Permutation sync | `sync` | yes | yes | yes (Fuji, real detector and VGGT) | yes (Fuji Core) |
+| v3 learned matcher | `v3` | yes | yes (trained on synthetic data only) | yes (Fuji, no Fuji fine-tune) | yes (Fuji Core; higher MAE than v2 at k=10) |
+
+## Baselines, pipeline and tooling
+
+| Component | Implemented | Synthetic-tested | Real-model-tested | Held-out real benchmark |
+|---|---|---|---|---|
+| sum / max / median baselines | yes | yes | yes | yes (Fuji Core) |
+| Ingest, lift, export, `result.json` | yes | yes | yes (tiny scene) | yes (Fuji Core) |
+| Sensitivity interval | yes | yes | yes | no (coverage not evaluated) |
+| Conformal / jackknife+ intervals | yes | yes | no | no |
+| Chunked reconstruction (chain, pose graph) | yes | yes | no | no |
+| SAM 2 masks | yes | yes | yes (GPU marked test) | no |
+| Benchmark harness, Fuji loader and report | yes | yes | yes | yes (Fuji Core only) |
+| API, jobs, worker | yes | yes | no | n/a |
+| Web app: demo, landing, benchmark and information pages | yes | yes (Playwright, synthetic demo scene) | no (not deployed) | n/a |
+| Web app: signed-in flow | yes | yes (mocked API; local API with a fake worker) | no (no real Google sign-in or GPU worker run) | n/a |
+| Count-first metrics and error decomposition | yes | yes | yes (Fuji failure-source run) | yes (Fuji Core) |
+| Failure-source harness | yes | yes | yes (Fuji, no oracle geometry) | k=10 only |
+| Photo-order invariance (v1, v2, sync, v3) | yes | yes (permutation test) | v1, v2, sync: 12 Fuji validation windows, 10 permutations, count range 0, partition unchanged, with merges present (v2 15/93 at k=5/10, sync 4/81; `results/order_invariance_fuji_merging.csv`). v3 not run on validation. **Test windows** (`results/order_invariance_fuji_test.csv`, 16 windows x 10 permutations, fixed recon): v1, v2, sync and v3 all count range 0, partitions unchanged. **VGGT re-run per permutation** (8 windows x 10 permutations, k=5 and 10): not invariant; counts change in 60/64 window-method pairs, median range 0.5 (v3 k=5) to 16 (v1 k=10), max 28; identical-order control reproduces exactly. The claim holds for association only, not end to end | no |
+
+## Known open problems
+
+The real detector + VGGT path counts the tiny scene correctly (5) only with `score_threshold=0.5`
+on the single frame the default near-duplicate filter keeps; at the 0.3 default it counts 7 (blue and
+green distractors), and with all five views VGGT geometry is too poor to merge (root cause in
+`docs/DEVIATIONS.md`, task M2). The synthetic-fixture path counts 5. Do not read the synthetic rows as
+evidence about real-model accuracy.
+
+- Fuji-SfM errors are large and gate G3 ("geometry beats Sum and Max") is recommended **not met**
+  (`docs/RESULTS_FUJI_ANALYSIS.md`); the owner's decision is open.
+- The v3 synthetic result is a component test (generated geometry, not rendered images). With
+  baselines tuned on validation and noisy depth, tuned v1 has a lower count MAE than v3 (1.8 vs
+  19.1 on 100 test episodes); v3 wins only against untuned defaults (`docs/RESULTS_V3_SYNTH.md`).
+- Nothing is hosted, and there are no own captures.
+
+## Quarantined (`experimental/`, PLAN §28.5)
+Not on the reliable path; run with `pytest experimental`. Not in the installed package and not in
+the default test run. Bring each back when its tier starts. No claims are made about these.
+- `experimental/llm/` LLM router, `experimental/integrations/` MCP server (`countonce-mcp` script
+  removed; `mcp` extra kept), `experimental/paper/` paper draft (`make paper`).
+- Stayed in the package because `countonce/cli.py` imports them: `sites.py`, `routing.py` (shadow
+  routing), `serving/` (cold start). See `docs/DEVIATIONS.md`.

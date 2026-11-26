@@ -12,7 +12,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - **Subpackages:** created `ingest`, `detect`, `recon`, `merge`, `export`, `schemas`, `match`
   (names from PLAN §8 and §10) as empty packages; `py.typed` added for mypy consumers.
 - **Lint rules:** ruff `E,F,I,UP,B,W`, line length 100. mypy runs in strict mode with the pydantic plugin.
-- **Tooling check:** ruff and pytest verified via the read-only `~/vggtProject/.venv`; mypy is not installed there and the system Python lacks venv/pip, so mypy config is unverified. Install with `pip install -e .[dev]` once a venv exists.
+- **Tooling check:** ruff and pytest verified via the read-only the sibling VGGT benchmark repo venv; mypy is not installed there and the system Python lacks venv/pip, so mypy config is unverified. Install with `pip install -e .[dev]` once a venv exists.
 
 ## 2026-11-24: Port from vggtProject
 - `Recon` from vggt-sparse-recon lives in `countonce/recon/result.py` (the ported, method-level reconstruction result). The §7 data-model `Recon` in `countonce/types.py` is a separate task and may wrap or replace it.
@@ -20,7 +20,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - Plotting: ported only generic helpers (style, `save`, `depth_to_rgb`, `point_cloud_preview`, `vram_vs_frames`). Benchmark-specific plots (`band_lines`, `scene_type_bars`) were left behind; they belong to Track B.
 - Env check: Python pin relaxed from `==3.11` to `>=3.11` to match `pyproject.toml`.
 - Frame extraction: dropped the unused `EXAMPLES` constant. `countonce/configs/colmap.yaml` copied verbatim.
-- Added `recon` optional-dependency extra and `pythonpath = ["."]` for pytest. `ruff`/`pytest` were run from `~/vggtProject/.venv` (3.11, has torch/pycolmap) since countonce has no venv yet.
+- Added `recon` optional-dependency extra and `pythonpath = ["."]` for pytest. `ruff`/`pytest` were run from the sibling VGGT benchmark repo venv (3.11, has torch/pycolmap) since countonce has no venv yet.
 - Video-clip helper (`clip.py`) was not ported: it is demo-site specific and not in the task list.
 
 ## types.py (2026-11-24)
@@ -146,7 +146,7 @@ One entry per decision: date, what the plan said, what was done, why.
 
 ## 2026-11-24: Core figure set and failure gallery
 - **CSV schema is append-only:** `peak_vram_mb`, `timings_json`, `assoc_f1` and `run_dir` were appended to `bench.runner.COLUMNS`. `read_rows` accepts the original 18-column header (or any prefix of the current one) and fills missing columns with `""`; `run_jobs` rewrites an old file once with the new header (atomic replace) before appending. Test: `tests/test_bench_core_figures.py`.
-- **`assoc_f1` is filled for the Fuji Core cells that have complete rows** (the k=20 v1 and v2 cells, 0.954 and 0.955; see `docs/RESULTS_FUJI.md`). It stays blank for the own-capture `gt.json` scenes, which carry no identity labels, and for Fuji cells where not all 16 tree-sides have a defined F1 (`TODO: fill from results`).
+- **`assoc_f1` is filled for the Fuji Core cells that have complete rows** (the miss-rate cells at k=20 only; see `docs/RESULTS_FUJI.md`). It stays blank for the own-capture `gt.json` scenes, which carry no identity labels, and for Fuji cells where not all 16 tree-sides have a defined F1 (`TODO: fill from results`).
 - **Figures 4, 6, 7** (`fig_assoc_f1`, `fig_runtime_vs_views`, `fig_ablation`) skip silently in `make_all` when their data is absent. Ablation deltas pair on per-scene mean percent error (ordered runs) against the `ablation_base` method; the base is inferred from the `base+field=value` names unless passed (`countonce bench --figures` passes `ablation_base`).
 - **Failure gallery:** each sampled run gets a contact sheet (max 12 evenly subsampled overlay frames) in `<figures>/gallery/`, embedded in its Markdown row; runs are located by the CSV `run_dir`, else `runs_dir/<run_key>`. Rows without overlays say "no overlay". Baselines have no overlays or VRAM.
 
@@ -186,7 +186,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - OOM is detected by class name `OutOfMemoryError` or a "out of memory" RuntimeError, so no torch import is needed.
 - `configure_allocator()` runs at `countonce.cli` import and in `main()`. It keeps other `PYTORCH_CUDA_ALLOC_CONF` options and respects an explicit `expandable_segments` setting. Python entry points that skip the CLI must call it themselves.
 - Profile CSV: one row per (repeat, stage) from the pipeline's `timings`. VRAM is filled only for `recon` (run peak) and `total`, and empty without CUDA. `docs/PROFILE.md` is a skeleton; `torch.profiler`/Nsight traces are not wired.
-- Tests ran with `~/vggtProject/.venv` (countonce still has no venv, see GATES.md).
+- Tests ran with the sibling VGGT benchmark repo venv (countonce still has no venv, see GATES.md).
 
 ## §9.6 ablation grid
 - `cannot_link: false` for v2 only lets *unassigned* same-frame detections join their cheapest admissible existing track (no tracks exist in the first frame, so same-frame pairs there stay separate). v1 skips both cannot-link checks.
@@ -244,7 +244,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - `result.json` does not record resolution or mean depth confidence, so they are read from optional `mean_depth_conf` / `config.image_width|image_height` keys, with depth confidence otherwise parsed from the `low_depth_confidence` warning text (only present when that warning fired). Features absent on either side are listed under `skipped`, never scored.
 - `lift_failure_rate` = `config.lift_fallbacks` / detections; `detection_density` = detections per frame (the bench CSV `density` column is per megapixel; the two are not mixed unless both sides come from the same source).
 - Categorical drift is flagged on PSI; the chi-square statistic is reported but not used for flagging (no p-value; scipy not assumed). Min 2 rows per side, else a ValueError / CLI exit 2.
-- Ran with the shared venv `~/vggtProject/.venv` since the repo has none.
+- Ran with the shared venv the sibling VGGT benchmark repo venv since the repo has none.
 
 ## "Explain this match" and schema 1.1
 - `result.json` 1.0 had no per-detection geometry, so 1.1 appends `detections` (id, frame, recon view, xyz, size, box-centre uv in recon pixels, optional feature) and `cameras` (K, world->camera extrinsics). `UPGRADERS["1.0"]` bumps the version and adds empty lists (markers only change version). `ResultV11` subclasses `ResultV1`; `tests/fixtures/schemas/v1.1/` is new and `v1.0/` is untouched. Existing tests that asserted `"1.0"` for freshly written files now assert `"1.1"`.
@@ -259,7 +259,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - `kind: zero_suite` is a `MethodSpec` kind skipped by `build_jobs`; `run_bench` runs it afterwards and writes `zero_suite.md` beside the CSV. Its `config` holds `options` (countonce overrides), `n_synthetic`, `seed`, `n_views`, `scenes_dir`.
 - Synthetic scenes are written to `results/zero_suite/scenes`; a distractor's scores go up to 0.45, so at the default 0.3 threshold some are intentional false positives. Negative prompts (CountGD++) are not covered here (no detector support yet).
 - `ghost_duplicate_rate` is an append-only column; the default executor leaves it blank (no moving GT ids on real scenes). NaN is written as blank.
-- Tests ran via `~/vggtProject/.venv` again (no repo venv).
+- Tests ran via the sibling VGGT benchmark repo venv again (no repo venv).
 
 ## Golden benchmark gate
 - The real-scene (GPU) half of `configs/golden.yaml` is empty: no datasets are on disk, so no scenes or hashes were invented. `bench.golden run` without `--cpu-synthetic` refuses unpinned scenes; `freeze` pins them. `configs/golden_gpu_baseline.json` does not exist yet (`TODO: fill from results`), so `golden-gpu.yml` fails until the owner adds it.
@@ -271,7 +271,7 @@ One entry per decision: date, what the plan said, what was done, why.
 - Idempotence uses a content key (job id + action + sorted detection ids); already-recorded keys are skipped. Interval low/high shift by the count change (clamped at 0), method unchanged: not re-calibrated.
 - Split with several source instances puts all moved detections in one new instance; splitting an instance's entire membership is refused (`ERR_INVALID_CORRECTION`). Merge of detections already in one instance is a no-op. Cannot-link violations raise `CorrectionError` with `ERR_CANNOT_LINK`.
 - Merge hard positives are all cross pairs between the two instances' members; Split hard negatives are moved-vs-remaining members. Pass the ORIGINAL results to `export_training_pairs`. Corrections whose job id has no result are skipped. CLI maps every job id in the file to the one `out_dir` result.
-- Tests ran with `~/vggtProject/.venv` (project `.venv` lacks torch/matplotlib).
+- Tests ran with the sibling VGGT benchmark repo venv (project `.venv` lacks torch/matplotlib).
 
 ## Negative prompts (natural-language prompts)
 - Suppression runs the negative phrases as a second detector call and matches boxes by IoU >= 0.5 (same frame) rather than adding tokens to one caption, because `Detection` carries only the max-token score. Works for any detector whose scores depend on the caption; opt-in via `supports_negatives` (GroundingDINO only). `Config.negative_margin` default 0.0, untuned. Detectors without the flag keep the original prompt and get a `negative_prompts_ignored` warning. `Config.negative_prompts=False` sends the raw prompt untouched (ablation row).
@@ -605,7 +605,7 @@ One entry per decision: date, what the plan said, what was done, why.
 
 ## Fuji Core report, step 3 (overnight 2026-11-24)
 - **No Fuji rows exist:** `results/bench.csv` is absent because step 2 never ran (no frozen `configs/fuji_core.yaml`, see `docs/GATES.md`). `bench/fuji_report.py` therefore filled **zero** cells: README block (`<!-- fuji-core:begin -->`), `docs/RESULTS_FUJI.md` and `paper/tables/fuji_core.tex` (git-ignored, like the other paper tables) are all `TODO: fill from results`. The failure analysis says plainly that there are no runs to analyse.
-- **Cell rule:** a cell is filled only if all 8 test trees x 2 sides have an ok row with a defined metric; per-tree value is the mean over its sides; CI is a 1,000-sample percentile bootstrap over trees (`bench.stats`); paired tests (v2 vs v1, sum, max, median, on MAE) need the same complete set. `write_cell` raises `MissingBackingRow` otherwise (`tests/test_fuji_report.py`). Only rows tagged `protocol: fuji_core_v1` in `config_json` with `split == test` count.
+- **Cell rule:** a cell is filled only if all 8 test trees x 2 sides have an ok row with a defined metric; per-tree value is the mean over its sides; CI is a 1,000-sample percentile bootstrap over trees (`bench.stats`); paired tests (v2 vs v1, sum, max, median, on MAE) need the same complete set. `write_cell` raises `MissingBackingRow` otherwise (`tests/test_fuji_report.py`). Only rows tagged `protocol: fuji_core_v2` in `config_json` with `split == test` count.
 - **"assoc_f1 is not filled" TODO (above) stays:** no Fuji cell is filled yet, so there is nothing to remove it for. Re-running `python -m bench.fuji_report` after step 2 fills the cells that have complete rows.
 - **Figures not generated:** `bench.figures.make_all` raises on an empty CSV, so no Core figures exist. Run `python -m bench.figures` after step 2.
 - Foliage occlusion is not recorded per row by the runner, so the analysis can only point to miss rate.
@@ -677,3 +677,507 @@ One entry per decision: date, what the plan said, what was done, why.
   GT counts (down to 0) with far larger predictions, which drives their very high MAPE. At k=20
   every method overcounts (v1 MAE 99.6, v2 101.5, sum 156.9), and v2 is better than v1 at k=10 only
   (-13.4 [-22.3, -5.0]). Foliage occlusion is not scored separately.
+
+## M1: GroundingDINO default, CountGD planned (2026-11-25)
+- `Config.detector` and `LiveRoute.detector` default to `gdino` (HF GroundingDINO). `countgd` and `countgdpp` stay valid names (saved configs still load) but `build_detector` raises `PlannedComponentError` (a `NotImplementedError`, so the CLI exits with the message). The `CountGDDetector` class is untouched.
+- Removed the `countgd` vs `gdino` ablation from `configs/bench.yaml` (default is now gdino; no second implemented detector to compare). `configs/profile.yaml` uses `gdino`.
+- README quickstart installs the `hf` extra (it was missing; the default detector needs `transformers`). README "no real-data benchmark" claim corrected to match the Fuji Core run. New `docs/STATUS.md` is the source of truth for evidence levels.
+- Not verified: a literal clean-venv install (no network install attempted); the tiny-scene quickstart command was run in the existing `.venv`.
+- Ruff: wrapped/fixed pre-existing lint in `scripts/diag_fuji_protocol.py`. `tests/test_fuji_protocol.py` (untracked, not mine) has a failing test and is left uncommitted.
+
+## M0: Fuji protocol fixes (sixteenth audit)
+CPU only, no GPU run; existing `results/bench.csv` rows were produced with the old protocol and are **not** re-scored here (a re-run is a separate task). Tests: `tests/test_fuji_protocol.py`.
+- **`visible_gt`:** the depth map is read at the nearest pixel (was truncated) and the last row/column is in frame (was cut by `w-1`/`h-1`). A pixel with NaN/inf/<=0 depth is no occlusion evidence, so the apple stays visible (was silently dropped by a NaN comparison). Depth must be in GT metres (`scaled_depth`).
+- **`window_for_tree`:** raises when the side has fewer than `k` frames, `cam_y` length differs from the side length, or `cam_y` is non-finite (was a negative start / silent bad window).
+- **Scale alignment:** `scaled_depth` (depth x `sim.s`) is tested against `project_points` z in the GT frame. `check_alignment` records `cam_rms_m`/`cam_span_m` and raises `AlignmentError` when the camera misfit exceeds 50 % of the window span or the scale is not positive (threshold chosen as a coarse sanity gate, not tuned). `scripts/run_fuji_core.py` now passes the overview pseudo-poses to `evaluate_window`.
+- **Identity matching:** detections are matched to the nearest GT apple in frame (visible or not), and the label is kept only if that apple is visible. Before, only visible apples were candidates, so a detection on an occluded apple could be labelled as a visible neighbour within 10 px.
+- **Interval recording:** pipeline rows now write `low`/`high` (were blank). The pipeline interval covers all instances while `pred` counts only the ROI, so both ends are shifted by the number of out-of-ROI instances and clamped to `low <= pred <= high`. This shift is an approximation (documented, untested against real runs). Baseline rows stay blank.
+- **MAPE with GT = 0:** such slices are skipped in the per-tree mean; a tree with GT = 0 on every side drops out of the MAPE cell (`n_trees` shows how many); a missing row still blocks the cell. MAE is unchanged and still includes those slices.
+
+## Tiny-scene over-count, root cause (M2, 2026-11-25)
+Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). Diagnosed per stage:
+- **Frames: five views deduplicated to one (the "smoke-check note").** The scene is a pentagon of reds
+  seen from azimuths 72 degrees apart, so the views are near-identical; the 16x16 mean-abs-diff
+  thumbnail distance is 0.008-0.0095 against the 0.02 default `dedup_threshold`. The default run
+  therefore used 1 frame (0.005 keeps 4, 0 keeps 5). The pipeline now logs a warning when the
+  filter keeps 1 of N>1 frames. The metric was not changed: with all five views the count is worse (below).
+- **Detections: blue/green distractors scored as "red sphere".** Per frame the 5 reds score 0.52-0.64
+  (0.48 for one occluded red in view 2) and the blue and green spheres 0.40-0.50, all above the 0.3
+  default. These two false positives are the 7 = 5 + 2.
+- **Per-frame duplicate boxes: not the cause.** No same-frame box pair was a duplicate object; added
+  `nms_per_frame` / `Config.nms_iou` (default 0 = off, so published runs are unchanged; the test uses 0.7).
+- **Lifting / merge radius: not the cause of the single-view 7, but a real limit with 5 views.** VGGT
+  on the 128x96 flat-shaded symmetric scene recovers cameras poorly (Sim(3)-aligned camera error 0.1-0.9
+  on a radius-4 orbit) and lifted points sit about 0.3-0.7 from the true sphere centres (radius 0.22), so
+  views of one sphere do not fall within `merge_k` object sizes. With dedup off and 5 views the count
+  is 22 at k=0.5 and 8-10 for k in 1-6 at the default threshold; no merge radius gives 5.
+- **Fix used (regression only, defaults unchanged):** `score_threshold=0.5` splits reds from
+  distractors on every view but the occluded one, giving 5 on the default single-frame path
+  (`tests/test_tiny_scene_real_gpu.py`, GPU marked). This is a threshold chosen on the tiny
+  fixture, not evidence about accuracy elsewhere; the Fuji grid still picks the defaults. The
+  5-view real path stays open (needs better geometry on this scene, not a merge-radius change).
+
+## M3: count-first metrics
+- **Sign convention:** PLAN §9.4 writes `missed + duplicates + FP − wrong merges = predicted − true`. Missed objects lower the count, so the exact identity is `duplicates + false_positives − missed − wrong_merges = predicted − true`. `bench.metrics.count_decomposition` returns the four non-negative magnitudes and `decomposition_error` applies the signs; the figure stacks over-counts up and under-counts down.
+- **Wrong merge vs missed:** a true object with detections that is the majority of no cluster counts as a wrong merge; one with no detection at all counts as missed.
+- **Decomposition scope:** `bench.evaluate` computes it only for scenes with identity labels (`instances`, optional `objects`) whose object count equals GT `count`; it is a mean over those scenes. Cluster count, not the submitted `count`, is what it explains.
+- `assoc_f1` stays in the result but is labelled explanatory and listed after every count metric. Fuji report gained a signed-bias column; the old `bench.csv` needs no change (bias is computed from pred - gt).
+
+## M4: photo-order invariance (2026-11-25)
+- **The old test did not test this.** `test_invariant_to_view_and_detection_order` shuffles the detection list and reorders whole-frame blocks, but every frame keeps its frame id and camera. v2 visits frames in ascending id, so it passed while still depending on photo order.
+- **True test:** `bench/order_invariance.py` moves photo `p` to frame id `sigma[p]` and permutes `intrinsics/extrinsics/depth/depth_conf/world_points*` with it (detection ids stay tied to the photo). `tests/test_photo_order_invariance.py` runs 12 random permutations per scene, 4 synthetic scenes (15 objects, 6 views, box noise 0.03 / 0.15 / 0.4 of object size, `make_scene`), for v1, v2, sync, v3 and v3+sync, plus a check that the harness catches the old behaviour.
+- **Measured before the fix** (4 scenes x 10 permutations per noise level; "changed" = partition differs from identity order):
+  - v1, v3 (threshold): 0/40 changed at every noise level.
+  - v2: 0/40 at noise 0.03, 38/40 at 0.15 (count range 3), 38/40 at 0.4 (count range 4); worst Rand index 0.988.
+  - sync: 0/40, 19/40 (range 1), 0/40. v3 + sync: 34/40, 34/40, 33/40 changed (count range 0, Rand index down to 0.94).
+  - Cause: v2 builds tracks greedily in frame-id order; the spectral rounding in `synchronize` assigns views in sorted view-id order.
+- **Decision: fix, do not narrow the claim.** New `countonce/merge/order.py` orders frames by camera centre (frame id only breaks exact ties). v2 visits frames in that order, `SyncAssociator` sorts detections and passes the rank as the view id, and `V3Associator(synchronize=True)` does the same. No global refinement was added: a canonical visit order makes the result a function of the photos, which is what the invariance claim needs. It does not make the greedy result optimal; quality vs the old order was not re-benchmarked on Fuji (a GPU/benchmark re-run is needed for that).
+- **After the fix:** 0 changed partitions and count range 0 for all five associators, all scenes, all permutations. Scope: synthetic scenes with finite-precision cameras; exact ties in camera centre (duplicated cameras) fall back to frame id and are not invariant.
+- Plain v3 and v1 needed no change. Defaults and published numbers for v1 and v3 are unchanged; v2/sync outputs can differ from before on scenes where the frame-id order mattered.
+
+## M6: controlled failure-source harness (2026-11-25)
+- **What:** `bench/failure_sources.py` + `scripts/run_failure_sources.py` + `tests/test_failure_sources.py`. A `SceneBundle` (GT positions and radius, oracle cameras and depth, an estimated recon, real detections) is run under four conditions: oracle detections + estimated geometry, real detections + oracle geometry, full pipeline, and an oracle/oracle ceiling. Detections are lifted once per condition; every associator gets that same `lifted` list and `recon`, and each row carries an `input_hash` (tests assert it is constant across methods within a condition). `tune_associators` grid-searches v1/v2/sync on validation bundles; `build_associators` takes the frozen result (v3 added with a checkpoint).
+- **Oracle detections:** GT objects projected with the oracle cameras, a box of the object's true radius, kept only where the oracle depth map shows the object (nothing nearer hides its centre). They are lifted through the normal `lift_detections`, so lifting error is part of what the harness measures, not removed.
+- **Stand-in geometry (CPU):** no weights here, so "estimated" is `perturb_recon(oracle)`: per-view pose jitter (1.5 deg, 0.05 units on the tiny scene), per-view depth scale drift, per-pixel noise, world points re-derived from the perturbed cameras. This is a stand-in for VGGT error, not a model of it. On a GPU box pass a real reconstruction (`tiny_scene_bundle(estimated=...)`) and real detections (`detections=...`). Real-photo conclusions need those runs; the numbers in `results/failure_sources_*.json` are component-test numbers.
+- **Tiny scene runs at default associator settings** (one scene, no validation split to tune on); the synthetic fixture tunes on separate validation episodes. Tuning on a scene and scoring on it would be leakage, so the tiny-scene test of the ceiling is labelled as such.
+- **Lift failures** never reach an associator, so they are left out of the error decomposition (an object seen only through failed lifts counts as missed) and are reported as `n_lift_failed`.
+- **Observed (not claims about real data):** on the tiny scene, default v1 over-counts even with oracle detections and geometry (front-surface lifting puts one sphere's views about 0.2 apart; tuned k=0.75 gives 5), and the perturbed geometry is the dominant error source. On the synthetic fixture the injected false positives are the main error for v1 under real detections.
+- **Not done here:** Fuji-SfM and own captures need a loader that fills a `SceneBundle` (GT trees from `bench.fuji_core`, dataset cameras as oracle); that is the M8 task. No GPU run was made.
+
+## M8: Fuji-SfM Core run and G3 (2026-11-25)
+
+- Resumed the `fuji_core_v2` test sweep with the frozen `configs/fuji_core.yaml`: 320 rows, 0 failed. A second writer started by mistake appended 2 duplicate rows; both were removed (identical preds). Report, figures and README table regenerated from `results/bench.csv`; the hand-written reading lives in `docs/RESULTS_FUJI_ANALYSIS.md` and is appended by `bench.fuji_report`.
+- Failure-source experiment on Fuji (`scripts/run_failure_sources_fuji.py`, k=10): Fuji has no depth or own poses, so oracle geometry is not available; only oracle-detections and full conditions ran. Assumed apple radius 4 cm for oracle boxes (not measured). Predictions there are not ROI-filtered, so MAE is not comparable with the Core table.
+- Not done: baselines beyond Sum/Max/Median (sync, COLMAP), sweep axes other than k, v3 on Fuji (G4 evidence), own captures.
+
+## M9: CI consistency (overnight, 2026-11-25)
+- **`db` extra:** added to `pyproject.toml` (`sqlalchemy`, `alembic`, `psycopg[binary]`) rather than dropped from `ci.yml`, because `countonce/db` and `jobs/pg_store.py` import them. `uv.lock` updated.
+- **mypy runs only in `full-cpu`.** Without torch/sqlalchemy/httpx the results differ (unfollowed imports become `Any`), so one config cannot be clean in both jobs. `tests/test_mypy_clean.py` skips when those are absent.
+- The `test` job now installs `.[dev,test,data]`; with `.[dev]` alone, collection failed and several tests errored on matplotlib/pyarrow.
+- `full-cpu` test step uses `shell: bash` (pipefail): before, `| tee` hid a pytest failure.
+- GPU modules that skip at import time now say `gpu test: ...` so `scripts/check_skips.py` accepts them.
+- `tests/test_fuji_core.py` resume test was stale since `fuji_core_v2` (protocol belongs in the job config); it also failed locally.
+- `huggingface_hub.*` added to mypy `ignore_missing_imports`; `warn_unused_ignores` off for the two HF model modules.
+- **Node job:** `web/` does not exist yet (M12). The `web` job detects `web/package.json` and is a no-op without it. It expects a committed `package-lock.json` and runs `npm ci`, lint/typecheck/test if present, then build. M12 may need to add Playwright browser install.
+- **Verification is a dry run, not `act`** (no Docker here): the `run:` commands in fresh Python 3.11 venvs on a copy of the tracked files, with embedded Postgres (`pgserver`) in place of the `postgres:16` service. The GitHub Actions themselves and the `web` job did not execute. `golden-gpu.yml` (self-hosted) was not run.
+
+## 2026-11-25: M10 related-work rewrite
+- `docs/RELATED_WORK.md` is organised around the §2.4 hypothesis. The C1-C5 coverage matrix and the "claim survives" verdict were removed: they rested on negative claims about unread papers.
+- Only CountVid, DG-Net and OneScene-Bench were read in full (the task's scope). Other works are tagged abstract/search/repo level and described only by what they state.
+- §2.4 does not define the two sides of "geometry-aware vs simpler geometric matching"; read as v2/sync/v3 vs v1/C-DOG.
+- Also updated where the full read contradicted them: PLAN §2.3 rows and §2.4 note, MODEL_SURVEY (DG-Net accepts estimated depth; venue), DATASETS (OneScene-Bench release has no images; loader layout assumption is wrong), EXPLAINER Q2, README license table, `paper/refs.bib`. The OneScene loader code was not changed (no images to test against).
+
+## M11 capture kit
+- `scripts/ingest_captures.py` re-encodes pixels to JPEG (q95, orientation applied, long side <= 2048, no EXIF/ICC) and renames to `img_NNN.jpg`; original filenames are not kept (they can carry dates). HEIC is rejected with a message rather than adding a plugin dependency.
+- Hand counts are required (`--counts A B [C]`, or `hand_counts` in the scene list); two must agree. A count of 0 needs `--zero` (and `--zero` needs count 0), so zero scenes are deliberate. `gt.json` adds `prompt`, `physical_scene`, `zero_target`, `hand_counts`, `count_definition`, per-image sha256; extra keys are ignored by `bench.sweep`.
+- Template `configs/capture_scenes.template.yaml` lists 20 scenes (16 positive across tiers, 4 zero-target); PLAN asks for 20-30, so add more as places are found. Video is not ingested.
+
+## M12 web scaffold (2026-11-25)
+- Scaffolded `web/` by hand (not `create-next-app`/`shadcn init`, both interactive): Next 16, React 19, Tailwind v4 (tokens in `globals.css` via `@theme`), shadcn-style `Button`/`Card` with `components.json` so `shadcn add` works later. TypeScript pinned to 5.x (7.x is too new for the Next toolchain).
+- `scripts/export_openapi.py` writes `web/openapi.json`; `npm run gen:api` makes `schema.gen.ts`. Committed both; `tests/test_export_openapi.py` fails when the spec is stale.
+- Backend fix found by type generation: `/health` was one `api_route(GET, HEAD)` giving duplicate operation IDs; now `GET` documented, `HEAD` hidden from the schema.
+- Zod schemas (`web/src/lib/schemas/result.ts`) are strict and upgrade 1.0 -> 1.1 like the backend; Vitest reads the backend's `tests/fixtures/schemas/v*` so versions cannot drift unnoticed.
+- CI `web` job now also runs Playwright (+ axe, desktop and phone projects). Not yet run on hosted CI.
+- Not done (later tasks): Lighthouse CI, the "no `TODO: fill from results` outside empty states" build check, charts, auth, upload client.
+
+## M14: results experience on demo assets
+- **Directory name `result-view`, not `results`:** the repo `.gitignore` has `results/`, which would have excluded `web/src/**/results/` from git *and* from Tailwind v4's source scan (utilities such as `py-2` silently vanished from the CSS). Components live in `web/src/components/result-view/`, helpers in `web/src/lib/result-view/`.
+- **Detection boxes are fixed-size squares (18 px) centred on `uv`:** `result.json` stores only the detection centre, not box extents, so the Photos tab and strip draw a square marker with the status outline style (solid / dashed / dotted) and label. The exported thumbnails (`thumbs/*.jpg`) already have the backend overlay burned in, so each tile shows the exporter's boxes plus the interactive ones. A follow-up should export clean thumbnails and real box extents.
+- **Camera fly-to keeps world-up (+z):** orbit controls stay z-up, so the view matches the photo's position, direction and field of view but not any roll. Verified visually that the point cloud lines up with the photo on the tiny scene.
+- **Interval wording:** the tiny scene's interval method is `sensitivity` (no calibration set yet), shown as "sensitivity to settings"; the "split conformal, n = ..." wording appears only when `n_calibration` is present.
+- **Confidence badge rule** (`confidenceBadge`): Low if the range is wider than the count itself, Medium if wider than 20% or any warning, else High. The thresholds are provisional until calibrated (P-track); the reason is always shown next to the badge.
+- **Report / Share:** Report calls `window.print()` (a real PDF report needs the backend); CSV is generated in the browser; Share copies the page URL. Corrections, feedback, the Gaussian splat toggle and `/jobs/[id]`, `/s/[token]` routes are out of scope for M14 (demo assets only).
+- **Match lines** draw for the selected or hovered object; the numbered 3D markers are 1-based (`#1` is `instances[0]`).
+
+## M15: landing page and demo gallery
+- **Hero is a static photo, not a spinning 3D scene.** PLAN 17.3 asks for an interactive 3D hero. Loading three.js on `/` would cost most of the Lighthouse performance score, so the hero is the scene's first photo thumbnail linking to `/demo/<scene>` where the real viewer lives.
+- **Proof points are empty states** ("No published number yet") until benchmark numbers are final; no figures were invented.
+- **"Count your own photos" is a disabled button** with an explanation: `/new` and sign-in do not exist yet.
+- **No links to unbuilt routes** (`/benchmark`, `/how-it-works`, `/about`): the nav only has the gallery. The benchmark teaser section is omitted until `/benchmark` exists.
+- **Only one demo scene exists** (synthetic `tiny`), so the gallery has one card and says real scenes are added after review.
+- Components live in `web/src/components/chrome/`, not `site/`, because `.gitignore` ignores `site/`.
+- **Lighthouse** (v13, mobile preset, production build, headless Chromium): performance 0.96, accessibility 1.00, best-practices 0.96 on `/`. Reproduce with `npm run build && npx next start -p 3100` then `npm run lighthouse` in `web/`.
+
+## M16: signed-in web flow (2026-11-25)
+- **No Auth.js** (PLAN 17 names it): a small authorization-code + PKCE flow in `web/src/app/api/auth/google/` with an AES-GCM httpOnly session cookie. The only identity needed is an API key from the existing API, so a session library added little. The id_token comes straight from Google's token endpoint over TLS, so its claims are checked but its signature is not.
+- **New API routes:** `POST /auth/exchange` (off unless `COUNTONCE_AUTH_SECRET` is set), `GET /me`, and corrections on finished jobs (migration 0003 adds `corrections.key` and `consent`). Every sign-in mints a new API key; old keys are not revoked yet.
+- **Backend-for-frontend proxy:** the browser never holds an API key and no CORS is needed. Upload chunks pass through the web server, which on Vercel is subject to request-size and duration limits; M18 must check this.
+- **Share pages and corrections:** shared links show the original result, not the owner's corrections.
+- **Test sign-in** (`COUNTONCE_DEV_AUTH=1`) exists so both end-to-end suites run without Google.
+- **CI:** the `web` job runs the mocked-API suite only. The live suite needs the Python env and is run locally (`npm run test:e2e:live`).
+- **Not done:** email-me-when-done toggle (Moon), real Google sign-in against live credentials.
+
+## M17: benchmark and information pages (2026-11-25)
+- **`/benchmark` reads a summary, not raw `bench.csv`:** `bench/web_summary.py` (also run by `bench.fuji_report`) writes `results/benchmark_summary.csv` with the same statistics as `docs/RESULTS_FUJI.md`, so the two cannot disagree. Only aggregates; no images or per-tree ground truth.
+- **That one file is committed** (`git add -f`; the rest of `results/` stays ignored) so a clean checkout builds with real numbers. `v3_capped_synth_eval.csv` stays local, so elsewhere that section shows the empty state. A deployment whose root is `web/` cannot see `../results`: M18 must include the folder in the build or set `COUNTONCE_RESULTS_DIR`.
+- **Fuji runs are marked dirty** in `bench.csv`; the page says so next to the commit.
+- **Synthetic v3 numbers predate M5** (not done: baselines untuned, no occlusion check); the page says this and labels them a component test.
+- **Chart is hand-written SVG**, not Recharts/Observable Plot: one dot-and-interval figure did not justify a dependency.
+- **Not on the page yet:** ordered vs. shuffled, scene type, VLM baseline, failure gallery, leaderboard (listed as not measured).
+- **`/how-it-works` uses the synthetic tiny scene** (colour detector, fixture geometry) and says so.
+- **New public `GET /status`:** queue state and timings of the last 10 finished jobs; no ids, users, prompts or worker names.
+- **`/privacy` states the gaps** instead of the PLAN 14.8 intent: no automatic 30-day deletion yet (M19), no automatic face/plate blurring, video metadata kept. Update the page when these change.
+- **`/about` has no email address;** contact is through GitHub issues.
+- **Build check** scans prerendered pages, browser bundles, `public/` and page sources (server-rendered pages have no prerendered output).
+
+## M18: API fit for Vercel
+- **Separate API project (`api.`), not `/api` in the site.** Python and Node in one project would need rewrites and two runtimes; the site proxy already makes the API same-origin for the browser. Details in `docs/DEPLOY.md`.
+- **SSE capped, polling fallback kept.** `COUNTONCE_SSE_MAX_S` ends the stream before the function limit; the existing client falls back to polling. No change to the client was needed; the proxy gets `maxDuration = 60`.
+- **`/` on the API redirects** to `COUNTONCE_WEB_URL` (else `/docs`) instead of returning JSON. Health probes should use `/health`.
+- **Benchmark data for a `web/`-rooted deploy:** `web/content/benchmark/benchmark_summary.csv` is committed (copy of `results/`, `npm run sync:results`). The `content/` name avoids the repo `.gitignore` entries for `data/` and `results/`.
+- **Not verified:** no real deployment was made (needs your Vercel/Neon/R2 accounts), so "frontend talks to the deployed API" is covered by the existing live Playwright run against a local API plus the proxy, not by a hosted one. Logged in `docs/GATES.md`.
+- Still open from M16: old API keys are not revoked on re-sign-in; `example_box` option rejected by `Config` in the worker (M19).
+
+## M19: worker hardening
+- **Supervisor in-process, not a systemd dependency.** `--supervise` works anywhere (WSL2 without systemd included); `--print-unit` covers boot start.
+- **Retention lives in the worker loop** (hourly, default 30 days) rather than a separate scheduler, so the one-command start covers it. No worker, no purge; `/privacy` states this.
+- **`example_box` is dropped before `Config`** (`UI_ONLY_OPTIONS` in `countonce/jobs/worker.py`): the pipeline has no use for it yet, so it is stored with the job but not applied. Fixes the M16 failure.
+- **Not verified:** the "upload from the frontend -> worker on GPU -> result page" run on real hardware was not done unattended (see `docs/GATES.md`). Covered: worker/queue logic by `tests/test_worker_hardening.py`, and the frontend-to-API path by the M16 live Playwright run with a fake worker.
+
+## M20: README front page (2026-11-25)
+- **No hand-counted photos exist and Fuji images cannot be shown** (PLAN 0.1), so the example is the synthetic tiny scene, labelled as such; "true count" is by construction, not a hand count. Replace with an own capture in P4/P5.
+- **Two example runs, both labelled:** consistent IDs across views come from the CPU stand-ins (`color_blob` + `fixture`); the failure is the real GroundingDINO + VGGT path on all five views (14, truth 5). The real path's correct 5 uses one view, so it cannot show cross-view IDs.
+- **The tiny-scene table was re-measured** (2026-11-25, `.venv-gpu`, commit b22b2ba, `backbone_options.weights_dtype: fp32`, v1 and v2). It replaces nothing; M2's "22 at k=0.5" was a different association setting/code state, today's v1 default gives 23.
+- **One measured table is MAE only**, copied from `results/benchmark_summary.csv`; `tests/test_readme.py` fails if they diverge. `bench.fuji_report` no longer writes a block into the README (it would bring the TODO cells back); the full table stays in `docs/RESULTS_FUJI.md`.
+- **Live demo link:** none exists, so the README says "not hosted yet" (see `docs/GATES.md`).
+- **Found, not fixed (outside M20):** the CLI's `expandable_segments:True` (`countonce/oom.py`) made the five-view VGGT run fail with `CUDA driver error: device not ready` on WSL2 + RTX 5070 8 GB (3 of 3 CLI attempts); with `expandable_segments:False` it succeeded, as did the Python API path, which does not set it. The README command sets the override.
+
+## M21 repo hygiene (2026-11-25)
+- Apache-2.0 covers the code only; model weights and datasets keep their own licenses (README note).
+- Agent files are untracked and gitignored but stay on disk. `CLAUDE.md` is still pending (see GATES.md).
+- The demo exporter rewrites the absolute repo root to `<repo>` in exported JSON; the tiny demo was re-exported.
+- Author name and GitHub URLs stay: they are attribution, not personal paths. History was not rewritten.
+
+
+## M22: final consistency pass (2026-11-25)
+- **README setup was wrong:** `.[dev,recon]` has neither `transformers` (default detector), `torchvision`
+  nor `vggt`. The README now installs them, with `vggt` pinned to the commit used for measured runs.
+  `pyproject.toml` and `uv.lock` were not changed.
+- **Landing proof points** said no number was published while README and `/benchmark` published them.
+  They now read the benchmark summary at build time, with titles that do not claim more than measured.
+- **No-WebGL crash:** a failed 3D renderer replaced the whole results page with an error screen. It is
+  now contained by `ViewerBoundary` (Playwright test).
+- **EXPLAINER** rewritten for the current code, with 33 interview questions. Numbers are copied from
+  the named reports; there is no test tying them to the source files.
+- **M5 was never completed** (superseded: completed by M5b-2, below); STATUS, EXPLAINER and `RESULTS_V3_SYNTH.md` now say so.
+- **§0.6:** rows are ticked on evidence only, so most stay open (GATES).
+
+## M22 follow-up: allocator setting on WSL (2026-11-25)
+- `configure_allocator()` no longer sets `expandable_segments:True` when the kernel release names
+  Microsoft (WSL). Native Linux is unchanged, and a user's own `PYTORCH_CUDA_ALLOC_CONF` is never edited
+  on WSL. Chosen over documenting an override because the default CLI and worker path must not crash.
+- Evidence (RTX 5070 Laptop 8 GB, torch 2.15.0+cu132, five-view tiny scene): before, 3 of 3 failed;
+  after, 3 of 3 returned 14, the README figure. The driver-level cause is not known.
+- Cost: WSL loses the fragmentation benefit; the OOM ladder still applies.
+
+## M5a: synthetic component-test harness (2026-11-25)
+- **Decomposition sign:** the task repeats the PLAN §9.4 wording; the exact identity stays
+  `duplicates + FP - missed - wrong merges = predicted - true` (see the M3 note). Fixed the same
+  slip in the `count_decomposition` docstring.
+- **Rejected detections** are no longer scored as one-detection clusters in the decomposition,
+  duplicate rate and miss rate: they are not predicted instances, and counting them broke the identity.
+  `bench/synth_assoc.py` (the old v3 table) is unchanged and still treats them as singletons.
+- **True count** stays `Episode.true_count` (objects with at least one detection), as in the first
+  comparison, so `missed` is non-zero only when the associator rejects all of an object's detections.
+- **Zero-scene false count** is `nan` with `n_zero = 0` when no episode has a true count of zero. The
+  generator's false positives scale with the instance count, so it cannot make a useful zero scene;
+  none were added.
+- **CSV layout:** `--out-csv` is now the count-first summary (one row per variant and method);
+  per-episode rows moved to `--out-rows-csv`.
+
+## Worker image extra (2026-11-25)
+- Added `worker` extra (recon + hf + torchvision + huggingface_hub + data + `vggt` pinned to commit a288dd0, same pin as README). Dockerfile installs `.[worker]` and apt-installs `git` (needed for the vggt git URL). Image not built (Docker is a human gate).
+- `uv lock` re-resolved other packages (e.g. opencv-python-headless 5.1 -> 4.11, as vggt constrains it); `uv lock --check` passes.
+- README setup now says `uv pip install -e ".[dev,worker]"`, the verified path; plain pip not run.
+- Fixed a broken M5b-WIP test (`tests/test_synth_component.py` lambda lacked `device` kwarg).
+
+## Order-invariance on real Fuji data (2026-11-25, validation trees only)
+- **SUPERSEDED for v2/sync by the next section:** this run never passed the window's `frames` to the associators, so v2 and sync compared frame-pixel boxes with recon-pixel projections and merged nothing. The "vacuous" finding below is a harness bug, not a property of the frozen gate. v1 does not use frames, so its rows stand. The two v2 "merges almost nothing" remarks below are unverified for the same reason (the MAE run went through `run()`, which does pass frames).
+- **Run:** `scripts/run_order_invariance_fuji.py` on Tree09-11 x east/west x k in {5, 10} (12 windows), frozen thresholds (score 0.2, merge_k 0.3), cached recon and detections, 10 photo permutations per window per associator (`bench.order_invariance.fuji_window_row`). Output: `results/order_invariance_fuji.csv`. No test-split tree touched.
+- **Result:** v1, v2 and sync all gave count range 0, 0 changed partitions, Rand index 1.0 in every window.
+- **But it is mostly vacuous:** v2 and sync merged nothing in all 12 windows (instance count = number of lifted detections), and v1 merged nothing in 4 of 12. Invariance holds trivially when nothing is merged. Only v1's 8 merging windows are real evidence.
+- **v2 count error, old frame-id order vs new camera-centre order** (`results/order_invariance_fuji_v2_mae.csv`, ROI counts vs GT): MAE 61.25 for both. Four windows move by 1-3 instances (Tree10 west k5 71 to 69, Tree09 east k10 86 to 89, Tree10 west k10 67 to 66), the rest are identical. The fix did not change v2's accuracy on Fuji; v2's weakness there is that it merges almost nothing, not visit order.
+- **Does the "unordered photos" claim hold?** Supported for v1 on real data. For v2/sync it is supported only by the synthetic test (M4); the real-data run cannot confirm or refute it. **The §0.6 row stays unticked.** Needed: a real scene (own captures, P2) or a looser v2 gate where v2 merges.
+- **Side finding:** `canonical_frame_order` sorts camera centres lexicographically by (x, y, z). On a row walk along y this makes x noise the main key. It is still permutation-invariant, but not a meaningful "along the path" order. Not changed.
+- Test: `tests/test_order_invariance_fuji_adapter.py` (CPU, tiny synthetic window).
+
+## `/demo/tiny` Lighthouse performance (2026-11-25)
+- **Method:** Lighthouse 13, default mobile preset (simulated throttling), headless Playwright Chromium on WSL2 (software rendering), production build served by `next start -p 3100`. Same flags as the `lighthouse` npm script, with the URL swapped per page and run from `/tmp`. Local runs, not Lighthouse CI or a real phone.
+
+| `/demo/tiny` | performance (3 runs) | median | LCP | TBT |
+|---|---|---|---|---|
+| before | 0.51, 0.54, 0.56 | 0.54 | 5.7-5.9 s | 1.12-1.85 s |
+| lazy viewer only | 0.76, 0.78, 0.77 | 0.77 | 3.2 s | 620-702 ms |
+| final | 0.93, 0.92, 0.94 | **0.93** | 0.77-0.78 s | 282-357 ms |
+
+- **Final build, accessibility / best practices:** 1.00 / 0.96. Script transfer before the viewer: 168.2 KiB (budget 200 KB).
+- **Other pages, 3 runs:** `/` 0.95, 0.94, 0.95 (median 0.95); `/benchmark` 0.94 in all three.
+- **Other pages, 1 run each:** `/demo` 0.93, `/how-it-works` 0.98, `/about` 0.95, `/privacy` 0.90, `/status` 0.92, `/history` 0.94, `/new` 0.96, `/signin` 0.93. `/jobs/[id]` and `/s/[token]` are measured in the section below.
+- **The margin is thin and noisy:** an intermediate `/demo/tiny` build with the same fix plus `<Suspense>` boundaries scored 0.90, 0.84, 0.82, 0.93, 0.92. TBT swings widely on this shared machine. Most of it is evaluation of the shared framework chunks, which `/` pays too.
+- **Changes:** scene JSON is read and validated at build time (zod leaves the client path, count and photos are in the static HTML); `points.bin` and the three.js viewer load only on activation; media queries are read only in the client-only viewer wrapper and an effect. The last one removed a forced second render on phones and took LCP from 3.2 s to 0.8 s.
+- **Behaviour change:** phones show a "Load 3D view" button (selecting an object or photo also loads it); desktop loads the viewer 1.2 s after the page load event. The poster is a text panel, not an image.
+- **No worker for point decoding:** `parsePoints` only creates typed-array views over the fetched buffer, so there is no decode work to move off the main thread.
+- **`<Suspense>` boundaries rejected:** React's prerender moved the large sections into hidden segments revealed by a script, one Playwright test then saw duplicate nodes, and the long hydration task did not shrink.
+
+## `/jobs/[id]` and `/s/[token]` Lighthouse (2026-11-26)
+- **Method:** as for `/demo/tiny` (Lighthouse 13, mobile preset, headless Playwright Chromium on WSL2, `next start` of a production build), but against the mocked API from the Playwright fixtures, with a finished job, a dev-auth session cookie and a share token. `web/scripts/lighthouse-pages.mjs [runs] [jobs|s]`, run from `/tmp`; every child call has a timeout, spawned servers are killed on exit (process groups), and Lighthouse's cwd is `/tmp/lhrun`, so no `lighthouse.*` folders appear in `web/`.
+
+| page | performance (3 runs) | median | accessibility | best practices | LCP | TBT |
+|---|---|---|---|---|---|---|
+| `/jobs/[id]` before | 0.86, 0.85, 0.84 | 0.85 | 1.00 | 0.96 | 0.6-0.7 s | 550-650 ms |
+| `/jobs/[id]` final | 0.91, 0.91, 0.91 | **0.91** | 1.00 | 0.96 | 0.6-0.7 s | 370-390 ms |
+| `/s/[token]` | 0.95, 0.95, 0.96 | **0.95** | 1.00 | 0.96 | 0.6 s | 230-270 ms |
+
+- **Fixes for `/jobs/[id]`:** (1) `useJob` no longer opens the SSE stream when the server-fetched job is already finished (0.85 to 0.89). (2) The result is validated on the server (`fetchJobBundle` returns `parsed`), so the browser needs no zod for first paint; the schema is imported dynamically only if a refetch needs it (0.89 to 0.91-0.94).
+- **Rejected:** lazy-loading `CorrectionsPanel` and `FeedbackForm` with `next/dynamic` (`ssr:false`) scored worse (0.78 median).
+- **Thin margin:** `/jobs/[id]` runs between 0.91 and 0.94 across builds; TBT is noisy on this machine, as for `/demo/tiny`. All six page/category medians are at or above 0.90.
+- **Unrelated test fix:** `e2e/signed-in.spec.ts` still expected the disabled "Continue with Google" button that commit `34bb80b` replaced with the demo link; it now checks `signin-unavailable`.
+
+## GATES.md hygiene (2026-11-25)
+- Older audit sections are marked resolved as snapshots, with their text kept. Their still-open items that no other open section listed are gathered in a new open section at the end of `docs/GATES.md`.
+- Mockup approval is marked resolved because PLAN §0.1 rule 5 moved the review to after the build (H2).
+- The 23 report re-run entries and the step-2 entry are one entry. `3737ddc`..`2afa977` (inclusive) holds retries 3-23; the first two retries are earlier commits.
+- Added an open section for the overnight tasks still marked `[!]` (M5b, sync/v3 on Fuji), which GATES did not list.
+
+## Quarantine of unproven scaffolding (2026-11-25)
+- **Moved to `experimental/`:** `countonce/llm/` -> `experimental/llm/`, `countonce/integrations/` -> `experimental/integrations/` (the `countonce-mcp` console script is removed from `pyproject.toml`; the `mcp` extra stays), `paper/` -> `experimental/paper/`, with `tests/test_llm_router.py`, `tests/test_mcp_server.py` and the paper-draft tests now in `experimental/tests/`. Nothing in `pipeline.py`, `cli.py`, `api/`, `jobs/` or `web/` imported them (grep checked).
+- **Stayed, because `cli.py` imports them lazily:** `countonce/sites.py` (`countonce sites`), `countonce/routing.py` (`countonce routing-report`; also used by `tests/test_planned_detectors.py`), `countonce/serving/` (`countonce coldstart`). Quarantining them would need removing those CLI commands, which the task forbids (cli.py must not depend on quarantined code). Candidates for a later task that drops the commands.
+- **Import names:** quarantined code imports as top-level `llm` / `integrations`, set up by `experimental/conftest.py`; they are not part of the installed package. `make paper` and `scripts/make_paper_tables.py` now write to `experimental/paper/`.
+- **CI:** added a `pytest experimental` step. `tests/test_paper_site.py` keeps the table and site generator tests.
+
+## Test write guard for results/ and docs/ (2026-11-25)
+- **Guard:** `tests/conftest.py` fails the session if any file under `results/` or `docs/` changed, appeared or was removed (removal added to the task's two cases). It compares mtime and size. The baseline is taken at conftest import, not at first fixture setup, so writes during collection count too.
+- **Leaks fixed:** `test_synth_component.py` (`results/synth_component_tuning.csv`); `test_profile_cache.py` (the shipped `configs/profile.yaml` rewrote `results/profile_variants.csv`; now run from `tmp_path`); `test_vggt_gpu.py` (default `out_dir="results"` would write `results/sanitized/`; found by reading, as the test is skipped without vggt).
+- **No bypass switch:** the guard cannot tell which process wrote a file, so it also fails while a benchmark is appending to `results/` in the same checkout. The failure message says so. Verify in a copy of the checkout, or rerun when the benchmark is idle.
+- **Not covered:** `pytest experimental` (separate rootdir conftest) and writes outside `results/` and `docs/`.
+
+## M5b-1: tuning split into a resumable parallel stage (2026-11-25)
+- `scripts/eval_synth_component.py` now has `--stage tune|test|all` (default `all`). `tune` appends one row per (variant, method, setting) to `results/synth_component_tuning.csv` as it finishes, resumes by skipping rows already present, and runs settings on a `fork` pool (`--workers`, default `cpu_count()-2`). When all rows are in, the CSV is rewritten in grid order with `chosen` set (ties: earlier grid point), so a resumed run's final file equals an uninterrupted one. `test` reads the chosen rows only and exits if any (variant, method) has none.
+- Sync is tuned on the chosen v2 settings, so it runs as a second phase. The default setting is added as an extra row (`in_grid=0`) when it is not on the grid; it is never eligible to be chosen, as before.
+- **Timing:** 5 val episodes, 1 worker, full grids, both variants: about 330 s wall (248 rows, BLAS threads unrestricted). Projected 100 episodes: about 1.8 h on one worker, less with 14 single-threaded workers, well under the 5 h limit. **No `--max-val` cut applied** (all 100 val episodes). Projection is an extrapolation, not a measured full run.
+- Workers run with `OMP/OPENBLAS/MKL_NUM_THREADS=1` and `CUDA_VISIBLE_DEVICES=` (CPU only; GPU may be busy).
+
+## Order-invariance at a merging operating point (2026-11-25, Fuji validation trees only)
+- **Bug found first:** `scripts/run_order_invariance_fuji.py` captured `(lifted, recon)` but dropped `frames`, so v2/sync (which map frame pixels to recon pixels with each frame's `grid_map`) saw mismatched coordinates and merged nothing at any gate (gate sweep 0.5-8.0, with frames omitted: 0 merges in every window). `fuji_window_row`, `gate_sweep` and `permute_frames` in `bench/order_invariance.py` now take the frames and permute them with the photos.
+- **Gate sweep** (`results/order_invariance_fuji_gate_sweep.csv`; v2 and sync `max_reproj_norm` in 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8; 6 windows per k; identity order): at the frozen gate 0.5, v2 merged in 6/6 k=10 windows (93 merges) and 5/6 k=5 windows (15); sync in 6/6 k=10 windows (81) and 1/6 k=5 windows (4). The criterion (every associator has a merge in >= half the k=10 windows) holds at the smallest gate tried, **so no loosening was needed: the operating point is the frozen gate 0.5.** (sync at k=5 needs gate >= 1.0 for 5/6 windows; not used.) `configs/fuji_core*.yaml` untouched.
+- **Result** (`results/order_invariance_fuji_merging.csv`, 24 rows = v2, sync x 12 windows, 10 permutations each, columns of the existing CSV plus `gate`, `n_merges`): count range 0 and ROI count range 0 in every row, 0 changed partitions, Rand index 1.0. v2 made 15 (k=5) and 93 (k=10) merges, sync 4 and 81. Sync's k=5 evidence is thin (4 merges, one window); k=10 is solid.
+- **Claim:** photo-order invariance of v1, v2 and sync is supported on 12 Fuji validation windows (10 permutations each). v3 and the test split were not run; validation trees only; one reconstruction per window (permutations re-order photos, they do not re-run VGGT).
+- **§0.6 row ticked** (v2 and sync invariant: count range 0, partitions unchanged, with merges present).
+- Tests: `tests/test_order_invariance_gate_sweep.py` (CPU). The script runs on CPU from the caches (stubs the GPU dtype probe so cache keys match).
+
+## Sync and v3 on the Fuji-SfM held-out trees (2026-11-25)
+- **Provenance:** the 128 test rows (64 `countonce_sync`, 64 `countonce_v3`) ran from commit `ec31df2` plus uncommitted changes that were committed afterwards as `07e948f`; the rows carry `git_commit=ec31df2…`, `git_dirty=True` and timestamp 2026-11-26T03:28:25Z (the run's start, UTC). They were not re-run from a clean tree.
+- **Row count:** the task text said 128 rows per method. There are 64 v2 test windows (8 trees x 2 sides x 4 k), so the complete set is 64 per method, 128 in total (`wall_min=117.2`, no failed rows). The stated criterion "one row per v2 test window" is what was applied.
+- **No second run:** the process had exited (`runs/fuji_core/test_sync_v3.done`, 21:25) before this session; nothing was relaunched.
+- **v3:** registered checkpoint `models/checkpoints/v001.pt` (sha256 prefix `ebd3f291fc111374`) as-is; no tuned setting of its own.
+- **Report path fix:** `bench/fuji_report.py` still wrote its LaTeX table to `paper/tables/`, which would have recreated the quarantined directory; it now writes to `experimental/paper/tables/` (test added).
+- `web/content/benchmark/benchmark_summary.csv` was refreshed from `results/` (existing cells unchanged, sync and v3 cells added). The web pages still show only v1, v2 and the baselines.
+
+## Default associator: v2 (2026-11-25, Fuji validation windows only)
+- **Rule (PLAN §0.1 rule 1):** GroundingDINO → VGGT → v2, or sync if sync wins on validation. Applied as written: **v2**, because sync is not lower.
+- **Inputs:** Tree09-11 x east/west x k in {5, 10} = 12 windows, protocol `fuji_core_v2`, each method at its frozen setting (score 0.2, merge_k 0.3): v1 and v2 from `results/fuji_tune2_s0.2_k0.3.csv` (commit `2309cdf`, dirty), sync from `results/fuji_tune_sync_s0.2_k0.3.csv` (commit `ec31df2`, dirty). No test-split row was read. Reproduce with `scripts/decide_assoc_fuji_val.py`, which writes `results/assoc_decision_fuji_val.csv`.
+
+| method | count MAE (apples) | 95% CI | MAE minus v2 | 95% CI |
+|---|---|---|---|---|
+| v1 | 54.75 | [16.5, 113.0] | -6.50 | [-11.0, 1.25] |
+| v2 | 61.25 | [27.5, 122.75] | 0 | |
+| sync | 61.83 | [27.25, 121.25] | +0.58 | [-1.5, 3.5] |
+
+- **v1 was lower than both v2 and sync.** v2 is kept per the rule. This is on record, not explained away.
+- **CIs:** 10,000-sample percentile bootstrap over trees (per-tree mean over its 4 windows), paired for the differences. The MAE column is the mean over the 12 windows. With only 3 trees the intervals are very coarse; none of the three methods is shown to differ.
+- **Limits:** these windows also chose the thresholds, so the MAEs are not held-out estimates. v1's distance `merge_k` was swept (0.3, 0.5, 0.8); v2's and sync's gates were not (their gate scales as k / merge_k, so `merge_k` leaves them unchanged), which may favour v1.
+- **Made to agree:** `Config.assoc`, `countonce run --help`, `routing.LiveRoute`, the demo exporter (assets under `web/public/demo/tiny` rebuilt: count 5 and interval 5-25 unchanged), README, STATUS, EXPLAINER. `score_threshold` and `merge_k` defaults are unchanged; the Fuji frozen values stay in `configs/fuji_core*.yaml`.
+- **Left explicit on v1:** `configs/profile*.yaml` and `scripts/profile_confidence.py` name v1 so they stay comparable with the profiles already measured. Bench and test configs that name an associator are unchanged.
+- **Tiny scene under the new default:** CPU (`color_blob` + `fixture`, `all_views.yaml`, no `--assoc`): count 5, associator recorded `v2`. GPU test `tests/test_tiny_scene_real_gpu.py` no longer pins v1; run on the RTX 5070 (`.venv-gpu`): 1 passed (count 5). It keeps one view by default dedup, so it does not discriminate between associators.
+
+## M5b-2: tuned synthetic component test (2026-11-25)
+- **Ran:** `--stage test` once, CPU (no GPU job running, but 14-worker CPU is fast: 5 min), held-out 100 test episodes, both depth variants, 2,000-sample bootstrap. Tuning finished earlier (248 rows, `runs/synth_component/tune.done`). Table in `docs/RESULTS_V3_SYNTH.md` is generated by the new `scripts/render_synth_component_doc.py` from `results/synth_component_rows.csv`/`.json`.
+- **Tuned values (chosen on 100 validation episodes):** v1 k=2.0, score 0.6; v2 (finite depth) max_reproj_norm 1.0, depth_tol 4.0, score 0.8 (NaN depth: depth_tol 0.5); sync eig 0.3, assign 0.7, score 0.8. Val MAE (default, tuned) finite depth: v1 78.14/1.79, v2 62.7/9.25, sync 38.05/8.45.
+- **v3 regression vs the old untuned comparison:** the old claim "v3 beats v1/v2" does not survive tuning. Test count MAE: tuned v1 1.8 [1.5, 2.2], tuned v2 9.0, tuned sync 8.1, v3+sync 5.6, v3 19.1 [16.7, 21.7] (finite depth). Paired v3 minus tuned v1 +17.3 [15.1, 19.7]. v3's number is the same as the first run (19.1), so v3 did not get worse; the baselines got much better. v3 still beats the untuned defaults.
+- **Caveats:** tuned v2/sync have lower F1 than defaults while having lower MAE (they drop detections). The test split has no zero-count scenes, so the zero-scene false count is NaN and reported as not measurable. v1 and v3 ignore depth so their rows are identical in both variants. Tuning and test come from one generator.
+- **Cleanup:** STATUS and EXPLAINER no longer say M5 was not completed; `[!]` M5 and M5b lines in TASKS_OVERNIGHT are annotated as superseded.
+
+## CI Python matrix (2026-11-25)
+- Both Python jobs (`test`, `full-cpu`) run on 3.11 and 3.12 with `fail-fast: false`. Job ids are unchanged; GitHub appends the version to the check name. The golden artifact name carries the version so the two runs do not collide. `uv lock --check` passed, so `uv.lock` was not regenerated.
+
+## Synthetic tuner pool uses spawn (2026-11-25)
+- `bench/synth_component.py` builds its tuning pool with `spawn` (not `forkserver`: spawn is portable and what the load tests use). The requested `filterwarnings("error::DeprecationWarning:multiprocessing")` marker was not used: CPython 3.12 discards the exception when this warning is escalated inside `os.fork`, so it can never fail a test; an autouse fixture in `tests/test_synth_component.py` records warnings and asserts there is no fork warning (checked by temporarily restoring `fork`).
+
+## Fuji COLMAP backbone (2026-11-25)
+
+- GT for a COLMAP window is the VGGT reference window's visible set (checked against the VGGT v2
+  row's `gt`). COLMAP's sparse depth cannot run the occlusion test, and its own test would give
+  the two backbones different GT.
+- `match_px` is scaled by the grid width ratio (COLMAP works at the downscaled image size, VGGT at
+  518). Alignment uses registered views only.
+- COLMAP sees the whole frame; VGGT's crop-mode preprocessing may not. Detections are the same.
+- `status=failed` rows count as finished on resume; `status=error` rows are retried.
+- COLMAP MAE in the report is over successful windows only, shown next to the failure rate.
+- `ColmapMethod` now copies inputs from several directories into one (`recon/staging.py`). The
+  pipeline's sanitized frames are one directory each, so `--backbone colmap` raised before.
+- The 128-slice run is blocked on the alignment problem in `docs/GATES.md`.
+
+## Fuji COLMAP rows: frame taken from the VGGT window (2026-11-25)
+
+- The earlier gate held the run because COLMAP, aligned on its own from camera centres, would sit
+  in a differently rotated frame than the VGGT-built GT. COLMAP's cameras are now placed directly
+  in the VGGT window's aligned frame (`fuji_core.align_to_reference`: mean orientation difference
+  for rotation, then centres for scale and translation, registered views only). This is "same GT
+  alignment as the VGGT rows", and removes the between-backbone rotation confound.
+- It does **not** fix the VGGT window alignment (docs/GATES.md, still open). The rows share that
+  frame, so absolute errors stay unreliable and these rows must be rerun after the fix.
+- COLMAP's placement uses VGGT's cameras, so VGGT pose error within a window carries into it. The
+  median orientation residual per window is stored as `rot_resid_deg` in the row timings, next to
+  `n_registered`. The misfit gate (`check_alignment`) is applied against the VGGT cameras.
+- The test split has 64 windows (8 trees x 2 sides x 4 k), not the 128 the task names, so one
+  method has 64 rows.
+
+## F1: camera alignment uses orientations (2026-11-26)
+
+- `recon.align.align_by_poses`: rotation is the chordal mean of the per-view orientation
+  differences, then scale and translation from the centres. `align_chunk` always uses it (chunk
+  stitching and the pose graph too), not only when centres are degenerate: nearly collinear
+  windows were also wrong. This replaces the two-camera axis-tip points.
+- A non-positive scale from the centres is now an error instead of a rotation chosen to fit them.
+- `check_alignment` also fails when the median orientation error exceeds 30 degrees
+  (`MAX_ROT_ERR_DEG`). The threshold was set a priori, not tuned on any split.
+- `fc.PROTOCOL` is not bumped and no rows were rerun, so the existing reports still build from the
+  old rows. The bump belongs to the rerun (docs/GATES.md).
+
+## Fuji COLMAP resume run from the pre-fix commit (2026-11-26)
+
+- The first COLMAP run was stopped by SIGTERM at 51 of 64 windows (sender not identified). The
+  rotation fix (`8d2d34e`) landed afterwards.
+- The remaining windows run from a detached worktree at `df5a7c8` (`../countonce_prefix`), whose
+  bench/countonce/scripts/configs code differs from the current branch only by that fix, appending
+  to the same `results/bench.csv`. Running them on the fixed code would mix two GT frames inside
+  one table and trip the check that GT equals the VGGT v2 row's GT.
+- All `fuji_core_v2` rows therefore predate the fix and need one joint rerun under a new protocol.
+- The task's "128 test slices" are 64 windows under `fuji_core_v2` (8 trees x 2 sides x 4 k); the
+  extra 64 `countonce_v2` rows in the CSV belong to the superseded `fuji_core_v1` protocol.
+
+## Fuji one-switch ablations (2026-11-26)
+
+- `--ablation` offers `no_cannot_link`, `no_hallucination_filter` and `sam_masks` (SAM 2.1 through
+  `transformers`) and `with_appearance`. Frozen v2 computes no appearance features, so the
+  "± appearance" pair adds them: `Config.appearance_model: dinov2_vits14` (default None) rather
+  than switching `Config.appearance` off, which would change nothing. Crop embeddings run on CPU
+  and are memoised in memory. ViT-S/14 is loaded with `torch.hub`, as the existing extractor did.
+- It refuses protocol `fuji_core_v2` instead of running from a pre-fix worktree: GATES holds
+  ablations until v2 is rerun with the fixed alignment. No rows, no analysis table, no STATUS ticks.
+
+## 2026-11-26: E1 tracker side on Fuji-SfM (ByteTrack, SAM 2.1)
+
+- **ByteTrack:** re-implemented in `bench/baselines_track.py` (IoU + constant-velocity Kalman, two-stage
+  matching, Hungarian via scipy) instead of a pip package: the reference `ByteTrack` repo is not on PyPI and
+  the packaged ports checked are GPL or unmaintained. Unit-tested on a synthetic moving-box sequence only; it
+  has not been validated against the reference implementation on MOT data, so absolute numbers are those of
+  this re-implementation.
+- **SAM 2.1:** `facebook/sam2.1-hiera-small` through `transformers` `Sam2VideoModel`, streaming mode, bf16.
+  A detection starts a new object (box prompt) unless a propagated mask covers it at mask/box IoU >=
+  `cover_iou`; covered detections join the best-covering track. The "small" checkpoint was chosen because it
+  is the one already in the HF cache and fits beside the other GPU jobs; large/base-plus were not tried.
+  Because new objects are added after the old ones were propagated on the same frame, that frame is
+  evaluated twice for the old objects (an API constraint), which only costs time.
+- **Views and strides:** the windows are the Core test windows (k = 3, 5, 10, 20; 40 views are not cached).
+  Stride s shows every s-th view of a window, so the viewpoint gap grows but the window shrinks to
+  ceil(k/s) views; fewer than 2 views is recorded as a `skipped` row. GT of a strided run is the union of the
+  GT apples visible in the shown views. CountOnce v1/v2 counts exist only at stride 1 (not re-reconstructed on
+  subsets).
+- **Scoring:** a tracker's count is the number of distinct tracks among detections whose lifted point lies in
+  the tree's ROI (detections whose lift failed cannot be placed and are not counted), the same ROI rule as
+  the per-image baselines. Tracks are never aligned to GT.
+- **Tuning:** thresholds chosen on the training trees (Tree09-11) only, windows k=5,10 (SAM 2.1: k=5), strides
+  1 and 2, capture order; written to `configs/e1_tracker.json`. Test rows are not read by `tune`.
+- **GT caveat inherited from Core:** the overview pseudo-poses still predate the window-alignment fix
+  (docs/GATES.md), so GT counts per window are as unreliable as for the existing v2 rows; the tracker-vs-v2
+  comparison uses the same prepared GT for both, so it is paired, but absolute errors are not.
+- **Rows:** `results/e1_tracker.csv`, not `results/bench.csv`, because the Core CSV's protocol/staleness
+  machinery assumes pipeline rows.
+
+## CI `full-cpu` installs `hf` (twentieth audit fast-test fix)
+
+- `transformers` maps to the `hf` extra in `tests/test_ci_workflow.py`; `full-cpu` now installs
+  `.[dev,test,data,api,db,dvc,hf]`. `scripts/check_skips.py` `ALLOWED` is unchanged. The only
+  `importorskip("transformers")` is in a `gpu`+`slow` test, which CI deselects.
+- **Open, not fixed here:** the `full-cpu` mypy step is expected to fail. Locally `mypy` reports 6 errors:
+  3 do not depend on `transformers` (`bench/synth_component.py` x2, `bench/track_e1.py`) and 3 in
+  `bench/baselines_track.py` appear only when `transformers` is installed, so installing `hf` exposes
+  them in CI. `tests/test_typing_regressions.py` skips locally without `pycolmap`, so the fast suite
+  does not catch this. Hosted CI was not run.
+
+## Fuji v3: thresholds refrozen (2026-11-26)
+
+- **Rule (as before, training trees only):** lowest v1 count MAE over 12 complete windows; ties (new)
+  broken by higher mean association F1. Evidence `results/fuji_tune3_*.csv`.
+- **Old -> new:** score_threshold 0.2 -> 0.2; merge_k 0.3 -> 0.5. At score 0.2, v1 MAE was 41.08 /
+  39.17 / 39.17 for merge_k 0.3 / 0.5 / 0.8; F1 0.561 (0.5) vs 0.527 (0.8), F1 defined in only 3
+  windows. v2 MAE was 39.75 at all three: v2 did not respond to merge_k.
+- **Movement on val, same cell (0.2, 0.3), v2 protocol -> v3:** v1 MAE 54.75 -> 41.08, v2 61.25 -> 39.75.
+  **Not an accuracy gain:** the GT frame changed, mean GT per window fell 92.6 -> 45.8 and windows with
+  GT = 0 rose from 3 to 7 of 12. The two MAEs are not on the same ground truth.
+- **Warning:** west overview `cam_y_monotonic_frac` fell 0.86 -> 0.54 and overview inlier fractions are
+  low (east 0.27, west 0.18). The v3 GT frame may still be wrong; treat v3 errors as unverified.
+
+## Fuji v3 test rows: west frame invalid (2026-11-26)
+
+- v3 test numbers are **not** compared with v2 or reported: the rebuilt west overview maps west
+  Tree01-Tree06 to one shared window (docs/GATES.md, 06:07 status). The test-tree movement note is
+  deferred until a rerun with a valid frame.
+
+## Fuji v3 test rows: how the v2 numbers moved (2026-11-26, diagnostic only)
+
+64 `countonce_v2` test rows exist under `fuji_core_v3` (53 ok, 11 failed, all k=3 `ChunkAlignmentError`).
+**West is invalid and east is unverified; none of this is an accuracy result.** Means over the slices
+that are ok under both protocols; the GT set differs between protocols, so the MAEs are not like for like.
+
+| side | k | slices | MAE v2 -> v3 | mean GT v2 -> v3 | mean pred v2 -> v3 |
+|---|---|---|---|---|---|
+| east | 3 | 3 | 5.67 -> 19.67 | 26.3 -> 22.7 | 20.7 -> 28.3 |
+| east | 5 | 8 | 56.88 -> 42.12 | 38.9 -> 32.5 | 30.0 -> 49.1 |
+| east | 10 | 8 | 37.88 -> 82.62 | 30.4 -> 131.2 | 68.2 -> 76.6 |
+| east | 20 | 8 | 68.25 -> 130.25 | 168.1 -> 238.0 | 138.9 -> 107.8 |
+| west | 3 | 2 | 2.00 -> 27.00 | 0.0 -> 34.5 | 2.0 -> 60.5 |
+| west | 5 | 8 | 74.50 -> 46.38 | 75.8 -> 0.5 | 12.0 -> 46.9 |
+| west | 10 | 8 | 42.38 -> 54.62 | 75.4 -> 10.9 | 71.2 -> 65.5 |
+| west | 20 | 8 | 135.38 -> 65.00 | 226.2 -> 7.8 | 141.1 -> 72.8 |
+
+- West Tree01-Tree06 give the same prediction with GT = 0 at k=5/10/20 (52 / 64 / 53): one shared
+  window, as in the 06:07 GATES entry.
+- **Choice:** `bench.fuji_report` was run on the rows into a scratch root (`--root <tmpdir>`: 320 v3
+  rows, 45 cells filled), so `docs/RESULTS_FUJI.md`, the paper table and the web summary are NOT
+  overwritten with invalid numbers. They keep the v2 numbers and their existing warning. Do not run the
+  report with the default root until the west frame is fixed (`fc.PROTOCOL` is now v3).
+- **Choice:** part 1 is ticked because its stated done criteria are met; part 2 and the ablation re-run
+  are marked `[!]`, since their `.done`/row-count preconditions would pass on the broken frame.
+
+## Order-invariance on the Fuji test trees, v3 and VGGT re-run (2026-11-26)
+
+- **Run** (`scripts/run_order_invariance_fuji_test.py`, `results/order_invariance_fuji_test.csv`, 192 rows): v1, v2, sync, v3 at the frozen settings (score 0.2, merge_k 0.3, gate 0.5, v3 `v001.pt`) on the `fuji_core_v3` test windows (8 trees x east/west = 16 windows) at k=5 and 10, 10 permutations each. `permute` (128 rows): cached recon, photo-to-frame assignment permuted. `rerun_vggt` (64 rows): fixed subset of 8 windows (one side per tree, alternating east/west, both k), VGGT re-run on photos uploaded in 10 new orders, plus an identity-order control.
+- **Result, permute:** count range 0 and 0 changed partitions for all four associators at both k (merges present: v3 9/16 windows at k=5, 15/16 at k=10). Invariant given a reconstruction.
+- **Result, rerun_vggt:** not invariant. Count range > 0 in all windows for v1/v2/sync at k=5 and 10 and v3 at k=10; v3 k=5 4/8. Median range v1 5/16, v2 11/10.5, sync 6/15.5, v3 0.5/4.5 (k=5/k=10); max 28. Min Rand index over changed partitions 0.992. The identity-order control gave the same count and partition every time, so the variation comes from the photo order seen by VGGT, not run-to-run noise.
+- **Caveats:** the west overview frame is degenerate (see "west frame invalid"), so ROI counts on west windows are not valid and were not used. Count/partition columns do not depend on GT. Subset is 8 windows (more than the 4 requested), not all 16. The variant was not run on validation.
+- **Claim:** the "unordered photos" wording is narrowed in README, STATUS and PLAN §0.6 to the association step; end-to-end order invariance is not claimed.
+
+## Fuji-SfM per-image data check: no dataset cameras (2026-11-26)
+
+Read-only check of the Zenodo 3712808 download for the oracle-geometry arm of the M6 harness.
+
+- **Archive:** `unrar lb` lists 2,643 entries (files and folders); the unpacked tree holds 2,631 files in 12 folders, so nothing was left unextracted. Zenodo's record files are `Fuji-SfM_dataset.rar`, `readme.txt`, `LICENSE.txt`.
+
+| Path under `Fuji-SfM_dataset/` | Files | Content |
+|---|---|---|
+| `2-SfM-set/raw_images_east_side/` | 291 | `*.JPG`, 5184x3456, the SfM frames |
+| `2-SfM-set/raw_images_west_side/` | 291 | `*.JPG`, same |
+| `1-Mask-set/training_images_and_annotations/` | 463 | crops, per-crop `*.csv`, `training_set_masks.json` |
+| `1-Mask-set/validation_images_and_annotations/` | 115 | crops, per-crop `*.csv`, `validation_set_masks.json` |
+| `1-Mask-set/raw_images/` | 12 | `*.JPG` the crops were cut from |
+| `3-3D_data/GroundTruth-3D_apples_locations/training_set/` | 433 | one xyz point list per apple |
+| `3-3D_data/GroundTruth-3D_apples_locations/test_set/` | 1022 | same |
+| `3-3D_data/` | 2 | `Fuji_apple_trees_point_cloud.txt` (rows of 6 numbers), `readme.txt` (global shift) |
+| top level | 2 | `readme.txt`, `LICENSE.txt` |
+
+- **Per SfM image:** pixels and EXIF only. EXIF gives Canon EOS 60D, 24 mm focal length and capture time. None of the 582 images has a GPS block (checked on all), and their XMP holds only `xmp:Rating`.
+- **Not shipped:** camera poses, calibrated intrinsics or distortion, per-image depth, image-to-point correspondences, a photogrammetry project or camera export.
+- **GT apples:** 3D positions exist (1,455 apples, shifted global coordinates, metres). They are scene-level, with no per-image 2D observations.
+- **Decision:** no `oracle_cameras` arm, no run on `fuji_core_v3` test windows, no new decomposition row. A nominal EXIF focal length gives no pose. Resectioning cameras from the coloured cloud, or using COLMAP/VGGT as the "reference", would be another estimate and not an oracle. The §0.6 note is narrowed instead (GATES).

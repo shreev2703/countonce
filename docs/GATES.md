@@ -3,11 +3,14 @@
 Log decision-gate failures (PLAN §21) and genuine roadblocks (missing credentials, gated weights,
 broken downloads, two failed fix attempts) here: exact error, what was tried, what is needed.
 
+Every `##` heading ends in its status: **open** (with an owner) or **resolved**. Text under a resolved
+heading is a historical record and may describe things as they stood then.
 
-## 2026-11-24: Human actions needed (logged by tech-lead audit, not overnight tasks)
+
+## 2026-11-24: Human actions needed (logged by tech-lead audit, not overnight tasks) — resolved (audit snapshot; open items carried to the open sections at the end)
 
 - **Dev environment:** countonce has no venv. `ruff`/`pytest` currently run from the read-only
-  `~/vggtProject/.venv`, and mypy has never been run. Needed: create `countonce/.venv` (Python 3.11) and
+  the sibling VGGT benchmark repo venv, and mypy has never been run. Needed: create `countonce/.venv` (Python 3.11) and
   `pip install -e .[dev,recon]`, then run `mypy` once.
 - **Gates G0 / G1 (PLAN §21):** need the niche interviews and professor meeting (PLAN §20) before they
   can be decided. `docs/RELATED_WORK.md` has `TODO: verify` items that need a full-paper read.
@@ -18,19 +21,19 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 - **Detector weights:** CountGD and GroundingDINO checkpoints need to be downloaded on a networked session
   before the real detector adapters can be checked end to end.
 
-## Detector weights needed (2026-11-24, detector interface task)
+## Detector weights needed (2026-11-24, detector interface task) — open (owner: Shreev; CountGD only, GroundingDINO HF resolved)
 - CountGD: clone niki-amini-naieni/CountGD, download its checkpoint (`checkpoint_fsc147_best.pth`) and the GroundingDINO Swin-B base weights it builds on; then implement `CountGDDetector._load`/`_infer` (currently stubs) and verify the output-format `TODO` in `countonce/detect/countgd.py`.
 - GroundingDINO (**resolved 2026-11-24 for the HF backend**: `grounding-dino-tiny` runs for real, see `docs/DEVIATIONS.md`; only the optional original-package path below is still unverified): `pip install groundingdino` (IDEA-Research), config `GroundingDINO_SwinT_OGC.py` and `groundingdino_swint_ogc.pth`; run `GroundingDinoDetector` once on a real frame to confirm `predict` score/box conventions.
 
-## 2026-11-24: Second tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Second tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Still open from the first audit: the countonce venv plus a first mypy run, G0/G1 interviews and the professor meeting, the G2 captures, own captures and hand counts, the Fuji-SfM download and license check, and the detector weights.
 - **Baselines 5-6 (C-DOG, CountVid) and 7 (DG-Net):** these need their repos and weights cloned and downloaded on a networked session, plus the RGBD-VideoCount/VideoCount data. They are not queued until that is done. Once it is, log failures to run in DEVIATIONS (PLAN §9.3).
 - **Labeling tool for identity labels (PLAN Phase 2):** this is useful only once real captures exist. It will be queued after the first captures land.
 - **CI:** the workflow file will be added locally. Pushing it and enabling Actions on GitHub is a human step.
 
-## 2026-11-24: Third tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Third tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - All 22 earlier overnight tasks are checked. `pytest` passes (157 tests) and `ruff check .` is clean, both
-  still run from `~/vggtProject/.venv`. mypy is still not installed anywhere, so the countonce venv item above stays open.
+  still run from the sibling VGGT benchmark repo venv. mypy is still not installed anywhere, so the countonce venv item above stays open.
 - **Frontier VLM baseline (PLAN §9.3 item 8):** needs API keys (Anthropic, Google, OpenAI), a spending cap
   and your approval of the prompt and the scene subset before any paid call. The harness can be built with a fake
   client later, but no real run happens without you.
@@ -43,9 +46,9 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 - **Real-data numbers:** every queued task is tested only on synthetic or tmp fixtures. Results tables and figures stay
   `TODO: fill from results` until the Fuji-SfM download, the detector weights and your own captures exist.
 
-## 2026-11-24: Fourth tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Fourth tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Audit state: all 26 earlier overnight tasks are checked. `pytest` passes 229 tests and `ruff check .` is clean, both still run from
-  `~/vggtProject/.venv`. mypy is still not installed in any environment, so the countonce venv item stays open.
+  the sibling VGGT benchmark repo venv. mypy is still not installed in any environment, so the countonce venv item stays open.
 - **Track J dependencies (PLAN §16B.1):** `pyarrow`, `duckdb`, `webdataset` and `dvc` are not installed anywhere, so the
   Parquet feature store, DuckDB catalog, WebDataset shards and DVC versioning are not queued yet (their tests would only skip).
   Needed: add them to the countonce venv, `dvc init`, and choose a remote (local disk or R2 credentials).
@@ -56,9 +59,9 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 - **Kubric/BlenderProc rendering:** still human-gated. The renderer-agnostic recipe and validation gates are queued. The renderers
   are not.
 
-## 2026-11-24: Fifth tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Fifth tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Audit state: all 35 earlier overnight tasks are checked. `pytest` passes 345 tests and `ruff check .` is clean, both still run from
-  `~/vggtProject/.venv`. mypy is still not installed anywhere (`~/vggtProject/.venv/bin/mypy` is missing), so the pre-commit mypy hook
+  the sibling VGGT benchmark repo venv. mypy is still not installed anywhere (its `bin/mypy` is missing), so the pre-commit mypy hook
   has never run. The countonce venv item stays open.
 - **Privacy region detector weights:** the installed `cv2` (5.1.0) has no bundled Haar cascades. For face/plate blurring to run for real,
   download a face model (e.g. OpenCV YuNet ONNX or `haarcascade_frontalface_default.xml`) and a plate cascade, and set their paths
@@ -70,9 +73,9 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   profile table needs an interactive RTX 5070 run with VGGT and detector weights present.
 - **Web API/DB/queue (PLAN §14.2-14.4):** still deferred until the Core benchmark has real numbers, and the frontend still waits for mockup approval.
 
-## 2026-11-24: Sixth tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Sixth tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Audit state: all 47 earlier overnight tasks are checked. `pytest` passes 402 tests (1 skipped) and `ruff check .` is clean, both
-  still run from `~/vggtProject/.venv`. mypy is still not installed, so the countonce venv item stays open.
+  still run from the sibling VGGT benchmark repo venv. mypy is still not installed, so the countonce venv item stays open.
 - **Web product deps (PLAN §14.2-14.4, §14.8 idempotency/resumable uploads):** `fastapi`, `httpx`, `sqlalchemy` and a Postgres instance
   are not available, and the frontend still waits for mockup approval. The API, idempotency keys and load test stay unqueued until you
   approve mockups and add those deps. The correction tools are queued as a backend only.
@@ -83,9 +86,9 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   scenes after captures exist.
 - **Track J (Parquet/DuckDB/WebDataset/DVC):** `pyarrow` and `duckdb` are still missing, so it stays unqueued (see the fourth audit).
 
-## 2026-11-24: Seventh tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Seventh tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Audit state: all 54 earlier overnight tasks are checked. `pytest` passes 477 tests (2 skipped) and `ruff check .` is clean in
-  `~/vggtProject/.venv`. A countonce `.venv` now exists (uv, **Python 3.12.3**, dev extra only). In it, 5 test modules fail to collect
+  the sibling VGGT benchmark repo venv. A countonce `.venv` now exists (uv, **Python 3.12.3**, dev extra only). In it, 5 test modules fail to collect
   (matplotlib/torch missing) and `mypy countonce` reports 65 errors. Both are queued as fixes. Human items: decide whether the venv should be
   3.11 to match CI (`setup-python 3.11`), then `uv pip install -e .[dev,recon,mcp]` (torch for `sm_120` needs the CUDA 12.8+ wheel index).
 - **SAM/SAM2 weights** (RESOLVED 2026-11-24 through Hugging Face: `facebook/sam2.1-hiera-small`, public, ungated, Apache-2.0, used by `Sam2HfMaskProducer`; only the `sam2`-package path still needs a manual checkpoint): download a checkpoint (e.g. `sam2_hiera_small.pt`) on a networked session and set its path
@@ -99,15 +102,15 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   FP8/NVFP4 (interactive GPU); VGGT-Ω/VGG-T³/CountGD++ backends (gated weights); OneScene-Bench, RGBD-VideoCount and VideoCount loaders plus the
   C-DOG/CountVid/DG-Net baselines (downloads); HF Space/model/dataset releases (needs results and your accounts).
 
-## 2026-11-24: SAM weights for the mask producer (human action)
+## 2026-11-24: SAM weights for the mask producer — resolved (Hugging Face SAM 2.1, see below)
 - `Config.masks: sam` needs the `sam2` package and a SAM 2 checkpoint, e.g. `sam2_hiera_small.pt` (config `sam2_hiera_s.yaml`), downloaded
   by you on a networked session and set as `mask_checkpoint`. Nothing was downloaded; `sam` mode raises `MaskModelUnavailable` when missing.
   The queued task built and tested only the `box_fill` producer and a fake. The bench ablation row uses `box_fill` for that reason.
 
-## 2026-11-24: Eighth tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Eighth tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Audit state: all 61 earlier overnight tasks are checked. In the countonce `.venv` (Python 3.12, dev extra only), `pytest` gives 480 passed and
   22 skipped, `ruff check .` is clean and `mypy countonce` reports no issues (70 files). The 22 skips are missing torch, matplotlib, cv2, mcp and
-  pycolmap. The 69 skipped-module tests pass in `~/vggtProject/.venv`. CI has the same blind spot, so a `full-cpu` CI job is queued.
+  pycolmap. The 69 skipped-module tests pass in the sibling VGGT benchmark repo venv. CI has the same blind spot, so a `full-cpu` CI job is queued.
 - **License choice (PLAN §16, §24):** the repo has no LICENSE. Pick the code license yourself (e.g. MIT or Apache-2.0 for the code).
   Several dependencies and weights are non-commercial (VGGT, VGGT-Ω, possibly Fuji-SfM; see `docs/DATASETS.md`, `docs/MODEL_SURVEY.md`),
   so the README needs a note on that whatever you choose. The queued hygiene task deliberately skips the LICENSE file.
@@ -122,7 +125,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   The best next unblockers are installing `pyarrow`+`duckdb` (unlocks Track J), approving mockups and adding `fastapi`/`sqlalchemy` (unlocks the
   web API), and downloading Fuji-SfM plus the detector weights (unlocks real Core numbers).
 
-## 2026-11-24: Ninth tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Ninth tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Audit state: all 69 earlier overnight tasks are checked. In the countonce `.venv` (now with CPU torch), `pytest` gives 573 passed and 3 skipped
   (mcp, pycolmap x2), and `ruff check .` is clean. **`mypy countonce` regressed to 3 errors** (privacy.py, appearance.py, vggt.py). The fix is queued first.
 - **Uncommitted `docs/PLAN.md` edit:** the working tree has a formatter-only diff in the §7 code blocks (comment spacing, blank lines). The audit
@@ -139,7 +142,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
 - **Autonomous work after this batch is nearly exhausted.** After these 6 tasks, the remaining PLAN items all need data, weights, GPU time,
   new dependencies or your approval. Biggest unblockers: Fuji-SfM plus the detector weights (real Core numbers), `pyarrow`+`duckdb` (Track J), and mockup approval (web product).
 
-## 2026-11-24: Tenth tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Tenth tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Audit state: all 75 earlier overnight tasks are checked. In the countonce `.venv`, the full `pytest` run gives 609 passed and 3 skipped, `ruff check .`
   is clean and `mypy countonce` reports no issues (79 files). **`tests/test_job_retention.py::test_cli` is flaky**: it failed once under `-x`, then passed
   on reruns, because share tokens can start with `-` and break argparse. The fix is queued first. The system PATH has no `ruff` or `rtk pytest`. Use `.venv/bin/…`.
@@ -158,7 +161,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   accounts or your approval. Biggest unblockers, in order: Fuji-SfM plus the detector weights (real Core numbers), mockup approval plus `fastapi`/`sqlalchemy`
   (web product), and `pyarrow`+`duckdb` (Track J).
 
-## 2026-11-24: Eleventh tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Eleventh tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Audit state: all 82 earlier overnight tasks are checked. In the countonce `.venv`, `pytest` gives 653 passed and 3 skipped (mcp, pycolmap x2),
   `ruff check .` and `ruff format --check .` are clean, and `mypy countonce` reports no issues (84 files). The audit found no new bugs or stubs beyond the weight-gated
   `NotImplementedError` paths already logged (`countgdpp`, `vggt_omega`, `vggt_t3`, the CountGD forward pass).
@@ -171,7 +174,7 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   cost rates, captures, hand counts, identity labels, interviews, the professor meeting, the pilot, the human baseline study, the demo video and the paper venue.
 - **After this batch the autonomous backlog is empty.** Everything left in PLAN.md needs data, weights, GPU or Docker time, accounts or your approval.
 
-## 2026-11-24: Twelfth tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Twelfth tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Audit state: all 89 earlier overnight tasks are checked. In the countonce `.venv`, `pytest` gives 708 passed and 4 skipped (safetensors, mcp, pycolmap x2),
   and `mypy countonce` reports no issues (91 files). **`ruff check .` fails (9 errors) and `ruff format --check .` flags 1 file, all in the untracked
   orchestrator script `scripts/hud.py`.** That breaks every task's lint gate, so the fix (ruff `extend-exclude`, not edits to your file) is queued first.
@@ -188,18 +191,18 @@ broken downloads, two failed fix attempts) here: exact error, what was tried, wh
   interviews, the professor meeting, the pilot, the human baseline study, the frontier-VLM baseline run (API keys and spend), the demo video and the paper venue.
 - **After this batch the autonomous backlog is truly exhausted.** The next audit should only queue bugs or regressions.
 
-## Object storage against real R2 (human gate)
+## Object storage against real R2 — open (owner: Shreev)
 - `S3BlobStore` and the cache/upload/worker routing pass the contract suite on `moto` only. To verify on Cloudflare R2: create a bucket and an API token, set `COUNTONCE_STORAGE=s3`, `COUNTONCE_S3_BUCKET`, `COUNTONCE_S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com`, `COUNTONCE_S3_ACCESS_KEY_ID`, `COUNTONCE_S3_SECRET_ACCESS_KEY` (`COUNTONCE_S3_REGION=auto`), install `.[storage]`, then run a worker with `--storage s3` and fetch a presigned URL by hand. Also set a bucket CORS rule before browser uploads use `presign_put`.
 
-## DVC remote (R2): human gate
+## DVC remote (R2) — open (owner: Shreev)
 `dvc.yaml`/`params.yaml` are committed but no DVC remote is configured. Needs a human: create the
 R2 bucket, then `dvc remote add -d r2 s3://<bucket>/dvc`, set the endpoint URL and credentials
 (local, not committed), `dvc push`. Until then `dvc.lock`/data stay local.
 
-## Real CountGD fine-tune (Track D)
+## Real CountGD fine-tune (Track D) — open (owner: Shreev)
 - **Gate:** CountGD weights (and the real MinneApple/WGISD/Fuji-SfM downloads). The harness (`countonce finetune-detector`, `scripts/make_detector_adaptation_report.py`) is tested with a tiny fake torch detector only. Needs a human to fetch the weights and supply a module factory; layer names in `configs/finetune.yaml` are `TODO: verify`.
 
-## 2026-11-24: Thirteenth tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Thirteenth tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Audit state: all 96 earlier overnight tasks are checked. In the countonce `.venv`, `pytest` gives 870 passed and 22 skipped (19 Postgres contract cases with no
   `COUNTONCE_PG_URL`, plus mcp and pycolmap x2). `ruff check .`, `ruff format --check .` and `mypy` (109 files) are clean, and `git status` is clean.
 - **Bugs found and queued:** (1) the CI `full-cpu` job should fail, because `dvc` isn't installed there, so the DVC test skips outside the
@@ -207,7 +210,7 @@ R2 bucket, then `dvc remote add -d r2 s3://<bucket>/dvc`, set the endpoint URL a
   (3) `bench/vlm/parse` reads "Confidence: 80%" as a count of 80 and "No apples are visible." as a parse failure instead of 0.
 - **The GPU is not human-gated:** this machine has an RTX 5070 Laptop GPU (8 GB) and the public `facebook/VGGT-1B` weights cached under `~/.cache/huggingface`.
   So this batch queues the first real-VGGT run and baseline profile (color-blob detector, tiny scene, capped at 20 minutes, its own `.venv-gpu`, leaving
-  `~/vggtProject` untouched). Earlier audits listed "GPU runs" as yours. If you'd rather watch GPU runs yourself, delete that task before the orchestrator reaches it.
+  the VGGT benchmark repo untouched). Earlier audits listed "GPU runs" as yours. If you'd rather watch GPU runs yourself, delete that task before the orchestrator reaches it.
 - **Mockups:** the queued task only *produces* static mockups in `docs/mockups/`. **Your approval** is still required before any `frontend/` code, and the
   frontend, 3D viewer and Google sign-in stay unqueued until you approve.
 - **Still yours (unchanged):** a real Postgres (Neon/Supabase) and R2 bucket and credentials, the DVC remote, deploys (Vercel/Render), the OTLP endpoint, HF uploads,
@@ -217,13 +220,13 @@ R2 bucket, then `dvc remote add -d r2 s3://<bucket>/dvc`, set the endpoint URL a
   Also still yours from earlier audits: whether to commit `uv.lock` and the orchestrator scripts.
 - **After this batch:** the remaining PLAN.md work needs your approval (frontend), accounts (deploys, Postgres/R2 hosting), gated weights or data, or Docker.
 
-## Mockup approval (PLAN §17) — human gate, open
+## Mockup approval (PLAN §17) — resolved (superseded by PLAN §0.1 rule 5: review after the build, H2)
 
 Static mockups are in `docs/mockups/` (upload, progress, results, history, states) with an approval checklist in `docs/mockups/README.md`.
 **Shreev must approve (or request changes) before any `frontend/` code starts.** No screenshots yet: `playwright` is not installed,
 so `scripts/render_mockups.py` skips; open the HTML files directly or install playwright and rerun.
 
-## 2026-11-24: Fourteenth tech-lead audit (human actions, not queued as overnight tasks)
+## 2026-11-24: Fourteenth tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
 - Audit state: at HEAD the code is healthy (`ruff check .`, `ruff format --check .` and `mypy countonce` (112 files) are clean), but **task 102 (API load test) was
   marked `[x]` without being committed**. Its untracked and modified files are still in the working tree, and with them `pytest` gives 938 passed, 26 skipped and
   **2 failed** (`test_coldstart.py::test_report_with_and_without_rows` and `test_loadtest_api.py::test_rate_limit_produces_429_and_still_reconciles`). Finishing
@@ -240,86 +243,560 @@ so `scripts/render_mockups.py` skips; open the HTML files directly or install pl
   so it is the biggest remaining Core gap); frontier-VLM API spend; interviews, the professor meeting, the pilot, the human baseline study, the demo video and the paper venue; and
   whether to commit `uv.lock` and the orchestrator scripts.
 
-## 2026-11-24: SAM weights resolved through Hugging Face
+## 2026-11-24: SAM weights resolved through Hugging Face — resolved
 - `Config.masks: sam` without `mask_checkpoint` now uses `Sam2HfMaskProducer` (`facebook/sam2.1-hiera-small`, public, ungated, Apache-2.0), downloaded from the HF Hub on first use. No manual download is needed; the earlier "SAM weights" human action above is closed. Setting `mask_checkpoint` still selects the `sam2`-package adapter.
 
-## 2026-11-24: Fifteenth tech-lead audit (the two `[!]` tasks were not real gates)
+## 2026-11-24: Fifteenth tech-lead audit (the two `[!]` tasks were not real gates) — resolved (non-gates; re-queued work done)
 - Audit state at `af6dba0`: `pytest` 957 passed and 29 skipped, and `ruff check .`, `ruff format --check .` and `mypy countonce` (112 files) are all clean.
 - **"First real Core benchmark on Fuji-SfM" (`[!]`):** the session hit the orchestrator's 40-turn cap (`error_max_turns`, log `logs/overnight_20261124_1502/181914_*.log`), so this was not a credential or weights gate. It had written `bench/fuji_core.py` and `scripts/run_fuji_core.py` (WIP commit `7e23718`, untested) and got one east-side overview run through (peak VRAM 5.5 GB, no OOM). It was then stuck registering VGGT windows to the GT frame. Its last diagnostic, which loaded the 542k-point GT cloud, was killed with **exit 137** (host RAM, 15 GB total). `.venv-gpu` has no `pandas`. The task is re-queued as a cleanup/tests task plus three bounded steps (train-split thresholds, resumable test-split runs, CPU-only report).
 - **"First capped v3 matcher training run" (`[!]`):** also stopped at the 40-turn cap (log `184420_*.log`). The training is **Python-bound: 703 s for epoch 1** of 800 episodes at about 11% GPU utilisation (epoch-1 val_f1 0.368; this is a partial run, not a result). It is re-queued as a training speed-up task, then a fresh capped run.
 - **Orchestrator note (human):** GPU tasks that wait on long runs with background monitors burn turns. Either raise the per-task turn cap for GPU tasks or keep them split as above. The new tasks tell agents to run GPU jobs in the foreground under `timeout`.
 - **Still yours (unchanged from the fourteenth audit):** mockup approval before any `frontend/` code; own captures, hand counts and identity labels; CountGD/CountGD++/VGGT-Ω/VGG-T³ weights; CountVid/DG-Net/C-DOG and the video datasets; real Postgres/R2/DVC remote/OTLP/deploys; HF uploads; frontier-VLM spend; the LICENSE choice (Fuji-SfM is CC BY-NC-SA, VGGT-1B is non-commercial); interviews, the professor meeting, the pilot, the human baseline study and the demo video.
 
-## 2026-11-24: Fuji Core step 2 not run (step 1 left no frozen config)
-- `configs/fuji_core.yaml` does not exist: step 1 (thresholds from Tree09-11) is still `[!]` and stopped partway (`runs/fuji_core/tune.log`). Running the test trees (Tree01-08) without frozen thresholds would tune on the test split, so no GPU run was started. Step 2 stays `[ ]` and needs re-queueing once step 1 commits the config.
-- Done meanwhile: the runner now takes `--config` (default `configs/fuji_core.yaml`, required for `--split test`), records its hash, and skips finished (tree, side, k, method) slices. See `docs/DEVIATIONS.md`.
+## 2026-11-24: Fuji Core step 2 and report re-run blocked — resolved (superseded by M8)
+- Step 2 (test-split runs) and the report re-run were blocked because step 1 had not frozen `configs/fuji_core.yaml`,
+  so `results/bench.csv` had no Fuji rows. No test-split run was started without frozen thresholds and no cell was filled.
+- The report re-run was retried 23 times while blocked. The third to twenty-third retries are the commit range
+  `3737ddc`..`2afa977` (history left as is).
+- M8 superseded all of these: it froze the config, ran the test trees into `results/bench.csv` and filled the report.
 
-## 2026-11-24: Fuji Core report re-run not possible (no Fuji rows)
-- `results/bench.csv` does not exist and `configs/fuji_core.yaml` is still missing, so step 2 (test-split runs) never produced rows. `python -m bench.fuji_report` and `bench.figures` would write only TODO cells, and `make_all` rejects an empty CSV. Nothing was filled; the DEVIATIONS "assoc_f1 is not filled" TODO stays.
-- Unblock: finish step 1 (commit the frozen config), run step 2 on Tree01-08, then re-queue this task. The task stays `[ ]` in `TASKS_OVERNIGHT.md`.
+## 2026-11-25: Sixteenth tech-lead audit — resolved (audit snapshot; open items carried to the open sections at the end)
+- Audit state at `c3e5655`: all 119 earlier tasks are checked. `ruff check .`, `ruff format --check .` and `mypy countonce` (112 files) are clean. `pytest -m "not slow and not gpu"` gives 988 passed and 26 skipped (21 Postgres with no `COUNTONCE_PG_URL`, plus mcp and pycolmap x2 in `.venv`).
+- **Bug found and queued:** the Fuji-SfM test-split numbers now in the README and `docs/RESULTS_FUJI.md` come from an evaluation protocol with visible defects. About half of the k=3/5 windows have GT = 0, miss rate is about 0.95 where it is defined, assoc F1 is set on only 54 of 320 rows, Tree06/west k=5 returns 0 for every method, and no row records `low`/`high`. **Until the queued protocol fix and re-run land, treat those numbers as provisional and do not quote them.** The queued order is: protocol fix (CPU), re-run, the sync and COLMAP baselines, the sweep axes, v3 on Fuji (G4 evidence), conformal and slicing on real rows, then docs.
+- **Orchestrator note (human):** the "Fuji Core report re-run" task was retried 23 times while its dependency was unmet. Each retry made a no-op commit (`3737ddc`..`2afa977`) and added GATES/DEVIATIONS entries. Consider having the orchestrator skip a task after 2 consecutive gate logs, or mark it `[!]` so it is not retried. The last queued task cleans up the entries; rewriting history is your call (never done automatically).
+- **Gate G4 (v3 vs. v2 on real data):** the v3-on-Fuji task only produces the evidence. **The decision is yours.** The same applies to G3 once the re-run report exists.
+- **Still yours (unchanged from the fifteenth audit):** mockup approval (`docs/mockups/`) before any `frontend/` code, plus the frontend, 3D viewer and Google sign-in after it; own captures, hand counts and identity labels (Phase 1-2 own-scene half of Core, and the 5-real-scene "Done when" of Phase 1); CountGD/CountGD++/VGGT-Ω/VGG-T³ weights; CountVid/DG-Net/C-DOG and the video datasets (CountVid is still the largest Core baseline gap); a real Postgres (the 21 skipped contract tests need `COUNTONCE_PG_URL`), R2, DVC remote, OTLP endpoint and deploys; HF uploads; frontier-VLM API spend; Docker (Kubric, the worker image); the LICENSE choice (Fuji-SfM is CC BY-NC-SA, VGGT-1B is non-commercial); interviews, the professor meeting, the pilot, the human baseline study, the demo video and the paper venue.
+- **After this batch:** the remaining autonomous PLAN.md work is the Fuji fine-tune ablation with at least 3 seeds (Phase 3), which waits on G4. Everything else needs the human items above.
 
-## 2026-11-24: Fuji Core report re-run still blocked (second attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; steps 1 and 2 have not produced Fuji rows. Nothing was run or filled, and the DEVIATIONS "assoc_f1 not filled" TODO stays. Task left `[ ]`; re-queue after step 2 writes rows.
+## 2026-11-25: Gate G3 (geometry helps) on Fuji-SfM, M8 evidence — open (owner: Shreev, decision)
+- **Recommendation: G3 not met (mixed).** On the 8 frozen test trees (320 rows, protocol `fuji_core_v2`), v1/v2 beat Sum in most slices at k=10 and 20 but not at k=3/5, and beat Max in most slices only at k=20 (v2 vs Max paired MAE diff -51.9, CI [-81.7, -20.3]); Max has the lowest MAE at k=10 (31.1 vs v2 40.1). Table and per-slice counts: `docs/RESULTS_FUJI_ANALYSIS.md`.
+- Failure sources (k=10, no oracle geometry available on Fuji): the detector (about 121 false positives and 52 misses per window) is the largest error, then duplicates from association (34-37 per window even with perfect detections).
+- Fallback per PLAN §21: publish the honest mixed result; the final decision and any redirect (detector first, then association) is the owner's. Does not decide G4.
 
-## 2026-11-24: Fuji Core report re-run still blocked (third attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled, and the DEVIATIONS "assoc_f1 not filled" TODO stays. Task left `[ ]`; re-queue after step 2 writes rows.
+## 2026-11-25: OneScene-Bench images not published (found during M10; does not block M10) — open (owner: Shreev)
+- `github.com/swathisuhas/OneScene-Bench` holds parquet annotations whose image fields are relative paths with no bytes (checked first rows of three files), and the repo tree has no image files.
+- Needed before the Strong-tier OneScene evaluation: get the images from the authors, or rebuild them from DL3DV-10K under its terms (yours: it needs accepting terms or contacting the authors). `bench/datasets/onescene.py` also needs rewriting for the parquet layout.
 
-## 2026-11-24: Fuji Core report re-run still blocked (fourth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled, and the DEVIATIONS "assoc_f1 not filled" TODO stays. Task left `[ ]`; re-queue after step 2 writes rows.
+## 2026-11-25: Google OAuth client needed (does not block M16) — open (owner: Shreev)
+- The sign-in code is in place but has never run against Google. Yours: create an OAuth web client, add `<origin>/api/auth/google/callback` as a redirect URI, set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `COUNTONCE_AUTH_SECRET`, `COUNTONCE_SESSION_SECRET` and `COUNTONCE_PUBLIC_URL`, and leave `COUNTONCE_DEV_AUTH` unset in public.
 
-## 2026-11-24: Fuji Core report re-run still blocked (fifth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled, and the DEVIATIONS "assoc_f1 not filled" TODO stays. Task left `[ ]`; re-queue only after step 1 commits the config and step 2 writes rows.
+## M18: hosted deployment — open (owner: Shreev)
+Create the two Vercel projects, Neon Postgres and the R2 bucket, then follow `docs/DEPLOY.md`. Until then "frontend talks to the deployed API" is verified only locally.
 
-## 2026-11-24: Fuji Core report re-run still blocked (sixth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled, and the DEVIATIONS "assoc_f1 not filled" TODO stays. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## M19: GPU end-to-end — open (owner: Shreev)
+Run once on the laptop: start the API and `web/` dev server (see `web/README.md`), run `scripts/start_worker.sh`, upload photos at `/new` and confirm the result page. Not run overnight (needs a GPU session and a browser).
 
-## 2026-11-24: Fuji Core report re-run still blocked (seventh attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled, and the DEVIATIONS "assoc_f1 not filled" TODO stays. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## M20: live demo URL — open (owner: Shreev)
+No hosted frontend exists (see M18 above). After deploying, replace the "Live demo: not hosted yet" line in `README.md` with the URL.
 
-## 2026-11-24: Fuji Core report re-run still blocked (eighth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled, and the DEVIATIONS "assoc_f1 not filled" TODO stays. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## M20: five-view VGGT run failed through the CLI on WSL2 8 GB — resolved
+The CLI's `expandable_segments:True` gave `CUDA driver error: device not ready`. `configure_allocator()`
+now leaves the allocator alone on WSL (`countonce/oom.py`); 3 of 3 five-view runs succeed without an override.
 
-## 2026-11-24: Fuji Core report re-run still blocked (ninth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled, and the DEVIATIONS "assoc_f1 not filled" TODO stays. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## M21: one step left for a human (2026-11-25) — open (owner: Shreev)
+`CLAUDE.md` is still tracked and still contains personal paths, so M21 is not done. The user-level
+`guard_commit.py` PreToolUse hook rejects any agent commit whose staged paths include `CLAUDE.md`,
+including its removal from the index. The hook was not bypassed. Everything else in M21 is committed.
 
-## 2026-11-24: Fuji Core report re-run still blocked (tenth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+To finish, from your own shell in the repo: `git rm --cached CLAUDE.md`, then
+`git commit -m "chore(repo): untrack agent rules file (M21)"`, then tick M21 in the local task file.
+The file stays on disk and is already in `.gitignore`. Then remove the `xfail` marker and the
+`CLAUDE.md` exemption in `tests/test_repo_hygiene.py`.
 
-## 2026-11-24: Fuji Core report re-run still blocked (eleventh attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+Before merging into `main` (which still tracks the agent files): back up the local copies. Checking out
+`main` and then merging this branch deletes them from the working tree. Git history also still holds
+them and their personal paths; history was not rewritten.
 
-## 2026-11-24: Fuji Core report re-run still blocked (twelfth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## M22: §0.6 rows left unticked (2026-11-25) — open (owner: Shreev)
+The consistency pass is committed, but its "done when" is not met: only the reliable-path, tiny-scene and
+README rows could honestly be ticked. M22 is left unchecked. What each other no-photo row needs:
+- **Gate G3 (yours):** confirm or reject the "not met" recommendation above.
+- **Repo hygiene (yours):** the M21 `CLAUDE.md` step, then push and check hosted CI.
+- **Lighthouse (code):** resolved 2026-11-25. `/demo/tiny` performance went from a median 0.54 to 0.93
+  (3 local runs); see DEVIATIONS.
+- **Failure sources:** separating geometry from association needs data with oracle geometry.
+- **Related work:** run experiments E1-E5 and read the remaining works (`docs/RELATED_WORK.md`).
 
-## 2026-11-24: Fuji Core report re-run still blocked (thirteenth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+Also found (fixed later via the `worker` extra): `docker/worker.Dockerfile` installs `.[recon,data]` without `transformers` or the
+`vggt` package, so that image cannot run the default pipeline (the image has never been built). The
+README setup was verified with `uv pip`, not plain `pip`, and resolved torch 2.15.0+cu132.
 
-## 2026-11-24: Fuji Core report re-run still blocked (fourteenth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## 2026-11-25: Seventeenth tech-lead audit — open (owner: Shreev)
+- Audit state at `f6392e3`: `ruff check .` clean; `pytest -m "not slow and not gpu"` gives 1113 passed, 27 skipped
+  (Postgres without `COUNTONCE_PG_URL`, `mcp`, `pycolmap`), 1 xfail (the M21 `CLAUDE.md` hygiene test).
+- **M5 was not a real gate:** its run stopped at the orchestrator's 40-turn cap (`error_max_turns`), leaving
+  WIP in `bd60d83`. It is re-queued as M5a (harness) and M5b (tuning + v3 re-run), sized to fit one session.
+- **Queued (autonomous, in order):** M5a, M5b, worker Docker image deps, order-invariance on Fuji (real data),
+  sync and v3 on Fuji held-out trees (G4 evidence only), `/demo/tiny` Lighthouse performance, GATES cleanup,
+  §28.5 quarantine of unproven Moon-tier modules into `experimental/`.
+- **`TASKS_OVERNIGHT.md` is gitignored (M21, §0.1 rule 6).** This audit updated it locally and did not
+  force-add it; only this file is committed.
+- **Still yours (human only):**
+  - Gate G3: confirm or reject the "not met (mixed)" recommendation above. Gate G4 when the Fuji v3 rows exist.
+  - M21: `git rm --cached CLAUDE.md` and commit from your own shell, then drop the xfail in
+    `tests/test_repo_hygiene.py`; push and check hosted CI.
+  - H1 capture day (20-30 scenes, ≥3 zero-target), then P1-P5 run as agent tasks.
+  - H5 accounts (Vercel x2, Google OAuth client, Neon, R2) and the M18 deploy; M19 GPU end-to-end from a browser;
+    put the live URL in the README.
+  - H2 frontend review, H3 interviews, H4 professor meeting, H6 ownership study, the demo video.
+  - Docker (worker image build, Kubric), gated weights (CountGD/CountGD++, VGGT-Ω, VGG-T³), CountVid/DG-Net and
+    the video datasets (E1-E3), OneScene-Bench images (E5), frontier-VLM API spend.
+- **After this batch:** remaining PLAN work needs the photos (P1-P6) or the human items above. Oracle-geometry
+  failure-source runs need a dataset with cameras (own captures with COLMAP, or rendered data in P6).
 
-## 2026-11-24: Fuji Core report re-run still blocked (fifteenth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## 2026-11-25: Eighteenth tech-lead audit — open (owner: Shreev)
+- Audit state at `426f112`: `ruff check .` clean; `pytest -m "not slow and not gpu"` gives 1091 passed, 26 skipped
+  (Postgres without `COUNTONCE_PG_URL`, `pycolmap`), 1 xfail (the M21 `CLAUDE.md` test); `pytest experimental`
+  gives 36 passed, 1 skipped (`mcp`).
+- **Neither `[!]` task is a real gate.** M5b and "sync and v3 on Fuji held-out trees" both stopped at the
+  orchestrator's 25-minute session timeout (exit 124). The Fuji test-split sync/v3 run kept going detached
+  (PID 1692818, 56 of 128 rows per method at 20:45). Both are re-queued: the Fuji one as a task that finishes
+  that run and never starts a second copy, and M5b as M5b-1 (resumable, parallel tuning launched detached) plus
+  M5b-2 (test run and report).
+- **Bug found:** a synthetic-component test wrote toy rows into `results/synth_component_tuning.csv` on every
+  `pytest` run. The audit deleted the toy file; the fix and a guard against tests writing into `results/` and
+  `docs/` are queued first.
+- **Gap found:** `Config.assoc` defaults to `v1`, but PLAN §0.1 rule 1 names v2 (or sync if it wins on
+  validation) and the README quickstart passes `--assoc v2`. Queued as a decision task that applies the rule to
+  the Fuji validation numbers.
+- **Also queued:** order-invariance at a gate where v2 and sync actually merge (the existing Fuji result is
+  vacuous for them), and a 3.11 + 3.12 CI matrix (closes the environment item below).
+- **Checked and not queued:** oracle-geometry failure-source runs on Fuji. Fuji-SfM has no dataset cameras or
+  depth (`scripts/run_failure_sources_fuji.py`), so they need own captures with COLMAP or rendered data (P2/P6).
+  No Strong-tier scaffolding is queued: PLAN §4 rules 9-11 and §0.1 rule 2 forbid it until the Core rows are
+  done, and those rows need the photos.
+- **`TASKS_OVERNIGHT.md` stays gitignored** (M21, §0.1 rule 6). The audit updated it locally and did not
+  force-add it; only this file is committed.
+- **Still yours (human only), unchanged from the seventeenth audit:** G3 decision (and G4 once the Fuji v3
+  rows are complete); the M21 `CLAUDE.md` untrack and a push to check hosted CI; H1 capture day, then P1-P5;
+  H5 accounts and the M18/M19 deploy; H2, H3, H4, H6 and the demo video; Docker builds, gated weights,
+  external datasets and VLM API spend.
+- **After this batch:** the PLAN has no autonomous work left that doesn't need the photos or the human items.
 
-## 2026-11-24: Fuji Core report re-run still blocked (sixteenth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## 2026-11-25: Gate G4 (learning helps), v3 vs v2 on Fuji-SfM — open (owner: Shreev, decision)
+- **Recommendation: G4 not met on Fuji-SfM. Keep v3 out of the default path.** G4 asks for v3 to beat v2 on
+  association F1 on Fuji-SfM and on own captures. v3 does not on Fuji; there are no own captures.
+- Association F1, v3 minus v2, on slices where both are defined (per-tree mean, 95% bootstrap CI over trees):
+  k=3 -0.36 [-0.68, -0.08] (5 slices); k=5 0.00 (2 slices, uninformative); k=10 -0.32 [-0.61, -0.06] (7 slices,
+  6 trees); k=20 -0.61 [-0.71, -0.50] (13 slices, 7 trees). These are small subsets of the 16 slices per k.
+- Count MAE, v3 minus v2, all 16 slices per k (8 trees): k=3 -1.7 [-3.7, -0.3]; k=5 +2.4 [0.1, 4.7];
+  k=10 +25.5 [9.8, 40.2]; k=20 +47.9 [-1.5, 107.6]. Slices where v3's error is lower / equal / higher: 5/8/3,
+  2/9/5, 3/2/11, 5/0/11. No multiple-comparison correction.
+- The one gain (k=3 MAE) comes with lower F1; v3 merges little and the pipeline under-counts there on average,
+  so it is not evidence of better matching.
+- v3 is the `v001` checkpoint trained on synthetic data only. A sim-to-real gap is a likely cause but was not
+  tested. PLAN §21 fallback: improve randomization or fine-tune (at least 3 seeds), and if it still fails,
+  report it and keep v2 as default. Whether to spend on the fine-tune ablation is the owner's call.
+- Evidence: `docs/RESULTS_FUJI.md`, `results/bench.csv` (rows from `ec31df2`, dirty tree; see DEVIATIONS).
 
-## 2026-11-24: Fuji Core report re-run still blocked (seventeenth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## Open items carried from earlier audit snapshots — open (owner: Shreev)
+Items from the resolved snapshots that no other open section above lists.
+- **Phase 0 and captures:** gates G0/G1; the G2 foliage and easy captures; identity labels on 3-5 scenes; the
+  `TODO: verify` full-paper reads in `docs/RELATED_WORK.md`.
+- **Studies and release:** the pilot, the human baseline study, HF uploads and releases, the paper venue.
+- **Accounts and services:** a real Postgres (`COUNTONCE_PG_URL`), the OTLP endpoint and token, the cloud GPU
+  worker and cold-start measurements, cost rates (`cost_per_hour`), API keys, spend cap and prompt approval for the
+  frontier-VLM baseline.
+- **Weights and data:** face and plate detector weights for privacy blurring; the FSC-147, WGISD, MinneApple,
+  AppleGrowthVision and video dataset downloads with license checks; the C-DOG, CountVid and DG-Net baselines.
+- **Interactive GPU / Docker:** Kubric/BlenderProc rendering, the worker image build, Triton and FP8/NVFP4, the
+  Track F profile measurements, a full-scale v3 training run and model-registry promotion on real data.
+- **Runners and tools:** register the self-hosted golden GPU runner and pick 5 golden scenes; install the `mcp`
+  extra and register the server in a client.
+- **Environment:** resolved 2026-11-25. CI now runs both Python jobs on a 3.11 + 3.12 matrix, so the 3.12 `.venv` is covered; `uv lock --check` passes (lockfile unchanged).
 
-## 2026-11-24: Fuji Core report re-run still blocked (eighteenth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## Overnight tasks left `[!]` — open (owner: orchestrator / Shreev, to re-queue)
+- **M5b** (tune v1/v2/sync on synthetic validation, re-run v3) has a WIP commit only (`7427ba3`); re-queued as
+  M5b-1 and M5b-2. Sync and v3 on Fuji held-out trees is finished (see G4 below).
+- Orchestrator settings suggested by earlier audits: skip a task after 2 consecutive gate logs, and raise the
+  turn cap for GPU tasks or split them.
 
-## 2026-11-24: Fuji Core report re-run still blocked (nineteenth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## 2026-11-25: Nineteenth tech-lead audit — open (owner: Shreev)
+- Audit state at `5d08ec8`: `ruff check .` clean; `pytest -m "not slow and not gpu"` gives 1097 passed, 26 skipped
+  (Postgres without `COUNTONCE_PG_URL`, `pycolmap` not in `.venv`), 1 xfail (the M21 `CLAUDE.md` test), 16 warnings.
+- **Bug found:** the 16 warnings are `DeprecationWarning: ... multi-threaded, use of fork() may lead to deadlocks`
+  from `bench/synth_component.py:406`, which builds its pool with `mp.get_context("fork")`. Queued first.
+- **Correction to the eighteenth audit's "no autonomous work left":** several PLAN items run on Fuji-SfM and public
+  weights without photos or accounts. Queued in order: COLMAP-lifting baseline (§9.3 #4; `pycolmap` 4.2.1 is in
+  `.venv-gpu`), a re-implemented C-DOG baseline and experiment E4 (§9.3 #5; no repo licence, so from the paper),
+  real-data ablations on Fuji (§9.6 list; only synthetic ablations exist), order-invariance on the test trees and
+  for v3 plus a re-run-VGGT-per-permutation variant (§0.6 row note), full reads of the six related-work papers
+  still marked "not read in full" (§0.6 row), experiment E1 tracker side with SAM 2.1 and ByteTrack on Fuji, and
+  Lighthouse on `/jobs/[id]` and `/s/[token]` (§0.6 product row note).
+- **Checked and not queued:** oracle-geometry failure sources on Fuji (no dataset cameras or depth; a COLMAP
+  reference would be another estimate, not an oracle); Strong-tier scaffolding (PLAN §4 rules 9-11 and §0.1 rule 2
+  until the Core rows are done); the v3 fine-tune ablation from the G4 fallback (owner's call, below).
+- **GPU tasks and the 25-minute session cap:** every queued GPU run must launch detached and resumable and leave a
+  GATES note with PID and row count if still running, so a cap hit is not mistaken for a gate.
+- **`TASKS_OVERNIGHT.md` stays gitignored** (M21, §0.1 rule 6). The audit updated it locally and did not
+  force-add it; only this file is committed.
+- **Still yours (human only), unchanged:** G3 decision; G4 decision and whether to fund the v3 fine-tune ablation
+  (≥ 3 seeds); the M21 `CLAUDE.md` untrack, then push and check hosted CI; H1 capture day, then P1-P5; H5 accounts
+  and the M18/M19 deploy plus the live URL in the README; H2, H3, H4, H6 and the demo video; Docker builds, gated
+  weights (CountGD/CountGD++, VGGT-Ω, VGG-T³), CountVid/DG-Net and the video datasets (E2, E3), OneScene-Bench
+  images (E5), frontier-VLM API spend.
 
-## 2026-11-24: Fuji Core report re-run still blocked (twentieth attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+## Fuji window alignment leaves rotation unconstrained; COLMAP test run not launched (CODE FIXED 2026-11-26, ROWS STALE)
 
-## 2026-11-24: Fuji Core report re-run still blocked (twenty-first attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+**Update 2026-11-26:** the alignment code is fixed (rotation from camera orientations, 30 degree
+median rotation gate in `check_alignment`, xfail removed). Cached VGGT windows replayed on CPU
+(median rotation error, degrees): Tree04 east k=3/5/10 = 1.0 / 6.9 / 10.2 (was 78 / 152 / 26).
+Tree02 west k=5 is now rejected (`ChunkAlignmentError`, negative scale from the camera centres):
+once the orientations are respected, the window's centres run against the pseudo-pose path, so
+that side's pseudo-poses (or the window reconstruction) still need checking.
 
-## 2026-11-24: Fuji Core report re-run still blocked (twenty-second attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+**Still open:** every existing Fuji row and the frozen thresholds predate the fix. They were not
+rerun and `fc.PROTOCOL` is still `fuji_core_v2`. Before writing any new Fuji row: bump
+`fc.PROTOCOL`, check the pseudo-poses, make the VGGT path in `scripts/run_fuji_core.py` record
+alignment rejections as `status=failed`, re-tune on the training trees and rerun. The text below
+describes the state before the fix.
 
-## 2026-11-24: Fuji Core report re-run still blocked (twenty-third attempt)
-- `results/bench.csv` and `configs/fuji_core.yaml` are still missing; no Fuji rows exist. Nothing was run or filled. Task left `[ ]`; do not re-queue until step 1 commits the config and step 2 writes rows.
+**Affects:** every Fuji row in `results/bench.csv` (VGGT v1/v2/sync/v3 and baselines), the frozen
+thresholds in `configs/fuji_core.yaml` (tuned under the same alignment), `docs/RESULTS_FUJI*.md`.
+
+**Cause:** `align_chunk` uses only camera centres for three or more views. Overview pseudo-poses
+interpolate centres linearly (stride 3), so short windows are exactly collinear and Umeyama's
+rotation about that line is arbitrary.
+
+**Measured** (cached VGGT windows, median camera rotation error against the pseudo-poses, degrees):
+
+| window | current alignment | centres + axis tips | centre singular values |
+|---|---|---|---|
+| Tree04 east k=3 | 78.2 | 10.4 | 0.11, 0, 0 |
+| Tree04 east k=5 | 152.0 | 15.1 | 0.179, 0.042, 0 |
+| Tree04 east k=10 | 26.1 | 14.9 | 0.243, 0.218, 0.02 |
+| Tree02 west k=5 | 156.3 | 81.3 | 0.267, 0.023, 0 |
+
+A COLMAP window on Tree04 east k=3 registered 3/3 views and scored pred 0 against gt 100 (smoke
+run on a temporary CSV). Its error was 103 degrees. Sparse lifting also rejects many detections
+(no triangulated point in the box centre), so the alignment is not the only cause of low counts.
+
+**Done:** `--backbone colmap`, the report section and tests are committed. The 128-slice run was
+**not** launched (no PID, 0 COLMAP rows in `results/bench.csv`): COLMAP would be scored against
+GT built in a differently rotated frame, so the comparison would be meaningless.
+
+**Next (owner or a new task):**
+1. Fix the window alignment using camera orientations. Axis tips alone are not enough (81 degrees
+   remains on Tree02 west), so also check the pseudo-poses themselves, and gate on rotation error
+   in `check_alignment`. The strict xfail in `tests/test_fuji_colmap.py` must then pass.
+2. Bump `fc.PROTOCOL`, re-tune on the training trees, rerun all VGGT test rows.
+3. Then run (detached, resumable; roughly 5-15 s per window, not measured at k=20):
+   `PYTHONPATH=. setsid nohup .venv-gpu/bin/python -u scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600 > runs/fuji_core/test_colmap.log 2>&1 &`
+   and `python -m bench.fuji_report`.
+
+**Re-check (2026-11-25, retry of the same task after a rate limit): still OPEN.** No alignment fix
+has landed: the strict xfail still fails as expected, `results/bench.csv` has 0 `_colmap` rows and no
+`run_fuji_core.py bench` process is running. The COLMAP task is **not done** and was not launched.
+`ruff check .` is clean; `pytest -m "not slow and not gpu"` (CUDA hidden): 1104 passed, 26 skipped,
+2 xfailed. The measurements in the table above were not repeated.
+
+- **Hold until the alignment is fixed:** the queued C-DOG/E4, real-data ablation, test-tree
+  order-invariance and E1 tracker tasks use the same Fuji windows. Any of them that scores against
+  window GT would add rows that need re-running.
+- **README is missing the warning:** its "Measured results on real trees" section still quotes the
+  affected numbers. `docs/RESULTS_FUJI.md` carries the "Known problem" section; the README does not.
+
+**Re-check #2 (2026-11-25, third attempt of the COLMAP task): still OPEN.** Alignment fix has not landed,
+`results/bench.csv` has 0 `_colmap` rows, and no `run_fuji_core.py bench` process is running (only the
+orchestrator's own session matched `pgrep`). No code changed; the 128-slice run was not launched. Task left unticked.
+
+**Re-check #3 (2026-11-25, fourth attempt of the COLMAP task): still OPEN.** No commit since
+re-check #2 touches the alignment, the strict xfail still fails as expected, `results/bench.csv` has 0
+`_colmap` rows and no bench process is running. Not launched; task left unticked. Re-queuing this task
+alone cannot succeed: queue the alignment fix (steps 1 and 2 above) ahead of it.
+`ruff check .` clean; `pytest -m "not slow and not gpu"`: 1104 passed, 26 skipped, 2 xfailed.
+
+**Re-check #4 (2026-11-25, fifth attempt of the COLMAP task): still OPEN.** No change to the alignment
+code since f2d08ac, `results/bench.csv` has 0 `_colmap` rows, no bench process is running. Not launched;
+task left unticked. The 128-slice run would be scored in a wrongly rotated GT frame; fix alignment first
+(steps 1-2 above).
+
+## Fuji COLMAP test-split run in progress (OPEN, 2026-11-25)
+
+**Do not start a second copy.** Launched detached (setsid) from the main checkout; PID 1969296, 39 of 64
+`countonce_v2_colmap` rows in `results/bench.csv` when this was written (0 with status `error`). The
+split has 64 windows, not 128. Log: `runs/fuji_core/test_colmap.log`; `runs/fuji_core/test_colmap.done`
+holds the exit code when it ends. k=10 windows took about 50-80 s each; k=20 is not yet timed.
+
+- This supersedes the "not launched" status above: COLMAP is now placed in the VGGT window's frame
+  (DEVIATIONS). The VGGT alignment bug itself is **still open**, so all rows still need a rerun after it.
+- So far: k=3 and k=5 each have 14/16 registration failures (`no_model`).
+- The rows were produced from a dirty tree (the code of the commit that adds this note).
+- While it runs, a full pytest in this checkout errors in the `results/` write guard; test in a copy.
+
+**When it has ended:** if it died, rerun the same command (it skips finished slices):
+`PYTHONPATH=. setsid nohup .venv-gpu/bin/python -u scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600 > runs/fuji_core/test_colmap.log 2>&1 &`
+Then run `python -m bench.fuji_report`, commit the report and summary CSV, and tick the task once
+there are 64 ok-or-failed rows.
+
+**Status check (2026-11-25 23:31, sixth session on this task):** run still going, PID 1969296, 42 of 64
+`countonce_v2_colmap` rows, no `.done` file. No second copy started, no code changed. Task left unticked;
+when it ends, follow "When it has ended" above (report, commit, tick).
+
+**Status check (2026-11-25 23:51, seventh session on this task):** run still going, PID 1969296, 51 of 64
+`countonce_v2_colmap` rows, no `.done` file; no second copy started. All 16 k=10 windows are finished (0
+registration failures), so the report now has the k=10 row; k=20 stays TODO. k=20 windows take about
+2.5 min each, so expect the run to end around 00:25. Task left unticked.
+
+**Re-queue note:** a session after the run ends only needs `python -m bench.fuji_report`, a commit and the
+tick. "128 test slices" in the task is 64 windows under the current protocol (8 trees x 2 sides x 4 k);
+the 128 `countonce_v2` test rows include 64 from the superseded v1 protocol.
+
+**Status check (2026-11-25 23:55, eighth session on this task):** run still going, PID 1969296, 51 of 64
+`countonce_v2_colmap` rows, no `.done` file; no second copy started, no code changed. Task left unticked;
+when it ends, follow "When it has ended" above (report, commit, tick).
+
+**Resume (2026-11-26 00:58, ninth session): run in progress again, do not start a second copy.** The
+first run was stopped by SIGTERM at 51 of 64 rows (`test_colmap.done` held `exit=143`; log kept as
+`runs/fuji_core/test_colmap.run1.log`). The remaining k=20 windows were relaunched detached,
+**PID 2086810**, 52 of 64 rows at the time of writing, at a few minutes per window. It runs from the
+worktree `~/countonce_prefix` (pre-fix commit `df5a7c8`, see DEVIATIONS) and appends
+to the main checkout's `results/bench.csv`; do not remove that worktree while the PID is alive. A
+copy of the CSV from before the relaunch is `runs/fuji_core/bench.before_colmap_resume.csv`.
+While it runs, test in a clone (the `results/` write guard).
+
+When `runs/fuji_core/test_colmap.done` says `exit=0` and there are 64 ok-or-failed rows:
+`.venv/bin/python -m bench.fuji_report`, commit, tick the task, then
+`git worktree remove --force ~/countonce_prefix` (its `data`, `runs` and `weights`
+are symlinks; only the links go). If it died, rerun from inside that worktree (finished slices are
+skipped):
+`PYTHONPATH=. setsid nohup ~/countonce/.venv-gpu/bin/python -u scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600 --csv ~/countonce/results/bench.csv > ~/countonce/runs/fuji_core/test_colmap.log 2>&1 &`
+
+**Status check (2026-11-26, tenth session on this task):** run still going, PID 2086810, 53 of 64
+`countonce_v2_colmap` rows (k=20 windows remain), no `.done` file; no second copy started, no code
+changed. Task left unticked; when `test_colmap.done` says `exit=0`, follow "Resume" above
+(report, commit, tick, remove the worktree).
+
+**Status check (2026-11-26 01:06, eleventh session on this task):** run still going, PID 2086810, 55 of 64
+`countonce_v2_colmap` rows, no `.done` file; no second copy started. The rows so far have unique
+windows that all match a VGGT v2 window, with equal GT on every ok row. Remaining windows are all
+k=20 at about 3 min each. Task left unticked; **do not re-queue it before the `.done` file exists**,
+then follow "Resume" above. Also replaced personal home paths in this file with `~` (the hygiene
+test failed on them).
+
+**Status check (2026-11-26 01:07, twelfth session on this task):** run still going, PID 2086810, 55 of 64
+`countonce_v2_colmap` rows, no `.done` file; no second copy started, no code changed. Task left unticked;
+when `test_colmap.done` says `exit=0`, follow "Resume" above (report, commit, tick, remove the worktree).
+
+**Status check (2026-11-26 01:14, thirteenth session on this task):** run still going, PID 2086810, 57 of 64
+`countonce_v2_colmap` rows (all k=3/5/10 done, only k=20 windows left), no `.done` file; no second copy
+started. ruff clean; fast tests in a clone: 1101 passed, 31 skipped, 1 xfailed. All 28 failed rows so far
+are `ReconAdaptError: ... no_model`. Task left unticked; follow "Resume" above once `test_colmap.done`
+says `exit=0`.
+
+**Status check (2026-11-26 01:26, fourteenth session on this task):** run still going, PID 2086810, 60 of 64
+`countonce_v2_colmap` rows (only k=20 windows left), no `.done` file; no second copy started, no code
+changed. Task left unticked; when `test_colmap.done` says `exit=0`, follow "Resume" above
+(report, commit, tick, remove the worktree).
+
+**Resolved (2026-11-26):** the run finished (`exit=0`), 64 of 64 rows (36 ok, 28 failed `no_model`).
+The report and docs are updated, the task is ticked and the `countonce_prefix` worktree is removed.
+The "Resume" steps above are done. Still open: the joint rerun of all Fuji rows after the alignment fix.
+
+## Real-data Fuji ablations: BLOCKED on the joint rerun (2026-11-26)
+
+Not started; no code changed, no rows added. Task left unticked.
+
+- **Why:** every `countonce_v2` row in `results/bench.csv` (protocol `fuji_core_v2`) and the frozen
+  thresholds in `configs/fuji_core.yaml` predate the window-alignment rotation fix (see the
+  "Next" note in the handoff and DEVIATIONS). The task needs *paired* differences against the
+  frozen v2. Ablation rows scored with the fixed alignment against stale v2 rows would pair two
+  different GT frames. The cached chunked reconstructions are also pre-fix, so "reuse cached
+  reconstructions" would reuse misaligned chunks.
+- **Also:** `scripts/tune_fuji_cdog.py` (PID 2130274) and its `run_fuji_core.py` child were using the
+  GPU and the same `runs/fuji_core/cache` when this session started; a second writer is unsafe.
+- **Resume (in order):** (1) bump `fc.PROTOCOL`, record VGGT alignment rejections as `failed`;
+  (2) invalidate/recompute the chunked recon cache; (3) re-tune on val and refreeze
+  `configs/fuji_core.yaml`; (4) rerun v2 on the test trees; (5) then add `--ablation` to
+  `scripts/run_fuji_core.py` (flip one `Config` switch from the frozen v2, method
+  `countonce_v2__<ablation>`, k=10 only, masks last) and run the 64 rows.
+
+### Retry (2026-11-26): still BLOCKED; `--ablation` option added, 0 of 64 rows
+
+- Block unchanged: `fc.PROTOCOL` is `fuji_core_v2`, v2 not rerun, and the C-DOG tuning job
+  (PID 2130274) was still running on the shared cache. No benchmark was launched.
+- Added: `scripts/run_fuji_core.py bench --split test --ks 10 --ablation
+  {no_cannot_link,no_hallucination_filter,sam_masks}`. It exits while the protocol is stale
+  (`fc.STALE_PROTOCOLS`). Unit-tested for arguments and overrides only; the run path has never
+  executed.
+- **Appearance ablation needs code first.** No caller passes `DinoV2Extractor` to
+  `V2Associator` and GroundingDINO sets no `Detection.feature`, so frozen v2 uses no appearance
+  and `appearance=False` is a no-op. Wire the extractor into the pipeline, then compare
+  "with DINOv2" against frozen v2 (this adds the feature rather than removing it). DINOv2 weights
+  were not in the local HF cache. So the full task is 64 rows only after that; 48 are ready now.
+- **Correction to resume step (2):** k=10 windows are a single chunk (`chunked.py`,
+  `len(frames) <= chunk_size`), so their cached reconstructions do not depend on the alignment
+  fix. The overview reconstructions are stitched, so `overview --force` is needed to rebuild the
+  pseudo-poses. k=20 windows are also single-chunk.
+
+### Retry 2 (2026-11-26 ~02:00): still BLOCKED, 0 of 64 rows, nothing changed
+
+- `fc.PROTOCOL` is still `fuji_core_v2` (in `STALE_PROTOCOLS`); v2 has not been rerun under the alignment-fix protocol, so paired deltas would be invalid.
+- C-DOG tuning (PID 2130274, child `run_fuji_core.py` on val) is still using the GPU and the shared `runs/fuji_core/cache`.
+- Appearance ablation still needs DINOv2 wired into the pipeline. Resume order above is unchanged.
+
+### Third attempt (2026-11-26 ~02:00): still BLOCKED; appearance switch wired, 0 of 64 rows
+
+- Block unchanged: `fc.PROTOCOL` is `fuji_core_v2`, v2 has not been rerun, and the C-DOG tuning job
+  was still running on the GPU and the shared cache. No benchmark was launched.
+- The appearance code gap above is closed: `--ablation with_appearance` sets
+  `Config.appearance_model: dinov2_vits14` (default None, so frozen v2 is unchanged). Four switches
+  x 16 windows now gives the 64 rows. Tested with a fake extractor only: the DINOv2 weights have
+  not been loaded and the ablation run path has never executed.
+- **Owner/orchestrator action:** `TASKS_OVERNIGHT.md` has no open task for the joint rerun, so
+  re-queuing this one will keep blocking. Queue the rerun first (resume steps 1-4 above, plus
+  `overview --force`), after which
+  this task runs as written (a new protocol name passes `check_ablation_request`).
+- Alternative, not taken: run the ablations from a pre-fix worktree, as the COLMAP resume did.
+  Deltas would pair correctly but sit in the known-wrong GT frame and need a second run.
+
+
+### Fourth attempt (2026-11-26): still BLOCKED, 0 of 64 rows, nothing changed
+
+- `fc.PROTOCOL` is still `fuji_core_v2` (in `STALE_PROTOCOLS`); no joint v2 rerun exists in
+  `TASKS_OVERNIGHT.md` or in `results/bench.csv`. `--ablation` refuses to run, correctly.
+- No code or rows changed. Queue the joint rerun (resume steps 1-4 plus `overview --force`) before
+  re-queuing this task.
+
+### Fifth attempt (2026-11-26 ~02:05): still BLOCKED, 0 of 64 rows
+
+- Same block: `fc.PROTOCOL` is `fuji_core_v2`, no newer-protocol rows exist, and no open task does
+  the joint rerun. The C-DOG tuning job was still using the shared `runs/fuji_core` cache and
+  overview poses, which `overview --force` would overwrite.
+- New: `DinoV2Extractor` ran on CPU with the real `dinov2_vits14` weights (now in the torch hub
+  cache) on two crops of one Fuji image, output shape (2, 384), finite. The ablation run path
+  itself has still never executed.
+- **Proposed line for `TASKS_OVERNIGHT.md`, above the ablation task (owner decides; not added):**
+  "Joint Fuji v2 rerun after the window-alignment fix: after any running Fuji job ends, bump
+  `fc.PROTOCOL`, run `overview --force`, re-choose thresholds on the training-split trees, rerun
+  every Fuji test method (v1, v2, baselines, sync, v3, COLMAP) detached and resumable across
+  sessions, rebuild the reports and remove the 'unreliable' note only for rerun tables."
+
+## 2026-11-26: Twentieth tech-lead audit — open (owner: Shreev / orchestrator)
+
+- **Checks:** `ruff check .` clean. `pytest -m "not slow and not gpu"`: 1149 passed, 26 skipped,
+  1 xfailed, **1 failed** (`test_ci_workflow.py::test_full_cpu_installs_every_extra_that_importorskip_needs`:
+  `transformers` is not mapped to an extra after the E1 WIP commit). Queued as the first new task.
+- **Why four Fuji tasks are `[!]`:** C-DOG/E4, real-data ablations, test-tree order invariance and E1
+  all score against the overview GT frame, which predates the window-alignment fix. No task did the
+  joint rerun, even though five ablation attempts proposed one. It is now queued (part 1: protocol bump,
+  `overview --force`, re-tune and rerun v2; part 2: every other method, C-DOG test, reports). The four
+  `[!]` lines are superseded by new `[ ]` lines that depend on part 1; **don't re-queue the old `[!]`
+  lines.** No Fuji or GPU job was running at audit time (C-DOG tuning finished, `tune_cdog.done` exit=0).
+- **Partial work kept:** E1 has 769 test rows (`results/e1_tracker.csv`, pre-fix GT) and
+  `scripts/report_e1.py` but no results doc; Lighthouse on `/jobs/[id]` and `/s/[token]` has a runner
+  script (`web/scripts/lighthouse-pages.mjs`) but no measured medians.
+- **Also queued:** an oracle-camera geometry arm on Fuji, to split geometry from association error
+  (§0.6 Core row), if the dataset ships per-image cameras.
+- **Human-only, not queued (unchanged):** G3 and G4 decisions (refreshed evidence after the rerun);
+  `git rm --cached CLAUDE.md` and push so hosted CI runs (M21); Google OAuth client, Vercel/R2/Neon
+  accounts and deploys (H5, M18-M20); capture day and hand counts (H1, unlocks P1-P5 and the own-scene
+  §0.6 rows); frontend review on a phone (H2); interviews (H3); professor meeting (H4); the demo video;
+  the CountGD weights; a scratch Postgres for the 21 skipped contract tests (`COUNTONCE_PG_URL`).
+- **Orchestrator note:** the joint rerun runs for hours on the 8 GB GPU. The tasks are written to wait up to
+  15 minutes, then log progress and exit. Expect status-only sessions until part 1's `.done` file exists.
+  The Lighthouse task comes before part 2 because it uses only the CPU.
+
+## Joint Fuji v3 rerun, part 1: IN PROGRESS (2026-11-26 05:25)
+
+- Done: `fc.PROTOCOL` = `fuji_core_v3` (v2 stays in `STALE_PROTOCOLS`, old rows untouched);
+  `run_fuji_core.py` records a window whose VGGT chunk alignment/rotation gate fails as `failed`
+  rows for all its methods (`group()` wraps `_group()`). Overview rebuilt for both sides after moving
+  the two stale 97-frame stitched recons to `runs/fuji_core/cache/recon_prefix_stale/` (the outer
+  cache key has no code version, so `--force` alone reused the pre-fix stitch). Old overview JSONs in
+  `runs/fuji_core/pre_v3/`. West `cam_y_monotonic_frac` fell 0.86 -> 0.54 (east rose 0.67 -> 0.85); watch the west windows.
+- Running (detached): `scripts/tune_fuji_v3.sh` (log `runs/fuji_core/v3_driver.log`): 12-cell val
+  grid -> `results/fuji_tune3_s*_k*.csv`, `.done` = `runs/fuji_core/tune_v3.done`. It then WAITS for
+  `runs/fuji_core/freeze_v3.ok` and runs the test benchmark (k=3/5/10/20, v1+v2+baselines) to
+  `runs/fuji_core/test_v3.done`.
+- **Next session:** wait/poll (until-loop <=15 min) for `tune_v3.done`; pick the (score, merge_k)
+  with lowest mean absolute v1 count error over complete 12-row cells (same rule as the
+  `configs/fuji_core.yaml` header), rewrite that file, record old (0.2, 0.3) vs new in DEVIATIONS,
+  `touch runs/fuji_core/freeze_v3.ok`. Then wait for `test_v3.done`, check 64 `countonce_v2` rows with
+  protocol `fuji_core_v3`, run `bench.fuji_report`, write the DEVIATIONS movement note, tick the task.
+
+### Joint Fuji v3 rerun, part 1: progress (2026-11-26 05:43), test run still going
+
+- Tuning done, `configs/fuji_core.yaml` refrozen (0.2, 0.5), `freeze_v3.ok` touched (DEVIATIONS).
+- Test run is live under `scripts/tune_fuji_v3.sh` (setsid; log `runs/fuji_core/test_v3.log`), about
+  50 s per window, 6 of 64 v2 windows at 05:41. Do not start a second writer.
+- **Remaining:** wait for `runs/fuji_core/test_v3.done`; check 64 `countonce_v2` rows (ok or failed)
+  with protocol `fuji_core_v3`; `python -m bench.fuji_report` (it rewrites docs/RESULTS_FUJI.md from v3
+  rows only, so sync/v3/COLMAP cells become TODO until part 2; mark `docs/RESULTS_FUJI_ANALYSIS.md` as
+  describing v2 rows and keep the 'unreliable' wording); add test-tree old vs new to DEVIATIONS; commit
+  `results/bench.csv`; tick the task.
+- **Check before trusting or running part 2:** the GT frame looks suspect. 7 of 12 val windows have
+  GT = 0, and test window Tree01 east k=5 has GT 0 with 85 predicted apples. Compare GT=0 counts across
+  all 64 windows against the v2 rows and inspect the overview registration.
+
+### Joint Fuji v3 rerun, part 1: status (2026-11-26 05:52)
+
+- Re-entered; the test run (`run_fuji_core.py bench --split test`, started 05:36 under `tune_fuji_v3.sh`) is
+  still live and `test_v3.done` does not exist. Not starting a second writer; task left UNTICKED.
+- Progress: Tree04 west reached in `runs/fuji_core/test_v3.log`. Follow the "Remaining" list in the 05:43
+  entry once `test_v3.done` appears.
+
+### Joint Fuji v3 rerun, part 1: status (2026-11-26 06:07): run unfinished, **v3 west rows are invalid**
+
+- `test_v3.done` absent after a ~10 min wait; the run was still live (at Tree06 k=20). No second
+  writer was started. Task left UNTICKED. `bench.fuji_report` not run.
+- **Blocker (new):** the rebuilt **west** overview is degenerate. West Tree01-Tree06 all get the same
+  window (side-local start 259 at k=10, 262 at k=5), and `countonce_v2` predicts the same count for
+  different trees (64 at k=10, 52 at k=5; GT 0). `window_for_tree` clamps every tree to the side's end,
+  so these are not per-tree results. East windows do advance with the tree (0, 5, 30, 62, 90, ...).
+- Evidence (`runs/fuji_core/overview_west.json` vs `pre_v3/`): `cam_y_monotonic_frac` 0.86 -> 0.54,
+  scale 3.98 -> 1.49, `inlier_frac` 0.20 -> 0.18, candidate 3 -> 16. The cause of the bad
+  registration is not diagnosed. East monotonic fraction is 0.85.
+- Also seen: at 05:56, 11 of 42 v3 v2 rows were `failed` (those inspected: `ChunkAlignmentError`, k=3).
+- **Consequence:** do not report v3 numbers or start part 2 (other methods, ablations, order
+  invariance, E1), which all score against this frame. Row count 64 alone does not meet "done".
+  The val tuning behind the refrozen (0.2, 0.5) uses the same frames, so treat it as suspect too.
+- **Next (recommended):** diagnose the west overview registration (`overview` subcommand); add a
+  validity gate that fails when trees collapse onto one window or camera y is not near-monotonic
+  (set the limit a priori); then bump to `fuji_core_v4`, rebuild, re-tune and rerun. Keep v3 rows.
+- Tests during the live run: ruff clean; 1150 passed, 26 skipped, 1 xfailed, 1 teardown error from the
+  write guard because the benchmark was appending to `results/bench.csv`.
+
+- Re-entered 2026-11-26 06:10: the Fuji test run (PID 2266684, Tree07 east k=20 in `test_v3.log`) is still live and `test_v3.done` is absent. No second writer started; task left UNTICKED. See the 06:07 entry for the west-frame blocker.
+
+### Joint Fuji v3 rerun, part 1: finished, results NOT usable (2026-11-26 06:19)
+
+- `test_v3.done` written; 64 `countonce_v2` rows under `fuji_core_v3` (53 ok, 11 failed). Report runs on
+  them (scratch root only; see DEVIATIONS). Part 1 ticked as specified.
+- **Still blocked:** the west overview frame is degenerate (06:07 entry, confirmed on the full run).
+  Part 2 and the ablation re-run are marked `[!]` in `TASKS_OVERNIGHT.md`.
+- **Proposed next task:** diagnose the west `overview` registration; add an a-priori validity gate
+  (fail if trees collapse onto one window or camera y is far from monotonic); bump to `fuji_core_v4`,
+  rebuild both overviews, re-tune on training trees, rerun v2. Keep v2 and v3 rows. Then re-queue part 2.
+
+## Experiment E1 tracker side, finish: BLOCKED on the Fuji GT frame (2026-11-26 ~06:45)
+
+- **Block:** the `fuji_core_v3` west overview is still degenerate (06:07 and 06:19 entries). Rechecked in
+  `results/bench.csv`: west Tree01-Tree06 at k=10 all give v2 pred 64, GT 0; `overview_west.json` has
+  `cam_y_monotonic_frac` 0.54. E1's GT and ROI come from these pseudo-poses, so re-preparing and
+  re-scoring would produce invalid errors. Part 1 is ticked, but its results are marked not usable.
+- **Not done:** no rows moved, no windows prepared, no tracker run, no `docs/RESULTS_E1.md`,
+  `docs/RELATED_WORK.md` unchanged. An east-only report was not made: the east frame is unverified.
+- **Needed first:** the task proposed in the 06:19 entry (diagnose the west overview, add a validity gate,
+  `fuji_core_v4`, re-tune, rerun v2/v1). Then re-queue this task against `fuji_core_v4`. The
+  order-invariance and oracle-geometry tasks queued after it use the same dataset frames; check them too.
+- **Trap for the next E1 run:** `runs/fuji_core/e1/*.json` (76 files) predate the v3 overview rebuild, and
+  `run_e1_tracker.py prepare` skips existing files. Move that directory aside before `prepare`, as well
+  as moving `results/e1_tracker.csv` to `results/e1_tracker.pre_alignfix.csv` (`run` skips existing keys).
+
+## Oracle geometry on Fuji: BLOCKED, the dataset ships no cameras (2026-11-26)
+
+- **Wanted:** an `oracle_cameras` arm in the M6 harness (same cached real detections, dataset cameras, no
+  VGGT), to split the Fuji count error into detection / geometry / association.
+- **Why it can't run:** the download has no per-image cameras. `2-SfM-set/` holds only
+  `raw_images_east_side/*.JPG` (291) and `raw_images_west_side/*.JPG` (291). `3-3D_data/` holds only
+  `Fuji_apple_trees_point_cloud.txt`, `readme.txt` and the per-apple `TreeNN-annotations_NNNNNN.txt` files
+  (433 training, 1022 test). `1-Mask-set/` holds crops of 12 frames with 2D masks. No pose, calibration,
+  depth or project file anywhere; EXIF has focal length but no GPS or orientation. Full listing: DEVIATIONS,
+  "Fuji-SfM per-image data check".
+- **Not done, on purpose:** no proxy cameras, no harness change, no new run, `docs/RESULTS_FUJI.md`
+  unchanged (it already says geometry is not separated). The §0.6 note is narrowed.
+- **Consequence:** the "duplicates" left with oracle detections mix reconstruction and association error.
+  The existing k=10 decomposition also predates the window-alignment fix.
+- **To unblock:** either ask the Fuji-SfM authors for the photogrammetry camera export (human, optional), or
+  measure the geometry share on data with true cameras, e.g. rendered synthetic scenes (P6).

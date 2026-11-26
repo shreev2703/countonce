@@ -55,7 +55,7 @@ def cluster_detections(
     if n == 0:
         return res
 
-    xyz = np.stack([ld.xyz for ld in ok]).astype(float)
+    xyz = np.stack([np.asarray(ld.xyz) for ld in ok]).astype(float)
     known = [ld.size for ld in ok if ld.size is not None and ld.size > 0]
     fallback = float(np.median(known)) if known else 1.0
     sizes = np.array(

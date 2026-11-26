@@ -118,6 +118,10 @@ class CountOnceError(RuntimeError):
         return is_retryable(self.code)
 
 
+class PlannedComponentError(NotImplementedError):
+    """A named component that is accepted by ``Config`` but not implemented (docs/STATUS.md)."""
+
+
 class MediaError(CountOnceError):
     """A permanent user/media error raised by ingest sanitization."""
 

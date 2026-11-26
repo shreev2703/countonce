@@ -12,7 +12,7 @@ sources are listed as conflicts; resolve against the primary record before any r
 | Fuji-SfM | Exact dup/miss measurement; matcher fine-tuning | Zenodo, DOI 10.5281/zenodo.3712808 | **CC BY-NC-SA 4.0** (`LICENSE.txt` and `readme.txt` in the download; research/education only, no commercial use) | ~6.4-6.9 GB | Core |
 | RGBD-VideoCount | RGB-D video counting eval | Hugging Face `aerospace123/RGBD-VideoCount` | CC BY 4.0 (HF card) | 2,032 frames, 77,638 boxes; GB `TODO: verify` | Strong |
 | VideoCount | Video counting eval (CountVid benchmark) | github.com/niki-amini-naieni/CountVid | `TODO: verify` (repo is MIT; source-video licenses TAO/MOT20 apply) | `TODO: verify` | Strong |
-| OneScene-Bench | Multi-view evidence integration (VLM) eval | arXiv 2610.38926; release `TODO: verify` | `TODO: verify` | `TODO: verify` | Strong |
+| OneScene-Bench | Multi-view evidence integration (VLM) eval | github.com/swathisuhas/OneScene-Bench (images not in repo) | none reported by GitHub; DL3DV-10K terms | images: `TODO: verify` | Strong |
 | WGISD | Grape-cluster detection; secondary orchard data | Zenodo 3361736, GitHub, HF | **Conflict**: CC BY-NC-SA 4.0 (Dataset Ninja) vs "no restrictions, contact Embrapa for commercial" (README) | ~1.3 GB | Optional |
 | MinneApple | Apple detection/counting, detector sanity checks | UMN Conservancy handle 11299/206575 | UMN Terms of Use; CC BY-NC-SA 3.0 US per Dataset Ninja (unconfirmed) | ~1-4 GB across archives | Optional |
 | AppleGrowthVision | Stereo apple orchard, detection, 3D | Fraunhofer HHI project page; HF mirror `Voxel51/AppleGrowthVision` | Original `TODO: verify`; HF FiftyOne copy says CC BY 4.0 | 9,317 stereo + 1,125 annotated images; GB `TODO: verify` | Optional |
@@ -68,8 +68,10 @@ sources are listed as conflicts; resolve against the primary record before any r
 ### OneScene-Bench
 - **What:** arXiv 2610.38926, "Do Vision-Language Models Integrate Evidence Across Views?". **Not a counting-only dataset**; its counting part draws on
   DL3DV-10K scenes (object category chosen by Qwen3-VL-32B-Instruct). It is the right probe for the frontier-VLM baseline.
-- **Availability, license, format, size:** `TODO: verify` (not found in search results; check the paper's project/code link).
-- **Loader:** `bench/datasets/onescene.py` (scaffold; whole layout assumed: `counting.json` + `scenes/<id>/images/`). `scripts/download_onescene.sh` needs its `DATA_URLS` filled first (not run).
+- **Release (checked 2026-11-25):** `github.com/swathisuhas/OneScene-Bench`. Parquet files per split (`counting_{complete,subset,complementary}`, `counting_multi_image`, `consistency`, `spatial_reasoning`); counting columns `id, image1, image2, object_name, answer`.
+- **Images are missing:** in the three files inspected, first-row image fields hold a relative path and no bytes, and the repo tree has no image files. Ask the authors or rebuild from DL3DV-10K (`TODO: verify` whether the path-to-frame mapping is recoverable).
+- **License / size:** GitHub reports no license; README defers to the DL3DV-10K terms. Image size `TODO: verify`.
+- **Loader:** `bench/datasets/onescene.py` (scaffold; its assumed `counting.json` + `scenes/<id>/images/` layout does **not** match the parquet release and needs rewriting once images are available). `scripts/download_onescene.sh` needs its `DATA_URLS` filled first (not run).
 - **Note:** DL3DV-10K has its own terms (`TODO: verify`) that bind any derived images.
 
 ### WGISD (Embrapa Wine Grape Instance Segmentation Dataset)
@@ -110,13 +112,13 @@ sources are listed as conflicts; resolve against the primary record before any r
 1. **Only Fuji-SfM and own captures provide cross-view identity GT**; the rest are single-view or video counting references. PLAN §3.1 Core therefore stays Fuji-SfM + own captures.
 2. **Download scripts only.** No dataset bytes are committed or redistributed; each license is resolved before CountOnce-Bench release.
 3. **License policy:** any conflicting or unverified license is treated as non-commercial, research-only until `TODO: verify` items are closed.
-4. **Open items for the first download session:** (Fuji-SfM is closed: license and layout verified); RGBD-VideoCount size/layout; VideoCount and OneScene-Bench terms; FSC-147 official terms; AppleGrowthVision original license.
+4. **Open items for the first download session:** (Fuji-SfM is closed: license and layout verified); RGBD-VideoCount size/layout; VideoCount terms; OneScene-Bench images; FSC-147 official terms; AppleGrowthVision original license.
 
 ## Sources
 - Fuji-SfM: https://zenodo.org/record/3712808 , https://grap.udl.cat/en/publications/fuji-sfm-dataset/ , https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7184157/
 - RGBD-VideoCount: https://huggingface.co/datasets/aerospace123/RGBD-VideoCount , https://arxiv.org/pdf/2608.06236 , https://github.com/streamer-AP/DG-Net
 - VideoCount: https://github.com/niki-amini-naieni/CountVid
-- OneScene-Bench: https://arxiv.org/pdf/2610.38926
+- OneScene-Bench: https://arxiv.org/pdf/2610.38926 , https://github.com/swathisuhas/OneScene-Bench
 - WGISD: https://zenodo.org/record/3361736 , https://huggingface.co/datasets/thsant/wgisd , https://datasetninja.com/wgisd
 - MinneApple: https://conservancy.umn.edu/handle/11299/206575 , https://arxiv.org/pdf/1909.06441
 - AppleGrowthVision: https://arxiv.org/abs/2505.14029 , https://huggingface.co/datasets/Voxel51/AppleGrowthVision
