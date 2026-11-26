@@ -519,3 +519,12 @@ there are 64 ok-or-failed rows.
 **Status check (2026-11-25 23:31, sixth session on this task):** run still going, PID 1969296, 42 of 64
 `countonce_v2_colmap` rows, no `.done` file. No second copy started, no code changed. Task left unticked;
 when it ends, follow "When it has ended" above (report, commit, tick).
+
+**Status check (2026-11-25 23:51, seventh session on this task):** run still going, PID 1969296, 51 of 64
+`countonce_v2_colmap` rows, no `.done` file; no second copy started. All 16 k=10 windows are finished (0
+registration failures), so the report now has the k=10 row; k=20 stays TODO. k=20 windows take about
+2.5 min each, so expect the run to end around 00:25. Task left unticked.
+
+**Re-queue note:** a session after the run ends only needs `python -m bench.fuji_report`, a commit and the
+tick. "128 test slices" in the task is 64 windows under the current protocol (8 trees x 2 sides x 4 k);
+the 128 `countonce_v2` test rows include 64 from the superseded v1 protocol.
