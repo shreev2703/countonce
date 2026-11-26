@@ -112,3 +112,64 @@ def sweep(
         name: [measure(make(), lf, rc, n_perms, seed=i) for i, (rc, lf) in enumerate(scenes)]
         for name, make in assocs.items()
     }
+
+
+# ----------------------------------------------------------------------------- Fuji adapter
+
+FUJI_CSV_FIELDS = (
+    "assoc", "tree", "side", "k", "n_perms", "n_dets", "base_count", "count_min", "count_max",
+    "count_range", "roi_count_min", "roi_count_max", "roi_count_range", "n_partition_changed",
+    "min_rand_index",
+)  # fmt: skip
+
+
+def fuji_window_row(
+    name: str,
+    assoc: Associator,
+    lifted: Sequence[LiftedDetection],
+    recon: Recon,
+    *,
+    tree: str,
+    side: str,
+    k: int,
+    n_perms: int = 10,
+    seed: int = 0,
+    to_gt: Callable[[np.ndarray], np.ndarray] | None = None,
+    in_roi: Callable[[np.ndarray], np.ndarray] | None = None,
+) -> dict[str, object]:
+    """Photo-order invariance of one Fuji window: count range and partition variation.
+
+    ``to_gt`` maps points from the window's reconstruction frame to the GT frame and ``in_roi``
+    tells which of those lie in the row's region of interest. Together they give the ROI count
+    the Fuji benchmark reports; without them the ROI columns repeat the raw counts. The raw count
+    and the partition are over all instances of the window.
+    """
+
+    def roi_count(res: ClusterResult) -> int:
+        if to_gt is None or in_roi is None or not res.instances:
+            return len(res.instances)
+        xyz = to_gt(np.array([i.xyz for i in res.instances], dtype=float))
+        return int(np.asarray(in_roi(xyz)).sum())
+
+    base = assoc.associate(list(lifted), recon)
+    base_part = partition(base)
+    counts, rois, changed, worst = [len(base.instances)], [roi_count(base)], 0, 1.0
+    rng = np.random.default_rng(seed)
+    for _ in range(n_perms):
+        lf, rc = permute_photos(lifted, recon, rng.permutation(recon.n_views))
+        res = assoc.associate(lf, rc)
+        counts.append(len(res.instances))
+        rois.append(roi_count(res))
+        part = partition(res)
+        if part != base_part:
+            changed += 1
+            worst = min(worst, pair_agreement(base_part, part))
+    return {
+        "assoc": name, "tree": tree, "side": side, "k": k, "n_perms": n_perms,
+        "n_dets": len(lifted), "base_count": counts[0],
+        "count_min": min(counts), "count_max": max(counts),
+        "count_range": max(counts) - min(counts),
+        "roi_count_min": min(rois), "roi_count_max": max(rois),
+        "roi_count_range": max(rois) - min(rois),
+        "n_partition_changed": changed, "min_rand_index": worst,
+    }  # fmt: skip

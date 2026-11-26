@@ -890,3 +890,12 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - `uv lock` re-resolved other packages (e.g. opencv-python-headless 5.1 -> 4.11, as vggt constrains it); `uv lock --check` passes.
 - README setup now says `uv pip install -e ".[dev,worker]"`, the verified path; plain pip not run.
 - Fixed a broken M5b-WIP test (`tests/test_synth_component.py` lambda lacked `device` kwarg).
+
+## Order-invariance on real Fuji data (2026-11-25, validation trees only)
+- **Run:** `scripts/run_order_invariance_fuji.py` on Tree09-11 x east/west x k in {5, 10} (12 windows), frozen thresholds (score 0.2, merge_k 0.3), cached recon and detections, 10 photo permutations per window per associator (`bench.order_invariance.fuji_window_row`). Output: `results/order_invariance_fuji.csv`. No test-split tree touched.
+- **Result:** v1, v2 and sync all gave count range 0, 0 changed partitions, Rand index 1.0 in every window.
+- **But it is mostly vacuous:** v2 and sync merged nothing in all 12 windows (instance count = number of lifted detections), and v1 merged nothing in 4 of 12. Invariance holds trivially when nothing is merged. Only v1's 8 merging windows are real evidence.
+- **v2 count error, old frame-id order vs new camera-centre order** (`results/order_invariance_fuji_v2_mae.csv`, ROI counts vs GT): MAE 61.25 for both. Four windows move by 1-3 instances (Tree10 west k5 71 to 69, Tree09 east k10 86 to 89, Tree10 west k10 67 to 66), the rest are identical. The fix did not change v2's accuracy on Fuji; v2's weakness there is that it merges almost nothing, not visit order.
+- **Does the "unordered photos" claim hold?** Supported for v1 on real data. For v2/sync it is supported only by the synthetic test (M4); the real-data run cannot confirm or refute it. **The §0.6 row stays unticked.** Needed: a real scene (own captures, P2) or a looser v2 gate where v2 merges.
+- **Side finding:** `canonical_frame_order` sorts camera centres lexicographically by (x, y, z). On a row walk along y this makes x noise the main key. It is still permutation-invariant, but not a meaningful "along the path" order. Not changed.
+- Test: `tests/test_order_invariance_fuji_adapter.py` (CPU, tiny synthetic window).

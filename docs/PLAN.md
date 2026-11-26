@@ -122,7 +122,7 @@ Checked in the M22 consistency pass (2026-11-25). A box is ticked only where the
 - [ ] Fuji-SfM held-out results with CIs, error decomposition and gate G3 decided — *results, CIs and a k=10 decomposition exist; G3 is recommended "not met" and awaits the owner*
 - [ ] 20–30 own scenes (≥3 zero-target) benchmarked with frozen splits
 - [ ] Failure-source experiments show where the remaining error comes from — *Fuji: detector, then duplicates; geometry is not separated from association (no oracle geometry)*
-- [ ] Order-invariance measured on real data; the "unordered photos" claim matches the evidence
+- [ ] Order-invariance measured on real data; the "unordered photos" claim matches the evidence — *measured on Fuji validation windows (`results/order_invariance_fuji.csv`): v1 invariant; v2 and sync invariant only vacuously (no merges at the frozen gate), so the claim is not yet supported for them; needs a scene where v2 merges*
 - [x] README front page with a real result, a real failure and a runnable command — *the real result is the Fuji-SfM table; the picture example is synthetic*
 - [ ] Related work read in full; one tested hypothesis instead of a novelty claim — *three closest works read in full, others not; the hypothesis is untested*
 - [ ] Repo hygiene done (license, no agent files or personal paths, green CI) — *license done; `CLAUDE.md` still tracked (GATES, M21); hosted CI not run on this branch*
