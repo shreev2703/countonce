@@ -2,7 +2,9 @@
 
     .venv-gpu/bin/python scripts/eval_synth_component.py
 
-Both depth variants run every time:
+Stages: `--stage tune` (resumable grid search on val, parallel), `--stage test` (reads the
+chosen rows from the tuning CSV, never tunes), `--stage all` (default). Both depth variants run
+every time:
 
   nan_depth     the stand-in reconstruction has NaN depth, so the v2/sync visibility
                 (occlusion) check never rejects anything on depth, as in the first v3 run.
@@ -20,6 +22,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -31,19 +34,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bench.stats import bootstrap_ci, paired_bootstrap
 from bench.synth_component import (
-    SYNC_GRID,
-    V1_GRID,
-    V2_GRID,
     Prepared,
+    StopAfter,
+    chosen_params,
     evaluate,
     make_sync,
     make_v1,
     make_v2,
     prepare,
+    read_tuning_rows,
+    run_tune,
     summarize_counts,
-    tune,
+    tuning_val_mae,
     write_summary_csv,
-    write_tuning_csv,
 )
 from countonce.merge.cluster import DEFAULT_K
 from countonce.merge.match import V2Config
@@ -86,46 +89,56 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out-tuning-csv", default="results/synth_component_tuning.csv")
     ap.add_argument("--device", default="cpu", help="device for v3 inference (cpu or cuda)")
     ap.add_argument("--n-boot", type=int, default=2000)
-    ap.add_argument("--max-val", type=int, default=None)
+    ap.add_argument("--max-val", type=int, default=None, help="tune on the first N val episodes")
+    ap.add_argument(
+        "--stage",
+        choices=("tune", "test", "all"),
+        default="all",
+        help="tune: grid search on val, resumable, appends to the tuning CSV; "
+        "test: read the chosen rows from that CSV and score the test split (never tunes)",
+    )
+    ap.add_argument(
+        "--workers",
+        type=int,
+        default=max(1, (os.cpu_count() or 3) - 2),
+        help="processes for the tune stage",
+    )
+    ap.add_argument("--stop-after", type=int, default=None, help=argparse.SUPPRESS)
     a = ap.parse_args(argv)
 
-    val_files = sorted(Path(a.data, "val").glob("*.npz"))[: a.max_val]
-    test_files = sorted(Path(a.data, "test").glob("*.npz"))
     dflt = defaults()
+    tuning_csv = Path(a.out_tuning_csv)
+    if a.stage in ("tune", "all"):
+        val_files = sorted(Path(a.data, "val").glob("*.npz"))[: a.max_val]
+        try:
+            run_tune(val_files, tuning_csv, dflt, workers=a.workers, stop_after=a.stop_after)
+        except StopAfter:
+            print(f"stopped after {a.stop_after} rows (test hook)")
+            return 1
+    if a.stage == "tune":
+        return 0
+
+    tuned_all = chosen_params(tuning_csv)  # exits if any method has no chosen row
+    val_maes = tuning_val_mae(tuning_csv)
+    test_files = sorted(Path(a.data, "test").glob("*.npz"))
     v3 = V3Associator(a.checkpoint, device=a.device)
     v3s = V3Associator(a.checkpoint, device=a.device, synchronize=True)
-    tuning_rows: list[dict[str, Any]] = []
     result: dict[str, Any] = {}
     row_dump: list[dict[str, Any]] = []
     summaries: dict[tuple[str, str], dict[str, float]] = {}
     for variant, finite in (("nan_depth", False), ("finite_depth", True)):
-        val: list[Prepared] = prepare(val_files, finite)
         test: list[Prepared] = prepare(test_files, finite)
-        t1 = tune("v1", make_v1, V1_GRID, dflt["v1"], val)
-        t2 = tune("v2", make_v2, V2_GRID, dflt["v2"], val)
-        ts = tune("sync", lambda p, v2=t2.best: make_sync(p, v2), SYNC_GRID, dflt["sync"], val)
+        best = tuned_all[variant]
         arms = {
             "v1 (default)": make_v1(dflt["v1"]),
-            "v1 (tuned)": make_v1(t1.best),
+            "v1 (tuned)": make_v1(best["v1"]),
             "v2 (default)": make_v2(dflt["v2"]),
-            "v2 (tuned)": make_v2(t2.best),
+            "v2 (tuned)": make_v2(best["v2"]),
             "sync (default)": make_sync(dflt["sync"]),
-            "sync (tuned)": make_sync(ts.best, t2.best),
+            "sync (tuned)": make_sync(best["sync"], best["v2"]),
             "v3": v3,
             "v3+sync": v3s,
         }
-        for t, dfl in ((t1, dflt["v1"]), (t2, dflt["v2"]), (ts, dflt["sync"])):
-            for params, mae in t.trials:
-                tuning_rows.append(
-                    dict(
-                        variant=variant,
-                        method=t.method,
-                        val_mae=mae,
-                        is_default=int(params == dfl),
-                        chosen=int(params == t.best),
-                        **params,
-                    )
-                )
         rows = {name: evaluate(assoc, test) for name, assoc in arms.items()}
         summ = {}
         for name, r in rows.items():
@@ -145,19 +158,10 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 paired[name] = dict(diff=d, lo=lo, hi=hi, p=p)
         result[variant] = dict(
-            tuned={
-                "v1": t1.best,
-                "v2": t2.best,
-                "sync": ts.best,
-                "val_mae": {
-                    "v1": [t1.default_val_mae, t1.val_mae],
-                    "v2": [t2.default_val_mae, t2.val_mae],
-                    "sync": [ts.default_val_mae, ts.val_mae],
-                },
-            },  # fmt: skip
+            tuned={**best, "val_mae": val_maes[variant]},
             summary=summ,
             v3_minus=paired,
-            n_val=len(val),
+            n_val=int(next(iter(read_tuning_rows(tuning_csv)))["n_val"]),
             n_test=len(test),
             mean_true_count=float(np.mean([d.ep.true_count() for d in test])),
         )
@@ -166,7 +170,6 @@ def main(argv: list[str] | None = None) -> int:
         Path(out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out_json).write_text(json.dumps(result, indent=1, default=float))
     write_summary_csv(Path(a.out_csv), summaries)
-    write_tuning_csv(Path(a.out_tuning_csv), tuning_rows)
     with Path(a.out_rows_csv).open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(row_dump[0]))
         w.writeheader()

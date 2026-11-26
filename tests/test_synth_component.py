@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from bench.metrics import decomposition_error
 from bench.synth_component import (
@@ -164,6 +165,98 @@ def test_zero_scene_false_count():
     assert math.isnan(summarize_counts(rows[1:])["zero_scene_false_count"])
 
 
+def _tiny_grids(monkeypatch):
+    import bench.synth_component as bsc
+
+    monkeypatch.setattr(bsc, "V1_GRID", {"k": [0.5, 1.0], "score_threshold": [0.0, 0.6]})
+    monkeypatch.setattr(
+        bsc,
+        "V2_GRID",
+        {"max_reproj_norm": [0.5, 1.0], "depth_tol": [1.0], "score_threshold": [0.0]},
+    )
+    monkeypatch.setattr(
+        bsc,
+        "SYNC_GRID",
+        {"eig_threshold": [0.3, 0.5], "assign_threshold": [0.5], "score_threshold": [0.0]},
+    )
+
+
+def _load_script(monkeypatch):
+    spec = importlib.util.spec_from_file_location("eval_synth_component", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _tune_argv(tmp_path, name, *extra):
+    return [
+        "--stage", "tune", "--data", str(tmp_path / "data"),
+        "--out-tuning-csv", str(tmp_path / name), *extra,
+    ]  # fmt: skip
+
+
+def _tiny_data(tmp_path):
+    cfg = GeometryConfig(n_instances=(5, 6), n_views=(3, 3))
+    write_dataset(tmp_path / "data" / "val", 3, cfg=cfg)
+
+
+def test_tune_resume_matches_uninterrupted_run(tmp_path, monkeypatch):
+    _tiny_grids(monkeypatch)
+    mod = _load_script(monkeypatch)
+    _tiny_data(tmp_path)
+    assert mod.main(_tune_argv(tmp_path, "full.csv", "--workers", "1")) == 0
+    # killed after 7 rows, then restarted with a different worker count
+    killed = _tune_argv(tmp_path, "resumed.csv", "--workers", "1", "--stop-after", "7")
+    assert mod.main(killed) == 1
+    part = (tmp_path / "resumed.csv").read_text().splitlines()
+    assert len(part) == 1 + 7  # header + rows appended as they finished
+    assert mod.main(_tune_argv(tmp_path, "resumed.csv", "--workers", "2")) == 0
+    full = (tmp_path / "full.csv").read_text()
+    assert (tmp_path / "resumed.csv").read_text() == full
+    rows = list(csv.DictReader(full.splitlines()))
+    # 4 + 2 + 2 grid points, the v1 default is off-grid in none of them or added once each
+    for v in ("nan_depth", "finite_depth"):
+        for m in ("v1", "v2", "sync"):
+            sel = [r for r in rows if r["variant"] == v and r["method"] == m]
+            assert sum(r["chosen"] == "1" for r in sel) == 1
+            assert sum(r["is_default"] == "1" for r in sel) == 1
+    # a finished run rerun does nothing and changes nothing
+    assert mod.main(_tune_argv(tmp_path, "resumed.csv", "--workers", "1")) == 0
+    assert (tmp_path / "resumed.csv").read_text() == full
+
+
+def test_test_stage_refuses_without_chosen_row(tmp_path, monkeypatch):
+    _tiny_grids(monkeypatch)
+    mod = _load_script(monkeypatch)
+    _tiny_data(tmp_path)
+    cfg = GeometryConfig(n_instances=(5, 6), n_views=(3, 3))
+    write_dataset(tmp_path / "data" / "test", 2, cfg=cfg)
+    monkeypatch.setattr(mod, "V3Associator", lambda *_a, **_k: make_v1({"k": 0.5}))
+    argv = _tune_argv(tmp_path, "t.csv", "--workers", "1")
+    # partial tuning (no chosen flags yet): test refuses, and writes nothing
+    assert mod.main([*argv, "--stop-after", "3"]) == 1
+    test_argv = [*argv]
+    test_argv[test_argv.index("tune")] = "test"
+    out_csv = tmp_path / "summary.csv"
+    extra = ["--out-csv", str(out_csv), "--out-json", str(tmp_path / "r.json")]
+    extra += ["--out-rows-csv", str(tmp_path / "rows.csv"), "--n-boot", "20"]
+    with pytest.raises(SystemExit, match="no chosen tuning row"):
+        mod.main([*test_argv, *extra])
+    assert not out_csv.exists()
+    # a missing file is refused too, and test never creates the tuning CSV
+    missing = [*test_argv, *extra]
+    missing[missing.index(str(tmp_path / "t.csv"))] = str(tmp_path / "absent.csv")
+    with pytest.raises(SystemExit, match="no chosen tuning row"):
+        mod.main(missing)
+    assert not (tmp_path / "absent.csv").exists()
+    # once tuning finishes, test runs from the CSV
+    assert mod.main(argv) == 0
+    assert mod.main([*test_argv, *extra]) == 0
+    assert out_csv.is_file()
+
+
 def test_help_documents_both_depth_variants():
     out = subprocess.run(
         [sys.executable, str(SCRIPT), "--help"], capture_output=True, text=True, check=True
@@ -179,8 +272,7 @@ def test_script_writes_count_first_csv(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "path", list(sys.path))
     spec.loader.exec_module(mod)
     monkeypatch.setattr(mod, "V3Associator", lambda *_a, **_k: make_v1({"k": 0.5}))
-    for name in ("V1_GRID", "V2_GRID", "SYNC_GRID"):
-        monkeypatch.setattr(mod, name, {k: v[:1] for k, v in getattr(mod, name).items()})
+    _tiny_grids(monkeypatch)
     cfg = GeometryConfig(n_instances=(5, 6), n_views=(3, 3))
     for split in ("val", "test"):
         write_dataset(tmp_path / split, 3, cfg=cfg)
