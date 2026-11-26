@@ -482,3 +482,7 @@ has landed: the strict xfail still fails as expected, `results/bench.csv` has 0 
   window GT would add rows that need re-running.
 - **README is missing the warning:** its "Measured results on real trees" section still quotes the
   affected numbers. `docs/RESULTS_FUJI.md` carries the "Known problem" section; the README does not.
+
+**Re-check #2 (2026-11-25, third attempt of the COLMAP task): still OPEN.** Alignment fix has not landed,
+`results/bench.csv` has 0 `_colmap` rows, and no `run_fuji_core.py bench` process is running (only the
+orchestrator's own session matched `pgrep`). No code changed; the 128-slice run was not launched. Task left unticked.
