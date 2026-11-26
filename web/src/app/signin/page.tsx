@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageShell } from "@/components/chrome/site-chrome";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -35,9 +36,12 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
               <a href={`/api/auth/google?next=${encodeURIComponent(dest)}`}>Continue with Google</a>
             </Button>
           ) : (
-            <Button size="lg" disabled>
-              Continue with Google (not configured)
-            </Button>
+            <div className="flex flex-col gap-3" data-testid="signin-unavailable">
+              <p className="text-sm text-muted-foreground">Accounts are not open yet, so there is nothing to sign in to. You can still try the full demo without one.</p>
+              <Button asChild size="lg">
+                <Link href="/demo/tiny">Try the demo scene</Link>
+              </Button>
+            </div>
           )}
           {dev && (
             <form action="/api/auth/dev" method="post" className="flex flex-col gap-2 border-t border-border pt-3" data-testid="dev-signin">
