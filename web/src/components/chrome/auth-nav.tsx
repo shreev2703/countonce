@@ -17,11 +17,8 @@ export function AuthNav() {
   });
   const link = "underline-offset-4 hover:underline";
   if (!q.data?.signedIn) {
-    return (
-      <Link href="/signin" className={link}>
-        Sign in
-      </Link>
-    );
+    // Google sign-in is hidden until OAuth is configured; the /signin route and auth code stay intact.
+    return null;
   }
   return (
     <>

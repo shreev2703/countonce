@@ -1,6 +1,6 @@
 "use client";
 
-import { Html, Line, OrbitControls } from "@react-three/drei";
+import { Billboard, Line, OrbitControls, Text } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -106,12 +106,22 @@ function Marker({
         <sphereGeometry args={[Math.max(m.size / 2, 0.05), 24, 16]} />
         <meshStandardMaterial color={color} transparent opacity={0.8} />
       </mesh>
-      <Html center zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
-        <span className="rounded bg-black/75 px-1.5 py-0.5 text-xs font-bold text-white" aria-hidden="true">
+      <Billboard follow lockZ={false}>
+        <mesh position={[0, 0, 0.001]} renderOrder={10}>
+          <planeGeometry args={[Math.max(m.size, 0.12) * 0.9, Math.max(m.size, 0.12) * 0.45]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.75} depthTest={false} />
+        </mesh>
+        <Text
+          fontSize={Math.max(m.size, 0.12) * 0.3}
+          color="#ffffff"
+          anchorX="center"
+          anchorY="middle"
+          renderOrder={11}
+          material-depthTest={false}
+        >
           {objectLabel(m.id)}
-        </span>
-      </Html>
-    </group>
+        </Text>
+      </Billboard>    </group>
   );
 }
 

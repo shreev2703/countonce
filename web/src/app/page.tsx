@@ -65,11 +65,10 @@ export default function Home() {
             <Button asChild size="lg">
               <Link href={hero ? `/demo/${hero.id}` : "/demo"}>Try a live example</Link>
             </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/new">Count your own photos</Link>
+            <Button size="lg" variant="outline" disabled>
+              Count your own photos: coming soon
             </Button>
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">Counting your own photos needs a Google sign-in.</p>
         </div>
         {hero?.thumb ? (
           <figure>
