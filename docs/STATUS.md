@@ -72,8 +72,9 @@ evidence about real-model accuracy.
 
 - Fuji-SfM errors are large and gate G3 ("geometry beats Sum and Max") is recommended **not met**
   (`docs/RESULTS_FUJI_ANALYSIS.md`); the owner's decision is open.
-- The v3 synthetic result is a component test: the tuned-baseline, noisy-depth re-run (M5) was not
-  completed (`docs/RESULTS_V3_SYNTH.md`).
+- The v3 synthetic result is a component test (generated geometry, not rendered images). With
+  baselines tuned on validation and noisy depth, tuned v1 has a lower count MAE than v3 (1.8 vs
+  19.1 on 100 test episodes); v3 wins only against untuned defaults (`docs/RESULTS_V3_SYNTH.md`).
 - Nothing is hosted, and there are no own captures.
 
 ## Quarantined (`experimental/`, PLAN §28.5)

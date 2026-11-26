@@ -182,10 +182,11 @@ synthetic geometry only.**
 - **Instance formation** ([`match/instances.py`](../countonce/match/instances.py)): threshold the
   probabilities, take connected components, and split any component holding two detections of one
   photo with a min-cut.
-- **Result** ([RESULTS_V3_SYNTH.md](RESULTS_V3_SYNTH.md), 100 synthetic test episodes): association
-  F1 0.964 against 0.741 for v2, and mean absolute count error 19.1 against 47.6. This is a
-  component test: v1/v2 were not tuned for it and its depth is NaN, so v2's occlusion check never
-  fires. It is not evidence about real photos, and v3 has no real-data result.
+- **Result** ([RESULTS_V3_SYNTH.md](RESULTS_V3_SYNTH.md), 100 synthetic test episodes, finite noisy
+  depth): mean absolute count error 19.1 for v3 against 1.8 for tuned v1, 9.0 for tuned v2 and 8.1
+  for tuned sync (v3+sync 5.6). v3 beat the untuned defaults (63.8 to 85.5) but not the baselines
+  tuned on validation. This is a component test on generated geometry, not rendered images. It is
+  not evidence about real photos, and v3 has no real-data result.
 
 ## 9. Synthetic data
 
@@ -396,9 +397,10 @@ re-tuned on training trees, same thresholds). So they are not untouched.
 COLMAP, permutation sync, CountVid, a vision-language model, and v3.
 
 **21. What changed between your first v3 comparison and an honest one?**
-Nothing in the numbers yet. The upgrade (tune v1/v2/sync on validation, finite noisy depth so the
-occlusion test fires, count injected false positives) has code in `bench/synth_component.py`, but
-the table was **not** regenerated. So the v3 result stays a component test with untuned baselines.
+The ranking flipped. The first table compared v3 with untuned v1/v2/sync. After tuning them on the
+validation split, with finite noisy depth so the occlusion test fires and injected false positives
+counted, tuned v1 has the lowest test count MAE (1.8, against 19.1 for v3). v3 only wins against
+untuned defaults. See `RESULTS_V3_SYNTH.md`; still a component test on generated geometry.
 
 **22. What does the dustbin do in Sinkhorn matching?**
 An extra row and column absorb detections with no match (false positives, objects seen in one view),
