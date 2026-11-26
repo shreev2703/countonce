@@ -470,3 +470,15 @@ GT built in a differently rotated frame, so the comparison would be meaningless.
 3. Then run (detached, resumable; roughly 5-15 s per window, not measured at k=20):
    `PYTHONPATH=. setsid nohup .venv-gpu/bin/python -u scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600 > runs/fuji_core/test_colmap.log 2>&1 &`
    and `python -m bench.fuji_report`.
+
+**Re-check (2026-11-25, retry of the same task after a rate limit): still OPEN.** No alignment fix
+has landed: the strict xfail still fails as expected, `results/bench.csv` has 0 `_colmap` rows and no
+`run_fuji_core.py bench` process is running. The COLMAP task is **not done** and was not launched.
+`ruff check .` is clean; `pytest -m "not slow and not gpu"` (CUDA hidden): 1104 passed, 26 skipped,
+2 xfailed. The measurements in the table above were not repeated.
+
+- **Hold until the alignment is fixed:** the queued C-DOG/E4, real-data ablation, test-tree
+  order-invariance and E1 tracker tasks use the same Fuji windows. Any of them that scores against
+  window GT would add rows that need re-running.
+- **README is missing the warning:** its "Measured results on real trees" section still quotes the
+  affected numbers. `docs/RESULTS_FUJI.md` carries the "Known problem" section; the README does not.
