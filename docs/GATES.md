@@ -756,3 +756,5 @@ Not started; no code changed, no rows added. Task left unticked.
   (set the limit a priori); then bump to `fuji_core_v4`, rebuild, re-tune and rerun. Keep v3 rows.
 - Tests during the live run: ruff clean; 1150 passed, 26 skipped, 1 xfailed, 1 teardown error from the
   write guard because the benchmark was appending to `results/bench.csv`.
+
+- Re-entered 2026-11-26 06:10: the Fuji test run (PID 2266684, Tree07 east k=20 in `test_v3.log`) is still live and `test_v3.done` is absent. No second writer started; task left UNTICKED. See the 06:07 entry for the west-frame blocker.
