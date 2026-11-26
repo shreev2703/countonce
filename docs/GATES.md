@@ -528,3 +528,7 @@ registration failures), so the report now has the k=10 row; k=20 stays TODO. k=2
 **Re-queue note:** a session after the run ends only needs `python -m bench.fuji_report`, a commit and the
 tick. "128 test slices" in the task is 64 windows under the current protocol (8 trees x 2 sides x 4 k);
 the 128 `countonce_v2` test rows include 64 from the superseded v1 protocol.
+
+**Status check (2026-11-25 23:55, eighth session on this task):** run still going, PID 1969296, 51 of 64
+`countonce_v2_colmap` rows, no `.done` file; no second copy started, no code changed. Task left unticked;
+when it ends, follow "When it has ended" above (report, commit, tick).
