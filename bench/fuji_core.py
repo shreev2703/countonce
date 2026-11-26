@@ -474,6 +474,36 @@ def methods_for(assocs: Any, baselines: bool = True, backbone: str = "vggt") -> 
     return out + BASELINE_METHODS if baselines and backbone == "vggt" else out
 
 
+# One-switch ablations of the frozen v2 (PLAN §9.6): name -> the single Config field it changes.
+# "v2 ± appearance" is absent on purpose: the pipeline gives v2 no appearance features, so frozen
+# v2 already runs without them and switching Config.appearance off changes nothing (docs/GATES.md).
+ABLATIONS: dict[str, dict[str, Any]] = {
+    "no_cannot_link": {"cannot_link": False},
+    "no_hallucination_filter": {"hallucination": "off"},
+    "sam_masks": {"masks": "sam"},  # frozen v2 has masks="none", i.e. box-centre lifting
+}
+# Protocols whose rows predate the window-alignment fix: nothing may be paired against them.
+STALE_PROTOCOLS = frozenset({"fuji_core_v2"})
+
+
+def ablation_method(name: str) -> str:
+    if name not in ABLATIONS:
+        raise ValueError(f"unknown ablation {name!r}; expected one of {sorted(ABLATIONS)}")
+    return f"{ASSOC_METHODS['v2']}__{name}"
+
+
+def check_ablation_request(name: str, split: str, ks: Any, backbone: str) -> None:
+    """Ablations are test-split, k=10, VGGT only, and need current-protocol v2 rows to pair with."""
+    ablation_method(name)
+    if (split, list(ks), backbone) != ("test", [10], "vggt"):
+        raise ValueError("--ablation needs --split test --ks 10 and the vggt backbone")
+    if PROTOCOL in STALE_PROTOCOLS:
+        raise ValueError(
+            f"protocol {PROTOCOL} rows predate the alignment fix; rerun v2 under a new "
+            "protocol before running ablations (docs/GATES.md)"
+        )
+
+
 def _row_protocol(r: dict[str, Any]) -> str | None:
     try:
         protocol: str | None = json.loads(r.get("config_json") or "{}").get("protocol")

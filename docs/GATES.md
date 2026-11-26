@@ -610,3 +610,21 @@ Not started; no code changed, no rows added. Task left unticked.
   `configs/fuji_core.yaml`; (4) rerun v2 on the test trees; (5) then add `--ablation` to
   `scripts/run_fuji_core.py` (flip one `Config` switch from the frozen v2, method
   `countonce_v2__<ablation>`, k=10 only, masks last) and run the 64 rows.
+
+### Retry (2026-11-26): still BLOCKED; `--ablation` option added, 0 of 64 rows
+
+- Block unchanged: `fc.PROTOCOL` is `fuji_core_v2`, v2 not rerun, and the C-DOG tuning job
+  (PID 2130274) was still running on the shared cache. No benchmark was launched.
+- Added: `scripts/run_fuji_core.py bench --split test --ks 10 --ablation
+  {no_cannot_link,no_hallucination_filter,sam_masks}`. It exits while the protocol is stale
+  (`fc.STALE_PROTOCOLS`). Unit-tested for arguments and overrides only; the run path has never
+  executed.
+- **Appearance ablation needs code first.** No caller passes `DinoV2Extractor` to
+  `V2Associator` and GroundingDINO sets no `Detection.feature`, so frozen v2 uses no appearance
+  and `appearance=False` is a no-op. Wire the extractor into the pipeline, then compare
+  "with DINOv2" against frozen v2 (this adds the feature rather than removing it). DINOv2 weights
+  were not in the local HF cache. So the full task is 64 rows only after that; 48 are ready now.
+- **Correction to resume step (2):** k=10 windows are a single chunk (`chunked.py`,
+  `len(frames) <= chunk_size`), so their cached reconstructions do not depend on the alignment
+  fix. The overview reconstructions are stitched, so `overview --force` is needed to rebuild the
+  pseudo-poses. k=20 windows are also single-chunk.

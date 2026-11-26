@@ -11,6 +11,10 @@ The window's GT and frame come from the VGGT reference reconstruction; COLMAP's 
 in that frame (``fuji_core.align_to_reference``). Failed registrations are recorded as
 ``status=failed`` rows.
 
+``--split test --ks 10 --ablation NAME`` changes one ``Config`` field of the frozen v2
+(``fuji_core.ABLATIONS``) and writes ``countonce_v2__NAME`` rows. Each window needs its finished
+v2 row of the current protocol with the same GT. It refuses to run on a stale protocol.
+
 Outputs go to ``runs/fuji_core/`` (git-ignored) and ``results/bench.csv`` (append-only).
 Run from the repo root inside ``.venv-gpu`` with ``PYTHONPATH=.``.
 """
@@ -165,6 +169,13 @@ def reference_gt(csv_path: Path, split: str, tree: str, side: str, k: int) -> fl
 
 
 def cmd_bench(args: argparse.Namespace) -> None:
+    ablation = args.ablation
+    if ablation:
+        try:
+            fc.check_ablation_request(ablation, args.split, args.ks, args.backbone)
+        except ValueError as e:
+            raise SystemExit(str(e)) from e
+        args.assocs = ["v2"]
     colmap = args.backbone == "colmap"
     if colmap and list(args.assocs) == ["v1", "v2"]:  # the parser default
         args.assocs = ["v2"]
@@ -208,6 +219,9 @@ def cmd_bench(args: argparse.Namespace) -> None:
     if colmap:
         model_cfg["gt_reference"] = "vggt_window_visibility"
         model_cfg["alignment"] = "colmap_cameras_to_vggt_aligned_window"
+    if ablation:
+        model_cfg["ablation"] = ablation
+        model_cfg["ablation_override"] = fc.ABLATIONS[ablation]
     t_start = time.time()
     memo: dict[tuple[str, str, int], dict[str, Any]] = {}
 
@@ -274,6 +288,25 @@ def cmd_bench(args: argparse.Namespace) -> None:
         n_reg = int(fc.registered_views(recon.extrinsics).sum())
         return {"ev": ev, "res": res, "n_registered": n_reg, "rot_resid_deg": rot_resid}
 
+    def ablation_group(tree: str, side: str, k: int) -> dict[str, Any]:
+        want = reference_gt(args.csv, args.split, tree, side, k)
+        if want is None:
+            raise RuntimeError("no finished v2 row of this window to pair with")
+        _, _, paths, gt_ext = _window(scene, imgs, ov, side, tree, k)
+        kw: dict[str, Any] = {"score_threshold": args.score_threshold, **_mk(args)}
+        cfg = base_config(assoc="v2", **kw, **fc.ABLATIONS[ablation])
+        try:
+            res = run(paths, PROMPT, cfg, detector=det, reconstructor=rec, export=False)
+            recon = load_recon(cfg, res.recon_cache_key or "")
+            sim = fc.align_window(gt_ext, recon.extrinsics)
+            ev = fc.evaluate_window(res, recon, sim, scene.gt_ids, scene.gt_xyz, box, gt_ext)
+        except (ReconAdaptError, ChunkAlignmentError, fc.AlignmentError) as e:
+            print(tree, side, k, "FAILED", e, flush=True)
+            raise SkipRun("failed", f"{type(e).__name__}: {e}") from e
+        if ev["gt"] != want:
+            raise RuntimeError(f"GT {ev['gt']} differs from the v2 row's {want:g}")
+        return {"ev": ev, "res": res}
+
     def jobs() -> Iterator[Job]:
         for k in args.ks:
             for tree in trees:
@@ -281,12 +314,24 @@ def cmd_bench(args: argparse.Namespace) -> None:
                     if (time.time() - t_start) / 60 > args.budget_min:
                         print(f"budget hit before {tree}/{side}/k={k}", flush=True)
                         return
-                    for method in fc.methods_for(args.assocs, not args.no_baselines, args.backbone):
+                    methods = (
+                        (fc.ablation_method(ablation),)
+                        if ablation
+                        else fc.methods_for(args.assocs, not args.no_baselines, args.backbone)
+                    )
+                    for method in methods:
                         cfg = {**model_cfg, "tree": tree, "side": side}
                         yield fc.make_job(tree, args.split, side, k, method, cfg)
 
     def fn(job: Job) -> RunOutput:
         assert job.n_views is not None
+        if ablation:
+            got = ablation_group(job.scene_id, job.sample, job.n_views)
+            res = got["res"]
+            out = fc.run_output(got["ev"], job.method, res, res.timings["total"])
+            print(job.scene_id, job.sample, job.n_views, job.method, "pred", out.pred, "gt",
+                  out.gt, flush=True)  # fmt: skip
+            return out
         if colmap:
             got = colmap_group(job.scene_id, job.sample, job.n_views)
             res = got["res"]
@@ -359,6 +404,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip the per-image baseline rows (already in the CSV)",
     )
+    b.add_argument("--ablation", choices=sorted(fc.ABLATIONS), help="one-switch v2 ablation")
     b.add_argument("--budget-min", type=float, default=90.0)
     b.add_argument("--config", type=Path, default=FROZEN_CONFIG)
     b.add_argument("--csv", type=Path, default=DEFAULT_CSV)

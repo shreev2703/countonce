@@ -1041,3 +1041,10 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - All `fuji_core_v2` rows therefore predate the fix and need one joint rerun under a new protocol.
 - The task's "128 test slices" are 64 windows under `fuji_core_v2` (8 trees x 2 sides x 4 k); the
   extra 64 `countonce_v2` rows in the CSV belong to the superseded `fuji_core_v1` protocol.
+
+## Fuji one-switch ablations (2026-11-26)
+
+- `--ablation` offers `no_cannot_link`, `no_hallucination_filter` and `sam_masks` (SAM 2.1 through
+  `transformers`). The appearance ablation is left out because it would be a no-op on frozen v2.
+- It refuses protocol `fuji_core_v2` instead of running from a pre-fix worktree: GATES holds
+  ablations until v2 is rerun with the fixed alignment. No rows, no analysis table, no STATUS ticks.
