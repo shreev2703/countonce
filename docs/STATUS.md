@@ -60,7 +60,7 @@ the message and exits non-zero. It never silently falls back to another detector
 | Web app: signed-in flow | yes | yes (mocked API; local API with a fake worker) | no (no real Google sign-in or GPU worker run) | n/a |
 | Count-first metrics and error decomposition | yes | yes | yes (Fuji failure-source run) | yes (Fuji Core) |
 | Failure-source harness | yes | yes | yes (Fuji, no oracle geometry) | k=10 only |
-| Photo-order invariance (v1, v2, sync, v3) | yes | yes (permutation test) | v1 only: 12 Fuji validation windows, 10 permutations, count range 0, partition unchanged. v2 and sync merged nothing there, so the test says nothing about them | no |
+| Photo-order invariance (v1, v2, sync, v3) | yes | yes (permutation test) | v1, v2, sync: 12 Fuji validation windows, 10 permutations, count range 0, partition unchanged, with merges present (v2 15/93 at k=5/10, sync 4/81; `results/order_invariance_fuji_merging.csv`). v3 not run | no |
 
 ## Known open problems
 

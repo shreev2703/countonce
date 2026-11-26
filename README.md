@@ -134,6 +134,7 @@ A longer walk-through is in [docs/EXPLAINER.md](docs/EXPLAINER.md). The full pla
   counts over a grid of merge strictness and detector thresholds. It shows how fragile the count
   is. It is not a statistical guarantee that the true count lies inside it
   (`confidence_method="sensitivity"`).
+- **Photo order.** Shuffling the photos (cameras travelling with them) did not change v1, v2 or sync counts or groupings in 12 Fuji validation windows (10 shuffles each, one reconstruction per window; v3 and the test trees not run). Evidence: `results/order_invariance_fuji_merging.csv`, `docs/DEVIATIONS.md`.
 - Quality warnings and confidence scores are heuristics and are not calibrated.
 - The default detector is HuggingFace GroundingDINO (text prompts only). CountGD and CountGD++ are
   planned, not implemented: selecting them exits with an error. Per-component evidence is in
