@@ -7,6 +7,7 @@ never needed by the tests (they use in-memory fakes).
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import lru_cache
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
@@ -26,6 +27,47 @@ def cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
     if na == 0.0 or nb == 0.0:
         return 0.0
     return float(np.dot(a, b) / (na * nb))
+
+
+class CachedExtractor:
+    """Memoises embeddings per (image, detection geometry): the sensitivity sweep associates
+    the same detections many times. Detections without a frame or a box/point are not cached."""
+
+    def __init__(self, inner: FeatureExtractor):
+        self.inner = inner
+        self._cache: dict[tuple[str, tuple[float, ...]], np.ndarray] = {}
+
+    def extract(self, frame: Frame | None, dets: Sequence[Detection]) -> np.ndarray:
+        keys: list[tuple[str, tuple[float, ...]] | None] = []
+        for d in dets:
+            geom = d.box_xyxy if d.box_xyxy is not None else d.point_xy
+            if frame is None or geom is None:
+                keys.append(None)
+            else:
+                keys.append((frame.sha256, tuple(float(v) for v in geom)))
+        todo = [i for i, k in enumerate(keys) if k is None or k not in self._cache]
+        fresh: dict[int, np.ndarray] = {}
+        if todo:
+            out = np.asarray(self.inner.extract(frame, [dets[i] for i in todo]))
+            for i, row in zip(todo, out, strict=True):
+                fresh[i] = row
+                key = keys[i]
+                if key is not None:
+                    self._cache[key] = row
+        rows: list[np.ndarray] = []
+        for i, k in enumerate(keys):
+            if i in fresh:
+                rows.append(fresh[i])
+            else:
+                assert k is not None  # keyless detections are always freshly embedded
+                rows.append(self._cache[k])
+        return np.stack(rows) if rows else np.zeros((0, 0))
+
+
+@lru_cache(maxsize=1)
+def load_extractor(model: str) -> FeatureExtractor:
+    """Shared cached extractor for ``model`` (weights load on first use)."""
+    return CachedExtractor(DinoV2Extractor(model))
 
 
 class DinoV2Extractor:

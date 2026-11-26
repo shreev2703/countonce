@@ -475,11 +475,12 @@ def methods_for(assocs: Any, baselines: bool = True, backbone: str = "vggt") -> 
 
 
 # One-switch ablations of the frozen v2 (PLAN §9.6): name -> the single Config field it changes.
-# "v2 ± appearance" is absent on purpose: the pipeline gives v2 no appearance features, so frozen
-# v2 already runs without them and switching Config.appearance off changes nothing (docs/GATES.md).
+# Frozen v2 computes no appearance features, so its "± appearance" arm *adds* DINOv2 (switching
+# Config.appearance off would change nothing).
 ABLATIONS: dict[str, dict[str, Any]] = {
     "no_cannot_link": {"cannot_link": False},
     "no_hallucination_filter": {"hallucination": "off"},
+    "with_appearance": {"appearance_model": "dinov2_vits14"},
     "sam_masks": {"masks": "sam"},  # frozen v2 has masks="none", i.e. box-centre lifting
 }
 # Protocols whose rows predate the window-alignment fix: nothing may be paired against them.

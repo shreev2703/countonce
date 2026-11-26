@@ -35,6 +35,7 @@ from countonce.ingest.privacy import (
 from countonce.ingest.sanitize import SanitizeReport, sanitize_image, validate_video
 from countonce.ingest.select import cap_frames, drop_near_duplicates
 from countonce.lift import LiftKwargs, apply_lift_region, compute_scene_scale, lift_detections
+from countonce.merge.appearance import load_extractor
 from countonce.merge.base import Associator
 from countonce.merge.cluster import V1Associator
 from countonce.merge.match import V2Associator, V2Config
@@ -217,6 +218,9 @@ def _make_base_associator(config: Config, k: float) -> Associator:
             "hallucination": config.hallucination,
         }
     )
+    extractor = None
+    if config.appearance and config.appearance_model is not None:
+        extractor = load_extractor(config.appearance_model)
     if config.assoc == "v3":
         from countonce.merge.v3 import V3Associator, load_cached
 
@@ -225,7 +229,7 @@ def _make_base_associator(config: Config, k: float) -> Associator:
         thr = min(max(1.0 - 0.5 * k / config.merge_k, 0.05), 0.95)
         return V3Associator(model=load_cached(config.v3_checkpoint), threshold=thr)
     if config.assoc == "sync":
-        return SyncAssociator(v2_config=v2cfg)
+        return SyncAssociator(v2_config=v2cfg, extractor=extractor)
     if config.assoc == "cdog":
         # comparison baseline kept under bench/ (re-implemented from the paper; the original has
         # no licence), imported only when selected. Like the other gates, tau scales with k.
@@ -239,7 +243,7 @@ def _make_base_associator(config: Config, k: float) -> Associator:
             ),
             v2_config=v2cfg,
         )
-    return V2Associator(v2cfg)
+    return V2Associator(v2cfg, extractor)
 
 
 def make_count_at(

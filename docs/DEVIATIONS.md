@@ -1045,6 +1045,9 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 ## Fuji one-switch ablations (2026-11-26)
 
 - `--ablation` offers `no_cannot_link`, `no_hallucination_filter` and `sam_masks` (SAM 2.1 through
-  `transformers`). The appearance ablation is left out because it would be a no-op on frozen v2.
+  `transformers`) and `with_appearance`. Frozen v2 computes no appearance features, so the
+  "± appearance" pair adds them: `Config.appearance_model: dinov2_vits14` (default None) rather
+  than switching `Config.appearance` off, which would change nothing. Crop embeddings run on CPU
+  and are memoised in memory. ViT-S/14 is loaded with `torch.hub`, as the existing extractor did.
 - It refuses protocol `fuji_core_v2` instead of running from a pre-fix worktree: GATES holds
   ablations until v2 is rerun with the fixed alignment. No rows, no analysis table, no STATUS ticks.

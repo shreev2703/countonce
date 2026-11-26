@@ -32,6 +32,9 @@ class Config(BaseModel):
     # Ablation switches (PLAN 9.6). Defaults reproduce the shipped behaviour.
     cannot_link: bool = True  # v1/v2: never merge two detections from the same frame
     appearance: bool = True  # v2/sync: use Detection.feature (cost, gate, split check)
+    # v2/sync: embed detections that carry no feature with this DINOv2 model. None (default)
+    # computes nothing, so no detector in the repo gives the associator any appearance.
+    appearance_model: Literal["dinov2_vits14"] | None = None
     # Natural-language prompts (PLAN 15): "red apples, not leaves" -> positives + negatives.
     # Off passes the prompt to the detector verbatim. A box is dropped when its best negative
     # phrase score exceeds its positive score by more than ``negative_margin``.

@@ -634,3 +634,19 @@ Not started; no code changed, no rows added. Task left unticked.
 - `fc.PROTOCOL` is still `fuji_core_v2` (in `STALE_PROTOCOLS`); v2 has not been rerun under the alignment-fix protocol, so paired deltas would be invalid.
 - C-DOG tuning (PID 2130274, child `run_fuji_core.py` on val) is still using the GPU and the shared `runs/fuji_core/cache`.
 - Appearance ablation still needs DINOv2 wired into the pipeline. Resume order above is unchanged.
+
+### Third attempt (2026-11-26 ~02:00): still BLOCKED; appearance switch wired, 0 of 64 rows
+
+- Block unchanged: `fc.PROTOCOL` is `fuji_core_v2`, v2 has not been rerun, and the C-DOG tuning job
+  was still running on the GPU and the shared cache. No benchmark was launched.
+- The appearance code gap above is closed: `--ablation with_appearance` sets
+  `Config.appearance_model: dinov2_vits14` (default None, so frozen v2 is unchanged). Four switches
+  x 16 windows now gives the 64 rows. Tested with a fake extractor only: the DINOv2 weights have
+  not been loaded and the ablation run path has never executed.
+- **Owner/orchestrator action:** `TASKS_OVERNIGHT.md` has no open task for the joint rerun, so
+  re-queuing this one will keep blocking. Queue the rerun first (resume steps 1-4 above, plus
+  `overview --force`), after which
+  this task runs as written (a new protocol name passes `check_ablation_request`).
+- Alternative, not taken: run the ablations from a pre-fix worktree, as the COLMAP resume did.
+  Deltas would pair correctly but sit in the known-wrong GT frame and need a second run.
+
