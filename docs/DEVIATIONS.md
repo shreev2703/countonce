@@ -797,3 +797,12 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **Only one demo scene exists** (synthetic `tiny`), so the gallery has one card and says real scenes are added after review.
 - Components live in `web/src/components/chrome/`, not `site/`, because `.gitignore` ignores `site/`.
 - **Lighthouse** (v13, mobile preset, production build, headless Chromium): performance 0.96, accessibility 1.00, best-practices 0.96 on `/`. Reproduce with `npm run build && npx next start -p 3100` then `npm run lighthouse` in `web/`.
+
+## M16: signed-in web flow (2026-11-25)
+- **No Auth.js** (PLAN 17 names it): a small authorization-code + PKCE flow in `web/src/app/api/auth/google/` with an AES-GCM httpOnly session cookie. The only identity needed is an API key from the existing API, so a session library added little. The id_token comes straight from Google's token endpoint over TLS, so its claims are checked but its signature is not.
+- **New API routes:** `POST /auth/exchange` (off unless `COUNTONCE_AUTH_SECRET` is set), `GET /me`, and corrections on finished jobs (migration 0003 adds `corrections.key` and `consent`). Every sign-in mints a new API key; old keys are not revoked yet.
+- **Backend-for-frontend proxy:** the browser never holds an API key and no CORS is needed. Upload chunks pass through the web server, which on Vercel is subject to request-size and duration limits; M18 must check this.
+- **Share pages and corrections:** shared links show the original result, not the owner's corrections.
+- **Test sign-in** (`COUNTONCE_DEV_AUTH=1`) exists so both end-to-end suites run without Google.
+- **CI:** the `web` job runs the mocked-API suite only. The live suite needs the Python env and is run locally (`npm run test:e2e:live`).
+- **Not done:** email-me-when-done toggle (Moon), real Google sign-in against live credentials.

@@ -14,7 +14,7 @@ test("home renders and has no serious accessibility violations", async ({ page }
 test("proof points are honest empty states and the example link works", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("No published number yet")).toHaveCount(3);
-  await expect(page.getByRole("button", { name: "Count your own photos" })).toBeDisabled();
+  await expect(page.getByRole("link", { name: "Count your own photos" })).toHaveAttribute("href", "/new");
   await page.getByRole("link", { name: "Try a live example" }).click();
   await expect(page).toHaveURL(/\/demo\/tiny$/);
 });

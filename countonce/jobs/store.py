@@ -112,6 +112,17 @@ SCHEMA = [
         comment TEXT,
         created_at DOUBLE PRECISION
     )""",
+    """CREATE TABLE IF NOT EXISTS corrections (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL REFERENCES jobs (id),
+        user_id TEXT,
+        key TEXT NOT NULL,
+        action TEXT NOT NULL,
+        detection_ids TEXT NOT NULL,
+        consent INTEGER NOT NULL DEFAULT 0,
+        created_at DOUBLE PRECISION,
+        UNIQUE (job_id, key)
+    )""",
     """CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         training_opt_in INTEGER NOT NULL DEFAULT 0,
@@ -459,6 +470,50 @@ class SqliteJobStore:
             )
         return fid
 
+    def add_correction(
+        self,
+        job_id: str,
+        user_id: str | None,
+        key: str,
+        action: str,
+        detection_ids: list[str],
+        consent: bool = False,
+    ) -> tuple[str, bool]:
+        """Store one correction; ``(id, created)``. A repeat of the same action is a no-op."""
+        with self._tx() as conn:
+            row = conn.execute(
+                "SELECT id FROM corrections WHERE job_id = ? AND key = ?", (job_id, key)
+            ).fetchone()
+            if row is not None:
+                return str(row["id"]), False
+            cid = uuid.uuid4().hex
+            conn.execute(
+                "INSERT INTO corrections (id, job_id, user_id, key, action, detection_ids, "
+                "consent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    cid,
+                    job_id,
+                    user_id,
+                    key,
+                    action,
+                    json.dumps(detection_ids),
+                    self._flag(consent),
+                    self.clock(),
+                ),
+            )
+        return cid, True
+
+    def corrections(self, job_id: str) -> list[dict[str, Any]]:
+        rows = self._query(
+            "SELECT id, user_id, key, action, detection_ids, consent, created_at "
+            "FROM corrections WHERE job_id = ? ORDER BY created_at, id",
+            (job_id,),
+        )
+        for r in rows:
+            r["detection_ids"] = json.loads(r["detection_ids"])
+            r["consent"] = bool(r["consent"])
+        return rows
+
     def get(self, job_id: str) -> dict[str, Any] | None:
         rows = self._query("SELECT * FROM jobs WHERE id = ?", (job_id,))
         return rows[0] if rows else None
@@ -797,6 +852,15 @@ class SqliteJobStore:
                 "INSERT INTO users (id, training_opt_in, created_at) VALUES (?, ?, ?) "
                 "ON CONFLICT (id) DO UPDATE SET training_opt_in = excluded.training_opt_in",
                 (user_id, self._flag(opt_in), self.clock()),
+            )
+
+    def ensure_user(self, user_id: str) -> None:
+        """Create the user row if missing (an existing opt-in is kept)."""
+        with self._tx() as conn:
+            conn.execute(
+                "INSERT INTO users (id, training_opt_in, created_at) VALUES (?, ?, ?) "
+                "ON CONFLICT (id) DO NOTHING",
+                (user_id, self._flag(False), self.clock()),
             )
 
     def opted_in_users(self) -> set[str]:

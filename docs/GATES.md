@@ -340,3 +340,6 @@ so `scripts/render_mockups.py` skips; open the HTML files directly or install pl
 ## 2026-11-25: OneScene-Bench images not published (found during M10; does not block M10)
 - `github.com/swathisuhas/OneScene-Bench` holds parquet annotations whose image fields are relative paths with no bytes (checked first rows of three files), and the repo tree has no image files.
 - Needed before the Strong-tier OneScene evaluation: get the images from the authors, or rebuild them from DL3DV-10K under its terms (yours: it needs accepting terms or contacting the authors). `bench/datasets/onescene.py` also needs rewriting for the parquet layout.
+
+## 2026-11-25: Google OAuth client needed (does not block M16)
+- The sign-in code is in place but has never run against Google. Yours: create an OAuth web client, add `<origin>/api/auth/google/callback` as a redirect URI, set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `COUNTONCE_AUTH_SECRET`, `COUNTONCE_SESSION_SECRET` and `COUNTONCE_PUBLIC_URL`, and leave `COUNTONCE_DEV_AUTH` unset in public.

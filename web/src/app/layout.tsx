@@ -9,6 +9,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.COUNTONCE_PUBLIC_URL ?? "http://localhost:3000"),
   title: "CountOnce",
   description: "Count objects from a few photos, each one exactly once.",
 };

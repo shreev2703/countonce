@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { AuthNav } from "./auth-nav";
+
 export function SiteHeader() {
   return (
     <header className="border-b border-border">
@@ -8,10 +10,11 @@ export function SiteHeader() {
         <Link href="/" className="text-lg font-semibold">
           CountOnce
         </Link>
-        <nav aria-label="Main" className="flex gap-5 text-sm">
+        <nav aria-label="Main" className="flex items-center gap-5 text-sm">
           <Link href="/demo" className="underline-offset-4 hover:underline">
             Demo gallery
           </Link>
+          <AuthNav />
         </nav>
       </div>
     </header>

@@ -1,6 +1,55 @@
 {
   "components": {
     "schemas": {
+      "AuthExchange": {
+        "properties": {
+          "provider": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "subject"
+        ],
+        "title": "AuthExchange",
+        "type": "object"
+      },
+      "CorrectionIn": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "consent": {
+            "default": false,
+            "title": "Consent",
+            "type": "boolean"
+          },
+          "detection_ids": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Detection Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "action",
+          "detection_ids"
+        ],
+        "title": "CorrectionIn",
+        "type": "object"
+      },
       "FeedbackIn": {
         "properties": {
           "comment": {
@@ -203,6 +252,65 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/auth/exchange": {
+      "post": {
+        "description": "Trusted web server -> API key for an identity it already verified (Google OAuth).\n\nOff (404) unless ``auth_secret`` is set. The web server keeps the key in an encrypted\nhttpOnly cookie, so the browser never sees it. Every sign-in mints a fresh key.",
+        "operationId": "auth_exchange_auth_exchange_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-auth-secret",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Auth-Secret"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthExchange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Auth Exchange Auth Exchange Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auth Exchange"
+      }
+    },
     "/health": {
       "get": {
         "operationId": "health_health_get",
@@ -533,6 +641,161 @@
           }
         },
         "summary": "Get Job"
+      }
+    },
+    "/jobs/{job_id}/corrections": {
+      "get": {
+        "operationId": "get_corrections_jobs__job_id__corrections_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Corrections Jobs  Job Id  Corrections Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Corrections"
+      },
+      "post": {
+        "description": "Split / merge / reject on a finished job. Replayed on the stored result, so the\noriginal is never changed; a repeat of the same action is a no-op.",
+        "operationId": "post_correction_jobs__job_id__corrections_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Post Correction Jobs  Job Id  Corrections Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Correction"
       }
     },
     "/jobs/{job_id}/events": {
@@ -996,6 +1259,70 @@
           }
         },
         "summary": "Submit Job"
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "me_me_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Me Me Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Me"
       }
     },
     "/share/{token}": {

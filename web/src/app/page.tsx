@@ -46,13 +46,11 @@ export default function Home() {
             <Button asChild size="lg">
               <Link href={hero ? `/demo/${hero.id}` : "/demo"}>Try a live example</Link>
             </Button>
-            <Button size="lg" variant="outline" disabled aria-describedby="own-photos-note">
-              Count your own photos
+            <Button asChild size="lg" variant="outline">
+              <Link href="/new">Count your own photos</Link>
             </Button>
           </div>
-          <p id="own-photos-note" className="mt-2 text-sm text-muted-foreground">
-            Uploading your own photos needs sign-in, which is not available yet.
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">Counting your own photos needs a Google sign-in.</p>
         </div>
         {hero?.thumb ? (
           <figure>
