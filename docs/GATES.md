@@ -650,3 +650,10 @@ Not started; no code changed, no rows added. Task left unticked.
 - Alternative, not taken: run the ablations from a pre-fix worktree, as the COLMAP resume did.
   Deltas would pair correctly but sit in the known-wrong GT frame and need a second run.
 
+
+### Fourth attempt (2026-11-26): still BLOCKED, 0 of 64 rows, nothing changed
+
+- `fc.PROTOCOL` is still `fuji_core_v2` (in `STALE_PROTOCOLS`); no joint v2 rerun exists in
+  `TASKS_OVERNIGHT.md` or in `results/bench.csv`. `--ablation` refuses to run, correctly.
+- No code or rows changed. Queue the joint rerun (resume steps 1-4 plus `overview --force`) before
+  re-queuing this task.
