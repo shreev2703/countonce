@@ -515,3 +515,7 @@ holds the exit code when it ends. k=10 windows took about 50-80 s each; k=20 is 
 `PYTHONPATH=. setsid nohup .venv-gpu/bin/python -u scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600 > runs/fuji_core/test_colmap.log 2>&1 &`
 Then run `python -m bench.fuji_report`, commit the report and summary CSV, and tick the task once
 there are 64 ok-or-failed rows.
+
+**Status check (2026-11-25 23:31, sixth session on this task):** run still going, PID 1969296, 42 of 64
+`countonce_v2_colmap` rows, no `.done` file. No second copy started, no code changed. Task left unticked;
+when it ends, follow "When it has ended" above (report, commit, tick).
