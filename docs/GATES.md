@@ -403,7 +403,7 @@ Items from the resolved snapshots that no other open section above lists.
   Track F profile measurements, a full-scale v3 training run and model-registry promotion on real data.
 - **Runners and tools:** register the self-hosted golden GPU runner and pick 5 golden scenes; install the `mcp`
   extra and register the server in a client.
-- **Environment:** decide whether `.venv` (Python 3.12) should be 3.11 to match CI.
+- **Environment:** resolved 2026-11-25. CI now runs both Python jobs on a 3.11 + 3.12 matrix, so the 3.12 `.venv` is covered; `uv lock --check` passes (lockfile unchanged).
 
 ## Overnight tasks left `[!]` — open (owner: orchestrator / Shreev, to re-queue)
 - **M5b** (tune v1/v2/sync on synthetic validation, re-run v3) has a WIP commit only (`7427ba3`); re-queued as

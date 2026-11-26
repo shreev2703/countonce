@@ -85,3 +85,15 @@ def test_every_extra_ci_installs_is_defined() -> None:
     for group in re.findall(r"pip install -e \.\[([^\]]+)\]", wf):
         missing = {e.strip() for e in group.split(",")} - defined
         assert not missing, f"ci.yml installs undefined extras: {sorted(missing)}"
+
+
+def test_python_jobs_matrix_covers_running_interpreter() -> None:
+    wf = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
+    running = f"{sys.version_info.major}.{sys.version_info.minor}"
+    for name in ("test", "full-cpu"):
+        job = wf["jobs"][name]
+        versions = [str(v) for v in job["strategy"]["matrix"]["python-version"]]
+        assert running in versions, f"{name} matrix {versions} lacks running Python {running}"
+        assert {"3.11", "3.12"} <= set(versions)
+        setups = [s for s in job["steps"] if s.get("uses", "").startswith("actions/setup-python")]
+        assert setups[0]["with"]["python-version"] == "${{ matrix.python-version }}"

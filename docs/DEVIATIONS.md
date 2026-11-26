@@ -982,3 +982,6 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 - **v3 regression vs the old untuned comparison:** the old claim "v3 beats v1/v2" does not survive tuning. Test count MAE: tuned v1 1.8 [1.5, 2.2], tuned v2 9.0, tuned sync 8.1, v3+sync 5.6, v3 19.1 [16.7, 21.7] (finite depth). Paired v3 minus tuned v1 +17.3 [15.1, 19.7]. v3's number is the same as the first run (19.1), so v3 did not get worse; the baselines got much better. v3 still beats the untuned defaults.
 - **Caveats:** tuned v2/sync have lower F1 than defaults while having lower MAE (they drop detections). The test split has no zero-count scenes, so the zero-scene false count is NaN and reported as not measurable. v1 and v3 ignore depth so their rows are identical in both variants. Tuning and test come from one generator.
 - **Cleanup:** STATUS and EXPLAINER no longer say M5 was not completed; `[!]` M5 and M5b lines in TASKS_OVERNIGHT are annotated as superseded.
+
+## CI Python matrix (2026-11-25)
+- Both Python jobs (`test`, `full-cpu`) run on 3.11 and 3.12 with `fail-fast: false`. Job ids are unchanged; GitHub appends the version to the check name. The golden artifact name carries the version so the two runs do not collide. `uv lock --check` passed, so `uv.lock` was not regenerated.
