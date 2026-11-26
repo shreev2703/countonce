@@ -985,3 +985,6 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 
 ## CI Python matrix (2026-11-25)
 - Both Python jobs (`test`, `full-cpu`) run on 3.11 and 3.12 with `fail-fast: false`. Job ids are unchanged; GitHub appends the version to the check name. The golden artifact name carries the version so the two runs do not collide. `uv lock --check` passed, so `uv.lock` was not regenerated.
+
+## Synthetic tuner pool uses spawn (2026-11-25)
+- `bench/synth_component.py` builds its tuning pool with `spawn` (not `forkserver`: spawn is portable and what the load tests use). The requested `filterwarnings("error::DeprecationWarning:multiprocessing")` marker was not used: CPython 3.12 discards the exception when this warning is escalated inside `os.fork`, so it can never fail a test; an autouse fixture in `tests/test_synth_component.py` records warnings and asserts there is no fork warning (checked by temporarily restoring `fork`).

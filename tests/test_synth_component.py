@@ -7,6 +7,8 @@ import importlib.util
 import math
 import subprocess
 import sys
+import threading
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -32,6 +34,22 @@ from countonce.types import Instance
 from synth.geometry import Episode, GeometryConfig, generate_episode, write_dataset
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "eval_synth_component.py"
+
+
+@pytest.fixture(autouse=True)
+def _no_fork_with_threads_warning():
+    """Fail any test here that forks a multi-threaded process.
+
+    A ``filterwarnings("error::...")`` marker cannot do this: CPython discards the exception when
+    this warning is escalated inside ``os.fork``, so the warnings are recorded and checked.
+    """
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        yield
+    forked = [str(w.message) for w in caught if "use of fork()" in str(w.message)]
+    assert not forked, forked
+    for w in caught:  # hand everything else back to pytest's own warning report
+        warnings.warn_explicit(w.message, w.category, w.filename, w.lineno, source=w.source)
 
 
 def _prep(seed: int, finite: bool) -> Prepared:
@@ -225,6 +243,25 @@ def test_tune_resume_matches_uninterrupted_run(tmp_path, monkeypatch):
     # a finished run rerun does nothing and changes nothing
     assert mod.main(_tune_argv(tmp_path, "resumed.csv", "--workers", "1")) == 0
     assert (tmp_path / "resumed.csv").read_text() == full
+
+
+def test_pool_path_is_byte_identical_to_serial_path(tmp_path, monkeypatch):
+    _tiny_grids(monkeypatch)
+    mod = _load_script(monkeypatch)
+    write_dataset(
+        tmp_path / "data" / "val", 2, cfg=GeometryConfig(n_instances=(5, 6), n_views=(3, 3))
+    )
+    # a live thread makes the parent multi-threaded on any machine, so a fork pool would warn
+    stop = threading.Event()
+    thread = threading.Thread(target=stop.wait)
+    thread.start()
+    try:
+        assert mod.main(_tune_argv(tmp_path, "serial.csv", "--workers", "1")) == 0
+        assert mod.main(_tune_argv(tmp_path, "pool.csv", "--workers", "2")) == 0
+    finally:
+        stop.set()
+        thread.join()
+    assert (tmp_path / "pool.csv").read_bytes() == (tmp_path / "serial.csv").read_bytes()
 
 
 def test_test_stage_refuses_without_chosen_row(tmp_path, monkeypatch):

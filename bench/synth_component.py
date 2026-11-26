@@ -403,7 +403,8 @@ def run_tune(
         fh.flush()
     pool = None
     if workers > 1:
-        pool = mp.get_context("fork").Pool(workers, _init_worker, ([str(p) for p in val_files],))
+        # spawn, not fork: the parent has BLAS threads alive, and forking it can deadlock a child.
+        pool = mp.get_context("spawn").Pool(workers, _init_worker, ([str(p) for p in val_files],))
     else:
         _init_worker([str(p) for p in val_files])
 
