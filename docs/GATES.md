@@ -696,3 +696,21 @@ Not started; no code changed, no rows added. Task left unticked.
 - **Orchestrator note:** the joint rerun runs for hours on the 8 GB GPU. The tasks are written to wait up to
   15 minutes, then log progress and exit. Expect status-only sessions until part 1's `.done` file exists.
   The Lighthouse task comes before part 2 because it uses only the CPU.
+
+## Joint Fuji v3 rerun, part 1: IN PROGRESS (2026-11-26 05:25)
+
+- Done: `fc.PROTOCOL` = `fuji_core_v3` (v2 stays in `STALE_PROTOCOLS`, old rows untouched);
+  `run_fuji_core.py` records a window whose VGGT chunk alignment/rotation gate fails as `failed`
+  rows for all its methods (`group()` wraps `_group()`). Overview rebuilt for both sides after moving
+  the two stale 97-frame stitched recons to `runs/fuji_core/cache/recon_prefix_stale/` (the outer
+  cache key has no code version, so `--force` alone reused the pre-fix stitch). Old overview JSONs in
+  `runs/fuji_core/pre_v3/`. West `cam_y_monotonic_frac` fell 0.86 -> 0.54 (east rose 0.67 -> 0.85); watch the west windows.
+- Running (detached): `scripts/tune_fuji_v3.sh` (log `runs/fuji_core/v3_driver.log`): 12-cell val
+  grid -> `results/fuji_tune3_s*_k*.csv`, `.done` = `runs/fuji_core/tune_v3.done`. It then WAITS for
+  `runs/fuji_core/freeze_v3.ok` and runs the test benchmark (k=3/5/10/20, v1+v2+baselines) to
+  `runs/fuji_core/test_v3.done`.
+- **Next session:** wait/poll (until-loop <=15 min) for `tune_v3.done`; pick the (score, merge_k)
+  with lowest mean absolute v1 count error over complete 12-row cells (same rule as the
+  `configs/fuji_core.yaml` header), rewrite that file, record old (0.2, 0.3) vs new in DEVIATIONS,
+  `touch runs/fuji_core/freeze_v3.ok`. Then wait for `test_v3.done`, check 64 `countonce_v2` rows with
+  protocol `fuji_core_v3`, run `bench.fuji_report`, write the DEVIATIONS movement note, tick the task.

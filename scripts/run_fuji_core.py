@@ -224,8 +224,22 @@ def cmd_bench(args: argparse.Namespace) -> None:
         model_cfg["ablation_override"] = fc.ABLATIONS[ablation]
     t_start = time.time()
     memo: dict[tuple[str, str, int], dict[str, Any]] = {}
+    failed_windows: dict[tuple[str, str, int], str] = {}
 
     def group(tree: str, side: str, k: int) -> dict[str, Any]:
+        """A window whose VGGT chunk alignment or rotation gate fails is a recorded ``failed``
+        result for every method of that window (PLAN §9.8), not a dropped or retried row."""
+        key = (tree, side, k)
+        if key in failed_windows:
+            raise SkipRun("failed", failed_windows[key])
+        try:
+            return _group(tree, side, k)
+        except (ReconAdaptError, ChunkAlignmentError, fc.AlignmentError) as e:
+            print(tree, side, k, "FAILED", e, flush=True)
+            failed_windows[key] = f"{type(e).__name__}: {e}"
+            raise SkipRun("failed", failed_windows[key]) from e
+
+    def _group(tree: str, side: str, k: int) -> dict[str, Any]:
         key = (tree, side, k)
         if key in memo:
             return memo[key]

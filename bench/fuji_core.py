@@ -438,7 +438,7 @@ def file_hash(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:16]
 
 
-PROTOCOL = "fuji_core_v2"
+PROTOCOL = "fuji_core_v3"  # v3: window-alignment rotation fix; failed windows kept as rows
 
 # Pipeline method name per association. All of them read the same cached detections and
 # reconstruction of a window, so their upstream inputs are identical.
