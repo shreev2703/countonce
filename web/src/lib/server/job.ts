@@ -1,5 +1,6 @@
 import { apiUrl } from "./config";
 import type { JobView } from "@/lib/api/browser";
+import { parseResult, type Result } from "@/lib/schemas/result";
 
 type Fetched<T> = T | undefined;
 
@@ -7,6 +8,8 @@ type Fetched<T> = T | undefined;
 export interface JobBundle {
   job?: JobView;
   result?: { job: JobView; result: { result_json: unknown; warnings_json: unknown }; outputs: { id: string; name: string; bytes: number; url: string }[] };
+  /** `result_json` validated on the server, so the browser needs no schema library for first paint. */
+  parsed?: Result;
   corrections?: { corrections: { action: string; detection_ids: string[] }[]; corrected_count: number | null };
 }
 
@@ -23,5 +26,11 @@ export async function fetchJobBundle(id: string, apiKey: string): Promise<JobBun
     get<NonNullable<JobBundle["result"]>>(`/jobs/${encodeURIComponent(id)}/result`, apiKey),
     get<NonNullable<JobBundle["corrections"]>>(`/jobs/${encodeURIComponent(id)}/corrections`, apiKey),
   ]);
-  return { job, result, corrections };
+  let parsed: Result | undefined;
+  try {
+    if (result) parsed = parseResult(result.result.result_json);
+  } catch {
+    // Unreadable format: the browser re-parses and shows the error message.
+  }
+  return { job, result, parsed, corrections };
 }

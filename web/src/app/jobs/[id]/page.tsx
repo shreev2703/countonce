@@ -13,7 +13,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   return (
     <PageShell>
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <JobView id={id} initial={bundle.job} initialResult={bundle.result} initialCorrections={bundle.corrections} />
+        <JobView id={id} initial={bundle.job} initialResult={bundle.result} initialParsed={bundle.parsed} initialCorrections={bundle.corrections} />
       </div>
     </PageShell>
   );

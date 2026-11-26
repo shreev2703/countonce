@@ -912,12 +912,26 @@ Real GroundingDINO-tiny + VGGT-1B counted 7 on `examples/tiny_scene` (truth 5). 
 
 - **Final build, accessibility / best practices:** 1.00 / 0.96. Script transfer before the viewer: 168.2 KiB (budget 200 KB).
 - **Other pages, 3 runs:** `/` 0.95, 0.94, 0.95 (median 0.95); `/benchmark` 0.94 in all three.
-- **Other pages, 1 run each:** `/demo` 0.93, `/how-it-works` 0.98, `/about` 0.95, `/privacy` 0.90, `/status` 0.92, `/history` 0.94, `/new` 0.96, `/signin` 0.93. `/jobs/[id]` and `/s/[token]` were not measured (they need backend data).
+- **Other pages, 1 run each:** `/demo` 0.93, `/how-it-works` 0.98, `/about` 0.95, `/privacy` 0.90, `/status` 0.92, `/history` 0.94, `/new` 0.96, `/signin` 0.93. `/jobs/[id]` and `/s/[token]` are measured in the section below.
 - **The margin is thin and noisy:** an intermediate `/demo/tiny` build with the same fix plus `<Suspense>` boundaries scored 0.90, 0.84, 0.82, 0.93, 0.92. TBT swings widely on this shared machine. Most of it is evaluation of the shared framework chunks, which `/` pays too.
 - **Changes:** scene JSON is read and validated at build time (zod leaves the client path, count and photos are in the static HTML); `points.bin` and the three.js viewer load only on activation; media queries are read only in the client-only viewer wrapper and an effect. The last one removed a forced second render on phones and took LCP from 3.2 s to 0.8 s.
 - **Behaviour change:** phones show a "Load 3D view" button (selecting an object or photo also loads it); desktop loads the viewer 1.2 s after the page load event. The poster is a text panel, not an image.
 - **No worker for point decoding:** `parsePoints` only creates typed-array views over the fetched buffer, so there is no decode work to move off the main thread.
 - **`<Suspense>` boundaries rejected:** React's prerender moved the large sections into hidden segments revealed by a script, one Playwright test then saw duplicate nodes, and the long hydration task did not shrink.
+
+## `/jobs/[id]` and `/s/[token]` Lighthouse (2026-11-26)
+- **Method:** as for `/demo/tiny` (Lighthouse 13, mobile preset, headless Playwright Chromium on WSL2, `next start` of a production build), but against the mocked API from the Playwright fixtures, with a finished job, a dev-auth session cookie and a share token. `web/scripts/lighthouse-pages.mjs [runs] [jobs|s]`, run from `/tmp`; every child call has a timeout, spawned servers are killed on exit (process groups), and Lighthouse's cwd is `/tmp/lhrun`, so no `lighthouse.*` folders appear in `web/`.
+
+| page | performance (3 runs) | median | accessibility | best practices | LCP | TBT |
+|---|---|---|---|---|---|---|
+| `/jobs/[id]` before | 0.86, 0.85, 0.84 | 0.85 | 1.00 | 0.96 | 0.6-0.7 s | 550-650 ms |
+| `/jobs/[id]` final | 0.91, 0.91, 0.91 | **0.91** | 1.00 | 0.96 | 0.6-0.7 s | 370-390 ms |
+| `/s/[token]` | 0.95, 0.95, 0.96 | **0.95** | 1.00 | 0.96 | 0.6 s | 230-270 ms |
+
+- **Fixes for `/jobs/[id]`:** (1) `useJob` no longer opens the SSE stream when the server-fetched job is already finished (0.85 to 0.89). (2) The result is validated on the server (`fetchJobBundle` returns `parsed`), so the browser needs no zod for first paint; the schema is imported dynamically only if a refetch needs it (0.89 to 0.91-0.94).
+- **Rejected:** lazy-loading `CorrectionsPanel` and `FeedbackForm` with `next/dynamic` (`ssr:false`) scored worse (0.78 median).
+- **Thin margin:** `/jobs/[id]` runs between 0.91 and 0.94 across builds; TBT is noisy on this machine, as for `/demo/tiny`. All six page/category medians are at or above 0.90.
+- **Unrelated test fix:** `e2e/signed-in.spec.ts` still expected the disabled "Continue with Google" button that commit `34bb80b` replaced with the demo link; it now checks `signin-unavailable`.
 
 ## GATES.md hygiene (2026-11-25)
 - Older audit sections are marked resolved as snapshots, with their text kept. Their still-open items that no other open section listed are gathered in a new open section at the end of `docs/GATES.md`.

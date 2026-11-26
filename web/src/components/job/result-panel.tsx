@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { api, type JobView } from "@/lib/api/browser";
 import { confidenceBadge, csvForResult, intervalText } from "@/lib/result-view/model";
 import type { JobBundle } from "@/lib/server/job";
-import { parseResult } from "@/lib/schemas/result";
+import type { Result } from "@/lib/schemas/result";
 import { cn } from "@/lib/utils";
 
 import { CorrectionsPanel } from "./corrections-panel";
@@ -20,22 +20,32 @@ const BADGE = {
   Low: "border-dotted text-status-rejected",
 } as const;
 
-export function ResultPanel({ job, initialResult, initialCorrections }: { job: JobView; initialResult?: JobBundle["result"]; initialCorrections?: JobBundle["corrections"] }) {
+export function ResultPanel({ job, initialResult, initialParsed, initialCorrections }: { job: JobView; initialResult?: JobBundle["result"]; initialParsed?: Result; initialCorrections?: JobBundle["corrections"] }) {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["result", job.id], queryFn: () => api.getResult(job.id), initialData: initialResult, staleTime: initialResult ? 60_000 : 0 });
+  const seed = initialResult && initialParsed ? { raw: initialResult, result: initialParsed } : undefined;
+  const q = useQuery({
+    queryKey: ["result", job.id],
+    queryFn: async () => {
+      const raw = await api.getResult(job.id);
+      // The schema library is only needed when the server could not hand over a parsed result.
+      const { parseResult } = await import("@/lib/schemas/result");
+      try {
+        return { raw, result: parseResult(raw.result.result_json) };
+      } catch (e) {
+        throw new Error(`This result uses a format this page cannot read (${(e as Error).message})`);
+      }
+    },
+    initialData: seed,
+    staleTime: seed ? 60_000 : 0,
+  });
   const corr = useQuery({ queryKey: ["corrections", job.id], queryFn: () => api.corrections(job.id), initialData: initialCorrections, staleTime: initialCorrections ? 60_000 : 0 });
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareErr, setShareErr] = useState(false);
 
-  if (q.isError) return <p role="alert">Could not load the result: {(q.error as Error).message}</p>;
+  if (q.isError) return <p role="alert">{(q.error as Error).message.startsWith("This result") ? (q.error as Error).message : `Could not load the result: ${(q.error as Error).message}`}</p>;
   if (!q.data) return <p role="status">Loading result…</p>;
 
-  let result;
-  try {
-    result = parseResult(q.data.result.result_json);
-  } catch (e) {
-    return <p role="alert">This result uses a format this page cannot read ({(e as Error).message}).</p>;
-  }
+  const result = q.data.result;
   const conf = confidenceBadge(result);
   const corrected = corr.data?.corrected_count ?? null;
 

@@ -14,7 +14,7 @@ test.beforeEach(async ({ request }) => {
 test("signed-out visitors are sent to sign-in and back after the test sign-in", async ({ page }) => {
   await page.goto("/new");
   await expect(page).toHaveURL(/\/signin\?next=%2Fnew/);
-  await expect(page.getByRole("button", { name: /Continue with Google/ })).toBeDisabled(); // no Google keys in tests
+  await expect(page.getByTestId("signin-unavailable")).toBeVisible(); // no Google keys in tests: the Google button is replaced by a demo link
   await page.getByLabel("Test user name").fill(unique("u"));
   await page.getByRole("button", { name: "Sign in as test user" }).click();
   await expect(page).toHaveURL(/\/new$/);

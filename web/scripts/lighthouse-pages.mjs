@@ -7,16 +7,25 @@
 import { spawn, execFileSync } from "node:child_process";
 import { readFileSync, mkdirSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
+
+const WEBDIR = fileURLToPath(new URL("..", import.meta.url));
 
 const runs = Number(process.argv[2] ?? 3);
+const only = process.argv[3]; // optional: "jobs" or "s" to measure one page
 const WEB = 3100, API = 4010, SECRET = "e2e-secret";
 const env = { ...process.env, COUNTONCE_AUTH_SECRET: SECRET, COUNTONCE_SESSION_SECRET: "e2e-session-secret-not-for-prod", COUNTONCE_DEV_AUTH: "1", COUNTONCE_API_URL: `http://127.0.0.1:${API}`, MOCK_API_PORT: String(API) };
-const kids = [spawn("node", ["e2e/support/mock-api.mjs"], { env, stdio: "ignore" }), spawn("npx", ["next", "start", "-p", String(WEB)], { env, stdio: "ignore" })];
-const stop = () => kids.forEach((k) => k.kill());
+const kids = [spawn("node", ["e2e/support/mock-api.mjs"], { env, cwd: WEBDIR, stdio: "ignore", detached: true }), spawn("npx", ["next", "start", "-p", String(WEB)], { env, cwd: WEBDIR, stdio: "ignore", detached: true })];
+const stop = () => kids.forEach((k) => { try { process.kill(-k.pid, "SIGKILL"); } catch {} });
 process.on("exit", stop);
+for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => process.exit(130));
+process.on("uncaughtException", (e) => { console.error(e); process.exit(1); });
+process.on("unhandledRejection", (e) => { console.error(e); process.exit(1); });
+const hard = setTimeout(() => { console.error("global timeout"); process.exit(1); }, 25 * 60_000);
+hard.unref();
 
 async function waitFor(url) {
-  for (let i = 0; i < 60; i++) { try { if ((await fetch(url)).ok) return; } catch {} await sleep(500); }
+  for (let i = 0; i < 60; i++) { try { if ((await fetch(url, { signal: AbortSignal.timeout(3000) })).ok) return; } catch {} await sleep(500); }
   throw new Error(`timeout waiting for ${url}`);
 }
 await waitFor(`http://127.0.0.1:${API}/health`);
@@ -37,15 +46,16 @@ await api(`/jobs/${id}/submit`, { method: "POST", headers: auth });
 for (let i = 0; i < 40; i++) { if ((await jf(await api(`/jobs/${id}`, { headers: auth }))).status === "done") break; await sleep(250); }
 const { token } = await jf(await api(`/jobs/${id}/share`, { method: "POST", headers: auth }));
 
-const chrome = execFileSync("node", ["-e", 'console.log(require("@playwright/test").chromium.executablePath())']).toString().trim();
+const chrome = execFileSync("node", ["-e", 'console.log(require("@playwright/test").chromium.executablePath())'], { cwd: WEBDIR, timeout: 30_000 }).toString().trim();
 mkdirSync("/tmp/lhrun", { recursive: true });
 const pages = [[`/jobs/${id}`, { Cookie: cookie }], [`/s/${token}`, {}]];
 let worst = 1;
 for (const [path, headers] of pages) {
+  if (only && !path.startsWith(`/${only}/`)) continue;
   const rows = [];
   for (let i = 0; i < runs; i++) {
-    const out = "/tmp/lhrun/pages.json";
-    execFileSync("npx", ["--yes", "lighthouse@13", `http://127.0.0.1:${WEB}${path}`, "--only-categories=performance,accessibility,best-practices", "--chrome-flags=--headless=new --no-sandbox", "--quiet", "--output=json", `--output-path=${out}`, `--extra-headers=${JSON.stringify(headers)}`], { cwd: "/tmp/lhrun", env: { ...process.env, CHROME_PATH: chrome }, stdio: "ignore" });
+    const out = `/tmp/lhrun/pages-${path.split("/")[1]}.json`;
+    execFileSync("npx", ["--yes", "lighthouse@13", `http://127.0.0.1:${WEB}${path}`, "--only-categories=performance,accessibility,best-practices", "--chrome-flags=--headless=new --no-sandbox", "--quiet", "--output=json", `--output-path=${out}`, `--extra-headers=${JSON.stringify(headers)}`], { cwd: "/tmp/lhrun", env: { ...process.env, CHROME_PATH: chrome }, stdio: "ignore", timeout: 240_000, killSignal: "SIGKILL" });
     const r = JSON.parse(readFileSync(out, "utf8"));
     const c = r.categories;
     rows.push({ perf: c.performance.score, a11y: c.accessibility.score, bp: c["best-practices"].score, lcp: r.audits["largest-contentful-paint"].displayValue, tbt: r.audits["total-blocking-time"].displayValue });

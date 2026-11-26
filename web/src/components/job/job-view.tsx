@@ -23,7 +23,7 @@ const STAGES: Record<string, string> = {
   done: "Done",
 };
 
-export function JobView({ id, initial, initialResult, initialCorrections }: { id: string; initial?: JobT; initialResult?: JobBundle["result"]; initialCorrections?: JobBundle["corrections"] }) {
+export function JobView({ id, initial, initialResult, initialParsed, initialCorrections }: { id: string; initial?: JobT; initialResult?: JobBundle["result"]; initialParsed?: JobBundle["parsed"]; initialCorrections?: JobBundle["corrections"] }) {
   const { job, transport, error } = useJob(id, initial);
   if (!job) {
     return <p role="status">{error ?? "Loading…"}</p>;
@@ -67,7 +67,7 @@ export function JobView({ id, initial, initialResult, initialCorrections }: { id
         </div>
       )}
 
-      {job.status === "done" && <ResultPanel job={job} initialResult={initialResult} initialCorrections={initialCorrections} />}
+      {job.status === "done" && <ResultPanel job={job} initialResult={initialResult} initialParsed={initialParsed} initialCorrections={initialCorrections} />}
     </div>
   );
 }

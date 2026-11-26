@@ -50,12 +50,14 @@ export function useJob(id: string, initial?: JobView, pollMs = 2000): { job: Job
         if (!stopped) void poll();
       };
     };
-    open();
+    // A job that is already finished needs no live stream (saves an open connection and main-thread work at load).
+    if (!(initial && TERMINAL.includes(initial.status))) open();
     return () => {
       stopped = true;
       es?.close();
       if (timer) clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `initial` is only the seed for the first connection
   }, [id, pollMs]);
 
   return { job, transport, error };
