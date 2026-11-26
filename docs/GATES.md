@@ -492,3 +492,8 @@ re-check #2 touches the alignment, the strict xfail still fails as expected, `re
 `_colmap` rows and no bench process is running. Not launched; task left unticked. Re-queuing this task
 alone cannot succeed: queue the alignment fix (steps 1 and 2 above) ahead of it.
 `ruff check .` clean; `pytest -m "not slow and not gpu"`: 1104 passed, 26 skipped, 2 xfailed.
+
+**Re-check #4 (2026-11-25, fifth attempt of the COLMAP task): still OPEN.** No change to the alignment
+code since f2d08ac, `results/bench.csv` has 0 `_colmap` rows, no bench process is running. Not launched;
+task left unticked. The 128-slice run would be scored in a wrongly rotated GT frame; fix alignment first
+(steps 1-2 above).
