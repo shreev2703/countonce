@@ -1158,3 +1158,26 @@ that are ok under both protocols; the GT set differs between protocols, so the M
 - **Result, rerun_vggt:** not invariant. Count range > 0 in all windows for v1/v2/sync at k=5 and 10 and v3 at k=10; v3 k=5 4/8. Median range v1 5/16, v2 11/10.5, sync 6/15.5, v3 0.5/4.5 (k=5/k=10); max 28. Min Rand index over changed partitions 0.992. The identity-order control gave the same count and partition every time, so the variation comes from the photo order seen by VGGT, not run-to-run noise.
 - **Caveats:** the west overview frame is degenerate (see "west frame invalid"), so ROI counts on west windows are not valid and were not used. Count/partition columns do not depend on GT. Subset is 8 windows (more than the 4 requested), not all 16. The variant was not run on validation.
 - **Claim:** the "unordered photos" wording is narrowed in README, STATUS and PLAN §0.6 to the association step; end-to-end order invariance is not claimed.
+
+## Fuji-SfM per-image data check: no dataset cameras (2026-11-26)
+
+Read-only check of the Zenodo 3712808 download for the oracle-geometry arm of the M6 harness.
+
+- **Archive:** `unrar lb` lists 2,643 entries (files and folders); the unpacked tree holds 2,631 files in 12 folders, so nothing was left unextracted. Zenodo's record files are `Fuji-SfM_dataset.rar`, `readme.txt`, `LICENSE.txt`.
+
+| Path under `Fuji-SfM_dataset/` | Files | Content |
+|---|---|---|
+| `2-SfM-set/raw_images_east_side/` | 291 | `*.JPG`, 5184x3456, the SfM frames |
+| `2-SfM-set/raw_images_west_side/` | 291 | `*.JPG`, same |
+| `1-Mask-set/training_images_and_annotations/` | 463 | crops, per-crop `*.csv`, `training_set_masks.json` |
+| `1-Mask-set/validation_images_and_annotations/` | 115 | crops, per-crop `*.csv`, `validation_set_masks.json` |
+| `1-Mask-set/raw_images/` | 12 | `*.JPG` the crops were cut from |
+| `3-3D_data/GroundTruth-3D_apples_locations/training_set/` | 433 | one xyz point list per apple |
+| `3-3D_data/GroundTruth-3D_apples_locations/test_set/` | 1022 | same |
+| `3-3D_data/` | 2 | `Fuji_apple_trees_point_cloud.txt` (rows of 6 numbers), `readme.txt` (global shift) |
+| top level | 2 | `readme.txt`, `LICENSE.txt` |
+
+- **Per SfM image:** pixels and EXIF only. EXIF gives Canon EOS 60D, 24 mm focal length and capture time. None of the 582 images has a GPS block (checked on all), and their XMP holds only `xmp:Rating`.
+- **Not shipped:** camera poses, calibrated intrinsics or distortion, per-image depth, image-to-point correspondences, a photogrammetry project or camera export.
+- **GT apples:** 3D positions exist (1,455 apples, shifted global coordinates, metres). They are scene-level, with no per-image 2D observations.
+- **Decision:** no `oracle_cameras` arm, no run on `fuji_core_v3` test windows, no new decomposition row. A nominal EXIF focal length gives no pose. Resectioning cameras from the coloured cloud, or using COLMAP/VGGT as the "reference", would be another estimate and not an oracle. The §0.6 note is narrowed instead (GATES).

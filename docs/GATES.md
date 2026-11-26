@@ -783,3 +783,20 @@ Not started; no code changed, no rows added. Task left unticked.
 - **Trap for the next E1 run:** `runs/fuji_core/e1/*.json` (76 files) predate the v3 overview rebuild, and
   `run_e1_tracker.py prepare` skips existing files. Move that directory aside before `prepare`, as well
   as moving `results/e1_tracker.csv` to `results/e1_tracker.pre_alignfix.csv` (`run` skips existing keys).
+
+## Oracle geometry on Fuji: BLOCKED, the dataset ships no cameras (2026-11-26)
+
+- **Wanted:** an `oracle_cameras` arm in the M6 harness (same cached real detections, dataset cameras, no
+  VGGT), to split the Fuji count error into detection / geometry / association.
+- **Why it can't run:** the download has no per-image cameras. `2-SfM-set/` holds only
+  `raw_images_east_side/*.JPG` (291) and `raw_images_west_side/*.JPG` (291). `3-3D_data/` holds only
+  `Fuji_apple_trees_point_cloud.txt`, `readme.txt` and the per-apple `TreeNN-annotations_NNNNNN.txt` files
+  (433 training, 1022 test). `1-Mask-set/` holds crops of 12 frames with 2D masks. No pose, calibration,
+  depth or project file anywhere; EXIF has focal length but no GPS or orientation. Full listing: DEVIATIONS,
+  "Fuji-SfM per-image data check".
+- **Not done, on purpose:** no proxy cameras, no harness change, no new run, `docs/RESULTS_FUJI.md`
+  unchanged (it already says geometry is not separated). The §0.6 note is narrowed.
+- **Consequence:** the "duplicates" left with oracle detections mix reconstruction and association error.
+  The existing k=10 decomposition also predates the window-alignment fix.
+- **To unblock:** either ask the Fuji-SfM authors for the photogrammetry camera export (human, optional), or
+  measure the geometry share on data with true cameras, e.g. rendered synthetic scenes (P6).
