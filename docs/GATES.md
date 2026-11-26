@@ -573,3 +573,7 @@ windows that all match a VGGT v2 window, with equal GT on every ok row. Remainin
 k=20 at about 3 min each. Task left unticked; **do not re-queue it before the `.done` file exists**,
 then follow "Resume" above. Also replaced personal home paths in this file with `~` (the hygiene
 test failed on them).
+
+**Status check (2026-11-26 01:07, twelfth session on this task):** run still going, PID 2086810, 55 of 64
+`countonce_v2_colmap` rows, no `.done` file; no second copy started, no code changed. Task left unticked;
+when `test_colmap.done` says `exit=0`, follow "Resume" above (report, commit, tick, remove the worktree).
