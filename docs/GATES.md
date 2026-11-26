@@ -550,19 +550,26 @@ when it ends, follow "When it has ended" above (report, commit, tick).
 first run was stopped by SIGTERM at 51 of 64 rows (`test_colmap.done` held `exit=143`; log kept as
 `runs/fuji_core/test_colmap.run1.log`). The remaining k=20 windows were relaunched detached,
 **PID 2086810**, 52 of 64 rows at the time of writing, at a few minutes per window. It runs from the
-worktree `/home/shreev2703/countonce_prefix` (pre-fix commit `df5a7c8`, see DEVIATIONS) and appends
+worktree `~/countonce_prefix` (pre-fix commit `df5a7c8`, see DEVIATIONS) and appends
 to the main checkout's `results/bench.csv`; do not remove that worktree while the PID is alive. A
 copy of the CSV from before the relaunch is `runs/fuji_core/bench.before_colmap_resume.csv`.
 While it runs, test in a clone (the `results/` write guard).
 
 When `runs/fuji_core/test_colmap.done` says `exit=0` and there are 64 ok-or-failed rows:
 `.venv/bin/python -m bench.fuji_report`, commit, tick the task, then
-`git worktree remove --force /home/shreev2703/countonce_prefix` (its `data`, `runs` and `weights`
+`git worktree remove --force ~/countonce_prefix` (its `data`, `runs` and `weights`
 are symlinks; only the links go). If it died, rerun from inside that worktree (finished slices are
 skipped):
-`PYTHONPATH=. setsid nohup /home/shreev2703/countonce/.venv-gpu/bin/python -u scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600 --csv /home/shreev2703/countonce/results/bench.csv > /home/shreev2703/countonce/runs/fuji_core/test_colmap.log 2>&1 &`
+`PYTHONPATH=. setsid nohup ~/countonce/.venv-gpu/bin/python -u scripts/run_fuji_core.py bench --split test --backbone colmap --budget-min 600 --csv ~/countonce/results/bench.csv > ~/countonce/runs/fuji_core/test_colmap.log 2>&1 &`
 
 **Status check (2026-11-26, tenth session on this task):** run still going, PID 2086810, 53 of 64
 `countonce_v2_colmap` rows (k=20 windows remain), no `.done` file; no second copy started, no code
 changed. Task left unticked; when `test_colmap.done` says `exit=0`, follow "Resume" above
 (report, commit, tick, remove the worktree).
+
+**Status check (2026-11-26 01:06, eleventh session on this task):** run still going, PID 2086810, 55 of 64
+`countonce_v2_colmap` rows, no `.done` file; no second copy started. The rows so far have unique
+windows that all match a VGGT v2 window, with equal GT on every ok row. Remaining windows are all
+k=20 at about 3 min each. Task left unticked; **do not re-queue it before the `.done` file exists**,
+then follow "Resume" above. Also replaced personal home paths in this file with `~` (the hygiene
+test failed on them).
